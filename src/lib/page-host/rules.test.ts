@@ -106,8 +106,9 @@ describe("pageContentPolicy", () => {
 });
 
 describe("pageSandbox", () => {
-  it("should never let the page navigate the tab it is shown in", () => {
+  it("should never let the page navigate the tab it is shown in, or start a download", () => {
     expect(pageSandbox).not.toContain("allow-top-navigation");
+    expect(pageSandbox).not.toContain("allow-downloads");
     expect(pageSandbox).toContain("allow-scripts");
   });
 });
@@ -120,10 +121,10 @@ describe("frameDocument", () => {
     expect(html).toContain("if (!host || host === window) return;");
   });
 
-  it("should keep the site's word in a variable of its own and answer only the site with it", () => {
+  it("should answer the site's question with the question's id, and answer only the site", () => {
     const html = frameDocument("https://artifacts.space");
-    expect(html).toContain("var word = null;");
-    expect(html).toContain('host.postMessage({ type: "artifact-page:pong", nonce: word }, site)');
+    expect(html).toContain('host.postMessage({ type: "artifact-page:pong", id: event.data.id }, site)');
+    expect(html).toContain("function onPing(event) {\n    if (event.origin !== site || event.source !== host) return;");
     // The listener is added after document.open(), which drops the earlier ones, and before the page is written.
     expect(html.indexOf("document.open()")).toBeLessThan(html.indexOf('window.addEventListener("message", onPing)'));
     expect(html.indexOf('window.addEventListener("message", onPing)')).toBeLessThan(html.indexOf("document.write(data.html)"));
@@ -131,8 +132,9 @@ describe("frameDocument", () => {
 
   it("should never let a value end its script element", () => {
     const html = frameDocument('https://x"</script><script>alert(1)</script>');
-    expect(html.match(/<script>/g)).toHaveLength(1);
-    expect(html.match(/<\/script>/g)).toHaveLength(1);
+    const lower = html.toLowerCase();
+    expect(lower.split("<script").length - 1).toBe(1);
+    expect(lower.split("</script").length - 1).toBe(1);
   });
 });
 

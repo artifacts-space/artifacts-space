@@ -24,20 +24,28 @@ export function usePagesCanRun(): boolean {
   return useContext(PageHostContext) !== null;
 }
 
-/** The origin of an artifact's page host, once its label is worked out; null before that and where no page host is set up. */
-function usePageOrigin(artifactId: string): string | null {
+/** Where an artifact's page runs: its origin once the label is worked out, or that it could not be. */
+interface PagePlace {
+  origin: string | null;
+  /** The label could not be worked out: the browser has no Web Crypto here (a site served over plain HTTP). */
+  failed: boolean;
+}
+
+/** The origin of an artifact's page host. Null before the label is worked out, and where no page host is set up. */
+function usePagePlace(artifactId: string): PagePlace {
   const base = useContext(PageHostContext);
-  const [found, setFound] = useState<{ key: string; origin: string } | null>(null);
+  const [found, setFound] = useState<{ key: string; origin: string | null } | null>(null);
   const key = `${base ?? ""}\n${artifactId}`;
   useEffect(() => {
     if (!base) return undefined;
     let alive = true;
     pageLabelFor(artifactId)
       .then((label) => { if (alive) setFound({ key, origin: pageOrigin(label, base, window.location) }); })
-      .catch(() => undefined);
+      .catch(() => { if (alive) setFound({ key, origin: null }); });
     return () => { alive = false; };
   }, [artifactId, base, key]);
-  return found?.key === key ? found.origin : null;
+  const mine = found?.key === key ? found : null;
+  return { origin: mine?.origin ?? null, failed: mine !== null && mine.origin === null };
 }
 
 /** Counts up each time the HTML changes, so a new version loads in a fresh frame document. */
@@ -47,10 +55,10 @@ function useGeneration(html: string): number {
   return shown.html === html ? shown.generation : shown.generation + 1;
 }
 
-/** The `type` and `nonce` of a message from the frame, when it has them. */
-function readMessage(data: unknown): { type: unknown; nonce: unknown } {
-  if (typeof data !== "object" || data === null) return { type: null, nonce: null };
-  return { type: "type" in data ? data.type : null, nonce: "nonce" in data ? data.nonce : null };
+/** The `type` and `id` of a message from the frame, when it has them. */
+function readMessage(data: unknown): { type: unknown; id: unknown } {
+  if (typeof data !== "object" || data === null) return { type: null, id: null };
+  return { type: "type" in data ? data.type : null, id: "id" in data ? data.id : null };
 }
 
 interface Handshake {
@@ -61,28 +69,40 @@ interface Handshake {
   onLeft: () => void;
 }
 
+/** A question the site asked the frame and still waits on: its id, and the timer that closes the frame. */
+interface OpenQuestion {
+  id: string;
+  timer: number;
+}
+
 /**
  * The site's side of the frame document's protocol
  * (src/lib/page-host/frame-document.ts). The frame document says it is
- * ready; this answers with the page and a word only the two of them know.
- * Each time the frame loads something, this asks the frame document for
- * the word. No answer within PAGE_ANSWER_MS means the frame holds another
- * document, and `onLeft` closes it. Messages go to the page host's origin
- * only, so another document in the frame never gets the page.
+ * ready; this answers with the page, to the page host's origin only, so a
+ * document of another origin in the frame never gets it.
+ *
+ * Each time the frame loads something, this asks "is a document of the
+ * page host still in the frame?", with a fresh id. An answer counts only
+ * from the frame's window, from the page host's origin, with that id. No
+ * such answer within PAGE_ANSWER_MS means the page sent its frame to
+ * another address, and `onLeft` closes it. Whatever else the frame posts is
+ * the page's word: it is read for nothing but "ready" and "shown".
  */
 function usePageHandshake({ frameRef, origin, html, onLeft }: Handshake) {
-  const [nonce] = useState(() => crypto.randomUUID());
   const [shown, setShown] = useState(false);
-  const waitingRef = useRef<number | null>(null);
+  const questionRef = useRef<OpenQuestion | null>(null);
 
-  const answered = useCallback(() => {
-    if (waitingRef.current !== null) window.clearTimeout(waitingRef.current);
-    waitingRef.current = null;
-  }, []);
   const ask = useCallback(() => {
-    frameRef.current?.contentWindow?.postMessage({ type: pageMessages.ping }, origin);
-    waitingRef.current ??= window.setTimeout(onLeft, PAGE_ANSWER_MS);
+    // One question at a time: a second load keeps the first question's deadline, with a new id to answer.
+    const timer = questionRef.current?.timer ?? window.setTimeout(onLeft, PAGE_ANSWER_MS);
+    const id = crypto.randomUUID();
+    questionRef.current = { id, timer };
+    frameRef.current?.contentWindow?.postMessage({ type: pageMessages.ping, id }, origin);
   }, [frameRef, origin, onLeft]);
+  const settle = useCallback(() => {
+    if (questionRef.current) window.clearTimeout(questionRef.current.timer);
+    questionRef.current = null;
+  }, []);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<unknown>) => {
@@ -90,16 +110,16 @@ function usePageHandshake({ frameRef, origin, html, onLeft }: Handshake) {
       if (!frame || event.source !== frame || event.origin !== origin) return;
       const message = readMessage(event.data);
       if (message.type === pageMessages.ready) {
-        frame.postMessage({ type: pageMessages.render, html, nonce }, origin);
+        frame.postMessage({ type: pageMessages.render, html }, origin);
         ask();
       }
-      if (message.type === pageMessages.pong && message.nonce === nonce) answered();
+      if (message.type === pageMessages.pong && questionRef.current !== null && message.id === questionRef.current.id) settle();
       if (message.type === pageMessages.shown) setShown(true);
     };
     window.addEventListener("message", onMessage);
     return () => { window.removeEventListener("message", onMessage); };
-  }, [frameRef, origin, html, nonce, ask, answered]);
-  useEffect(() => answered, [answered]);
+  }, [frameRef, origin, html, ask, settle]);
+  useEffect(() => settle, [settle]);
 
   return { shown, onLoad: ask };
 }
@@ -128,6 +148,15 @@ function PageWindow({ origin, html, title, onLeft }: PageWindowProps) {
       // A page without colors of its own is black on white, as in a browser tab, whatever this site's theme.
       className="block size-full border-0 bg-[Canvas] [color-scheme:light]"
     />
+  );
+}
+
+/** Shown where the page's host could not be worked out. */
+function PageCannotStart() {
+  return (
+    <div role="status" data-slot="page-frame-failed" className="flex size-full items-center justify-center p-6 text-center">
+      <p className="max-w-md text-sm leading-6 text-muted-foreground">This page could not start in this browser. Open the site over HTTPS, then load it again.</p>
+    </div>
   );
 }
 
@@ -160,7 +189,7 @@ interface PageFrameProps {
  * page host is set up; the caller shows the source there (`usePagesCanRun`).
  */
 export function PageFrame({ artifactId, html, title, className }: PageFrameProps) {
-  const origin = usePageOrigin(artifactId);
+  const { origin, failed } = usePagePlace(artifactId);
   const generation = useGeneration(html);
   const [attempt, setAttempt] = useState(0);
   const load = `${String(generation)}:${String(attempt)}`;
@@ -168,7 +197,8 @@ export function PageFrame({ artifactId, html, title, className }: PageFrameProps
   const onLeft = useCallback(() => { setLeftLoad(load); }, [load]);
   const showAgain = useCallback(() => { setAttempt((current) => current + 1); }, []);
   return (
-    <div data-slot="page-frame-box" aria-busy={origin ? undefined : true} className={cn("min-h-0 overflow-hidden", className)}>
+    <div data-slot="page-frame-box" aria-busy={origin || failed ? undefined : true} className={cn("min-h-0 overflow-hidden", className)}>
+      {failed ? <PageCannotStart /> : null}
       {origin && leftLoad !== load ? <PageWindow key={load} origin={origin} html={html} title={title} onLeft={onLeft} /> : null}
       {origin && leftLoad === load ? <PageLeft onShowAgain={showAgain} /> : null}
     </div>

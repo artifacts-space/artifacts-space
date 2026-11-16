@@ -590,11 +590,14 @@ on a second domain (`src/lib/page-host/rules.ts`).
   site, to the page host, or to any other site; no form posts; no frames. A
   page cannot loosen it. Add a host to the list only for a public,
   read-only package or font host.
-- The iframe's sandbox (`pageSandbox`) never has `allow-top-navigation`. A
-  page can still send its own frame to another address; the site notices
-  (the frame document answers a question with a word only it holds, the
-  other document cannot) and closes the frame (`usePageHandshake`,
-  `PAGE_ANSWER_MS`).
+- The iframe's sandbox (`pageSandbox`) never has `allow-top-navigation` or
+  `allow-downloads`. A page can still send its own frame to another
+  address; the site notices and closes the frame (`usePageHandshake`,
+  `PAGE_ANSWER_MS`). After each load of the frame the site asks a question
+  with a fresh id, and takes an answer only from the frame's window, from
+  the page host's origin, with that id. A document of another origin cannot
+  answer. Nothing in the frame document is a secret from the page: the two
+  share a window, so never rely on one.
 - The site-wide header rule skips page hosts (`missing` host), because its
   `frame-ancestors 'none'` and `X-Frame-Options: DENY` would stop the site
   from framing the frame document. `pageHostResponse` sends its own headers.

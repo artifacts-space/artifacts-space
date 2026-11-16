@@ -7,28 +7,29 @@ import { pageMessages } from "./rules";
  * the site (`siteOrigin`); in a tab of its own it does nothing. It writes
  * once: a new version is shown by loading this document again.
  *
- * With the page comes a word (`nonce`) that only this script keeps, in a
- * variable the page's scripts cannot reach. When the site asks, this script
- * answers with the word. That is how the site knows the frame still holds
- * this document and the page it wrote: a page that sent its frame to
- * another address cannot answer. Everything else the frame posts is the
- * page's word, not this document's.
+ * It also answers the site's question "is a document of the page host still
+ * in the frame?" by repeating the question's id. The page it writes shares
+ * this window and this origin, so nothing here is a secret from the page,
+ * and the page could answer as well: that is fine, because the question is
+ * about the origin. What gives the answer its meaning is on the site's
+ * side: it accepts an answer only from the frame's window, only from the
+ * page host's origin, and only with the id of a question it just asked, so
+ * a document of another origin can never answer, and an answer sent ahead
+ * of the question does not count (page-frame.tsx).
  */
 export function frameDocument(siteOrigin: string): string {
   const script = `(function () {
   var site = ${JSON.stringify(siteOrigin)};
   var host = window.parent;
   if (!host || host === window) return;
-  var word = null;
   function onPing(event) {
     if (event.origin !== site || event.source !== host) return;
-    if (event.data && event.data.type === ${JSON.stringify(pageMessages.ping)}) host.postMessage({ type: ${JSON.stringify(pageMessages.pong)}, nonce: word }, site);
+    if (event.data && event.data.type === ${JSON.stringify(pageMessages.ping)}) host.postMessage({ type: ${JSON.stringify(pageMessages.pong)}, id: event.data.id }, site);
   }
   function onMessage(event) {
     if (event.origin !== site || event.source !== host) return;
     var data = event.data;
     if (!data || data.type !== ${JSON.stringify(pageMessages.render)} || typeof data.html !== "string") return;
-    word = typeof data.nonce === "string" ? data.nonce : null;
     window.removeEventListener("message", onMessage);
     document.open();
     // document.open() drops every listener on the window, so this one is added after it, and before any script of the page runs.

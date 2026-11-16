@@ -113,10 +113,12 @@ export function pageContentPolicy(siteOrigin: string): string {
 /**
  * The iframe's sandbox. Scripts run, and the page keeps its own origin (its
  * own host), so browser storage works and stays with the artifact. It
- * cannot navigate the tab it is shown in. Links may open a new tab, which
- * is an ordinary tab, not a sandboxed one.
+ * cannot navigate the tab it is shown in, and it cannot start a download:
+ * a file with a name the page chose, saved from under this site's header,
+ * would read as this site's. Links may open a new tab, which is an ordinary
+ * tab, not a sandboxed one.
  */
-export const pageSandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads";
+export const pageSandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox";
 
 /** Headers of the frame document. No session exists on the page host, so the response is the same for everyone. */
 export function pageHostHeaders(siteOrigin: string, cache: boolean): Record<string, string> {
@@ -149,16 +151,16 @@ export const pageMessages = {
   render: "artifact-page:render",
   /** Frame document to site: the page was written. */
   shown: "artifact-page:shown",
-  /** Site to frame document: are you still the frame document? */
+  /** Site to frame: is a document of the page host still in the frame? Carries a fresh `id`. */
   ping: "artifact-page:ping",
-  /** Frame document to site: yes, with the word the site gave it. */
+  /** Frame to site: yes, repeating the question's `id`. */
   pong: "artifact-page:pong",
 } as const;
 
 /**
- * How long the site waits for the frame document to answer after the frame
- * loaded something. No answer means the frame holds another document (the
- * page navigated its frame to another address), and the site closes it. Long
+ * How long the site waits for an answer after the frame loaded something.
+ * No answer means the frame holds a document of another origin (the page
+ * navigated its frame to another address), and the site closes it. Long
  * enough for a heavy page that keeps its thread busy while it starts.
  */
 export const PAGE_ANSWER_MS = 8000;
