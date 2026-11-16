@@ -53,9 +53,12 @@ export interface PanZoom {
   };
 }
 
-/** True while the board's world still moves toward the view (a button's glide, a CSS transition). */
+/**
+ * True while the board's world still moves toward the view (a button's glide, a CSS transition on the world itself).
+ * Only the world's own animations count, never those of what the frames show: a spinner in a frame is no glide.
+ */
 function isGliding(pane: HTMLElement): boolean {
-  return (pane.querySelector("[data-canvas-world]")?.getAnimations().length ?? 0) > 0;
+  return (pane.querySelector("[data-canvas-world]")?.getAnimations({ subtree: false }).length ?? 0) > 0;
 }
 
 /** How many frames the board waits for a glide to end before it gives up bringing the focused control into view. */
@@ -115,8 +118,12 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
   });
 
   const move = useCallback((next: BoardView, smooth: boolean) => {
+    const moved = { zoom: next.zoom, x: Math.round(next.x), y: Math.round(next.y) };
+    // Noted at once, not only by the effect above: the handlers start from `latest`, and two of them can run before
+    // that effect does (a scroll in one frame and another in the next), so the second must start from the first's view.
+    latest.current = { ...latest.current, view: moved };
     setGlide(smooth);
-    setMoved({ zoom: next.zoom, x: Math.round(next.x), y: Math.round(next.y) });
+    setMoved(moved);
   }, []);
 
   // A zoom keeps one point still and moves the rest, so it can push the whole board out of the window as a drag could. It goes through the drag's clamp.

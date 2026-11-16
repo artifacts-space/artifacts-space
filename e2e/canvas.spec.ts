@@ -203,16 +203,37 @@ test.describe("on a desktop", () => {
     await page.getByRole("button", { name: "Frames" }).click();
     const pane = await boxOf(board(page));
     const alerts = frame(page, "settings").getByRole("switch", { name: "Push alerts" });
-    // The glide takes 200 ms; the focus lands in it. The browser then scrolls by where the control is drawn at that
-    // moment, not by where the view comes to rest, so the board has to bring the control into view again at rest.
-    await page.getByRole("menuitem", { name: /1\. Sign in/ }).click();
-    await alerts.focus();
-    await expect.poll(async () => board(page).evaluate((element) => [element.scrollLeft, element.scrollTop])).toEqual([0, 0]);
-    await expect.poll(async () => {
-      const box = await boxOf(alerts);
-      return box.x >= pane.x && box.x + box.width <= pane.x + pane.width;
-    }).toBe(true);
+    await expect(page.getByRole("menuitem", { name: /1\. Sign in/ })).toBeVisible();
+    expect((await boxOf(alerts)).x).toBeGreaterThan(pane.x + pane.width);
+    // Chosen and focused in the page, in one go, so the focus lands in the 200 ms glide on a runner of any speed. The
+    // menu hands the focus to the picked frame as it closes; once it has, and while the world's transition still runs,
+    // the control is focused, as Tab would do. The browser then scrolls by where the control is drawn at that moment.
+    const gliding = await alerts.evaluate(async (control: HTMLElement) => {
+      const item = [...document.querySelectorAll('[role="menuitem"]')].find((node) => node.textContent.includes("1. Sign in"));
+      const world = document.querySelector("[data-canvas-board] [data-canvas-world]");
+      if (!(item instanceof HTMLElement) || !world) return "missing";
+      item.click();
+      const onFrame = () => document.activeElement?.getAttribute("data-canvas-frame") === "sign-in";
+      for (let frames = 0; frames < 120 && !onFrame(); frames += 1) await new Promise(requestAnimationFrame);
+      const running = world.getAnimations({ subtree: false }).length > 0;
+      control.focus();
+      return `${onFrame() ? "focus still on the frame" : "focus moved"}, ${running ? "gliding" : "at rest"}`;
+    });
+    expect(gliding).toBe("focus moved, gliding");
     await expect(alerts).toBeFocused();
+    // The end state, read together: the focus scroll was turned into a pan (the box is back at 0), and the control is
+    // inside the board. Right after the focus the box is still scrolled, which alone would put the control in view.
+    const atRestInView = async () => {
+      const [scroll, box] = await Promise.all([board(page).evaluate((element) => [element.scrollLeft, element.scrollTop]), boxOf(alerts)]);
+      return scroll[0] === 0 && scroll[1] === 0 && box.x >= pane.x && box.x + box.width <= pane.x + pane.width;
+    };
+    await expect.poll(atRestInView).toBe(true);
+    // And it stays so once nothing moves any more: no later pan takes the control out again.
+    await board(page).locator("[data-canvas-world]").evaluate(async (world) => {
+      await Promise.allSettled(world.getAnimations({ subtree: false }).map((animation) => animation.finished));
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    expect(await atRestInView()).toBe(true);
   });
 
   test("should bring a control into view, without scrolling the board's box, when focus moves to one outside it", async ({ page }) => {
