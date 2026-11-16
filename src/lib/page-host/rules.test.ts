@@ -201,13 +201,26 @@ describe("hosts under the page domain that are not page hosts", () => {
 
   it("should send every path of every host under the page domain to the refusal", () => {
     const rules = pageDomainRewrites({ NODE_ENV: "production", PAGE_HOST: "artifacts.link" });
-    expect(rules).toEqual([{ source: "/:path*", has: [{ type: "host", value: ".+\\.artifacts\\.link" }], destination: "/page-host-refusal" }]);
+    expect(rules).toHaveLength(1);
+    expect(rules[0]).toMatchObject({ source: "/:path*", destination: "/page-host-refusal" });
     for (const host of ["www.artifacts.link", "app.artifacts.link", "a.b.artifacts.link", `${label}.x.artifacts.link`, `${label}.artifacts.link`]) {
       expect(ruleMatches(host, { PAGE_HOST: "artifacts.link" }), host).toBe(true);
     }
   });
 
+  it("should hold for a host in capitals and for one that ends with a dot, as the proxy's check does", () => {
+    for (const host of ["WWW.ARTIFACTS.LINK", "Www.Artifacts.Link", "www.artifacts.link.", "WWW.ARTIFACTS.LINK."]) {
+      expect(ruleMatches(host, { PAGE_HOST: "artifacts.link" }), host).toBe(true);
+      expect(isUnderPageDomain(host, "artifacts.link"), host).toBe(true);
+    }
+    expect(ruleMatches("www.my-pages.example.net", { PAGE_HOST: "my-pages.example.net" })).toBe(true);
+    expect(ruleMatches("www.mypages.example.net", { PAGE_HOST: "my-pages.example.net" })).toBe(false);
+  });
+
   it("should never catch the site, a look-alike domain, or the page domain itself", () => {
+    for (const host of ["artifacts.link.", "ARTIFACTS.LINK", "artifacts.link.evil.example"]) {
+      expect(ruleMatches(host, { PAGE_HOST: "artifacts.link" }), host).toBe(false);
+    }
     for (const host of ["artifacts.space", "www.artifacts.space", "artifacts.link", "notartifacts.link", "www.artifactsxlink", "artifacts.link.example.com", "localhost"]) {
       expect(ruleMatches(host, { PAGE_HOST: "artifacts.link" }), host).toBe(false);
     }

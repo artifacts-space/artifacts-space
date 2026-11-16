@@ -38,6 +38,15 @@ export function isUnderPageDomain(host: string | null, base: string | null): boo
 /** The path every request to another host under the page domain is sent to; it answers 404 (src/app/page-host-refusal). */
 export const pageHostRefusalPath = "/page-host-refusal";
 
+/**
+ * A pattern for one host name as a server may receive it: in any letter case. The pattern is matched as written,
+ * with no flags, so each letter stands for both cases. A host name holds letters, digits, hyphens, and dots
+ * (pageHostBase checks it); only the dot means something in a pattern.
+ */
+function hostPattern(name: string): string {
+  return name.replace(/[a-z.]/g, (char) => (char === "." ? "\\." : `[${char}${char.toUpperCase()}]`));
+}
+
 /** One rewrite of the Next config: a path pattern, the hosts it holds for, and where it goes. */
 export interface HostRewrite {
   source: string;
@@ -54,19 +63,19 @@ export interface HostRewrite {
  * domain to the refusal. A page host itself never gets here: the proxy
  * answers it first. Read when the app is built, so `PAGE_HOST` must be set
  * for the build as well as at run time. The domain itself is not covered:
- * never point it at this app.
+ * never point it at this app. The pattern takes the host in any letter case
+ * and with the dot a fully qualified name may end with, as isUnderPageDomain
+ * does, so the two rules hold for the same hosts.
  */
 export function pageDomainRewrites(env: NodeJS.ProcessEnv = process.env): HostRewrite[] {
   const base = pageHostBase(env);
   if (!base) return [];
-  // A host name holds letters, digits, hyphens, and dots (pageHostBase checks it); only the dot means something in a pattern.
-  const escaped = base.replaceAll(".", "\\.");
-  return [{ source: "/:path*", has: [{ type: "host", value: `.+\\.${escaped}` }], destination: pageHostRefusalPath }];
+  return [{ source: "/:path*", has: [{ type: "host", value: `.+\\.${hostPattern(base)}\\.?` }], destination: pageHostRefusalPath }];
 }
 
-/** A Host header without its port, in lower case. */
+/** A Host header without its port, in lower case, and without the dot a fully qualified name may end with. */
 export function hostName(host: string | null): string {
-  return (host ?? "").split(":", 1)[0]?.toLowerCase() ?? "";
+  return ((host ?? "").split(":", 1)[0]?.toLowerCase() ?? "").replace(/\.$/, "");
 }
 
 /** The port of a Host header, or "" when it has none. */

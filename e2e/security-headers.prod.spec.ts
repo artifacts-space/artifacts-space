@@ -56,7 +56,7 @@ for (const path of ["/preview", "/docs", "/sign-in", "/api/auth/get-session", "/
 }
 
 // A wildcard domain sends every host under the page domain to the app. Only page hosts get an answer there.
-for (const name of ["www", "app", `${pageHostLabel}.x`]) {
+for (const name of ["www", "app", "WWW", `${pageHostLabel}.x`]) {
   for (const path of ["/", "/preview", "/docs", "/sign-in", "/app", "/api/auth/get-session", "/api/mcp", "/robots.txt", "/_next/static/chunks/none.js"]) {
     test(`should answer 404 for ${path} on ${name}.<page domain>, which is no page host`, async ({ request, baseURL }) => {
       const site = new URL(baseURL ?? "");
@@ -67,6 +67,15 @@ for (const name of ["www", "app", `${pageHostLabel}.x`]) {
     });
   }
 }
+
+test("should answer 404 on a host under the page domain that ends with a dot", async ({ request, baseURL }) => {
+  const site = new URL(baseURL ?? "");
+  for (const path of ["/", "/preview", "/sign-in"]) {
+    const response = await request.get(path, { headers: { host: `www.localhost.:${site.port}` }, maxRedirects: 0 });
+    expect(response.status(), path).toBe(404);
+    expect(response.headers()["set-cookie"]).toBeUndefined();
+  }
+});
 
 test("should answer 404 for a POST to a host under the page domain that is no page host", async ({ request, baseURL }) => {
   const site = new URL(baseURL ?? "");
