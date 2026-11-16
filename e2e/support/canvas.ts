@@ -43,12 +43,17 @@ export async function touchScreen(page: Page) {
     client.send("Input.dispatchTouchEvent", { type, touchPoints: fingers.map((finger, id) => ({ x: Math.round(finger.x), y: Math.round(finger.y), id })) });
 }
 
-/** A frame body's box, measured from the board window's corner, so a page scroll does not change it. */
-export async function boxInBoard(page: Page, id: string) {
-  const pane = await boxOf(board(page));
-  const box = await boxOf(frameBody(page, id));
-  return { x: box.x - pane.x, y: box.y - pane.y, width: box.width, height: box.height };
-}
+/**
+ * A frame body's box, measured from the board window's corner, so a page scroll does not change it. Both boxes are
+ * read in the page at one moment: read one after the other from here, a page that is still scrolling (after a
+ * swipe) moves between the two reads, and the frame seems to have moved in the board.
+ */
+export const boxInBoard = (page: Page, id: string) => frameBody(page, id).evaluate((body) => {
+  const pane = body.closest("[data-canvas-board]");
+  if (!pane) throw new Error("The frame is not on a board.");
+  const [window, box] = [pane.getBoundingClientRect(), body.getBoundingClientRect()];
+  return { x: box.x - window.x, y: box.y - window.y, width: box.width, height: box.height };
+});
 
 /** How much of the frames is inside the board's window, in pixels across and down. Nothing or less means the window is empty. */
 export const framesInWindow = (page: Page) => board(page).evaluate((pane) => {
