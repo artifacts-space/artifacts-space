@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { htmlProblem, htmlStarter, htmlText, htmlTitle, looksLikeHtmlPage } from "./rules";
+import { htmlProblem, htmlStarter, htmlText, htmlTitle, looksLikeHtmlPage, showsAuthorNote } from "./rules";
 
 describe("htmlProblem", () => {
   it("should accept a page that starts with the doctype, in any case, after white space or a byte order mark", () => {
@@ -36,5 +36,28 @@ describe("htmlTitle", () => {
   it("should give the page's own title, on one line", () => {
     expect(htmlTitle("<!doctype html><title>\n  Q3 &amp; Q4\n</title>")).toBe("Q3 & Q4");
     expect(htmlTitle("<!doctype html><body>No title</body>")).toBe("");
+  });
+});
+
+describe("htmlText with odd closing tags", () => {
+  it("should leave out a script whose closing tag has spaces, attributes, or capitals", () => {
+    expect(htmlText("<body><p>One</p><SCRIPT>a()</script ><p>Two</p><script>b()</script\t\n bar><p>Three</p></body>")).toBe("One Two Three");
+  });
+
+  it("should leave out a comment that ends the lenient way", () => {
+    expect(htmlText("<body>One<!-- hidden --!>Two</body>")).toBe("One Two");
+  });
+});
+
+describe("showsAuthorNote", () => {
+  it("should show the note to a reader who cannot edit an HTML page shared by link or with everyone", () => {
+    expect(showsAuthorNote({ kind: "html", canEdit: false, visibility: "link" })).toBe(true);
+    expect(showsAuthorNote({ kind: "html", canEdit: false, visibility: "public" })).toBe(true);
+  });
+
+  it("should not show it to an editor, on a page kept in the team, or on another format", () => {
+    expect(showsAuthorNote({ kind: "html", canEdit: true, visibility: "public" })).toBe(false);
+    expect(showsAuthorNote({ kind: "html", canEdit: false, visibility: "team" })).toBe(false);
+    expect(showsAuthorNote({ kind: "markdown", canEdit: false, visibility: "public" })).toBe(false);
   });
 });

@@ -1,3 +1,6 @@
+import type { ArtifactKind, ArtifactVisibility } from "@/lib/artifact-types";
+import { isReportable } from "@/lib/reports/rules";
+
 /*
  * The HTML format: one full HTML document with its own styles and scripts,
  * shown running in a sandbox on a page host (src/lib/page-host/rules.ts).
@@ -52,10 +55,19 @@ export function htmlText(content: string): string {
   const source = content.slice(0, scanChars);
   const body = source.replace(/^[\s\S]*?<body\b[^>]*>/i, "");
   const text = body
-    .replace(/<!--[\s\S]*?(-->|$)/g, " ")
-    .replace(/<(script|style|template|noscript|svg|head)\b[\s\S]*?(<\/\1\s*>|$)/gi, " ")
+    .replace(/<!--[\s\S]*?(--!?>|$)/g, " ")
+    .replace(/<(script|style|template|noscript|svg|head)\b[\s\S]*?(<\/\1\b[^>]*>|$)/gi, " ")
     .replace(/<[^>]*(>|$)/g, " ");
   return decodeEntities(text).replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Whether a reader sees the note that an HTML page is its author's, not
+ * this site's: on a page shared by link or with everyone, for a reader who
+ * cannot edit it. The author and the team know whose page it is.
+ */
+export function showsAuthorNote(view: { kind: ArtifactKind; canEdit: boolean; visibility: ArtifactVisibility }): boolean {
+  return view.kind === "html" && !view.canEdit && isReportable(view.visibility);
 }
 
 /** The page's own <title>, or "" when it has none. */

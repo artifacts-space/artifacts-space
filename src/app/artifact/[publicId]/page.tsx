@@ -48,6 +48,7 @@ import { loadActor } from "@/lib/agents/queries";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
+import { showsAuthorNote } from "@/lib/html/rules";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
 import { hasWidthSetting, bodyFillsColumnClass, pageColumnClass, usesFullWidth } from "@/lib/page-width/rules";
 import { pageOrganizersFor } from "@/lib/projects/page-project";
@@ -316,7 +317,7 @@ function LinkableBody({ viewable, files, canComment }: { viewable: ViewableArtif
  * where the page is, as well as in the footer.
  */
 function SharedPageNotice({ viewable }: { viewable: ViewableArtifact }) {
-  if (viewable.view.kind !== "html" || viewable.canEdit || !isReportable(viewable.record.visibility)) return null;
+  if (!showsAuthorNote({ kind: viewable.view.kind, canEdit: viewable.canEdit, visibility: viewable.record.visibility })) return null;
   return (
     <ViewNotice title="This page was made by its author, not by artifacts.space." className="mb-4">
       <p>It runs in a sandbox, apart from your account. Do not type a password or payment details into it. <ReportDialog publicId={viewable.record.publicId} /></p>
