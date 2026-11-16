@@ -164,7 +164,7 @@ function PageCannotStart() {
 function PageLeft({ onShowAgain }: { onShowAgain: () => void }) {
   return (
     <div role="status" data-slot="page-frame-left" className="flex size-full flex-col items-center justify-center gap-3 p-6 text-center">
-      <p className="max-w-md text-sm leading-6 text-muted-foreground">This page tried to show another address in its place, so it was closed.</p>
+      <p className="max-w-md text-sm leading-6 text-muted-foreground">This page stopped answering, or tried to show another address in its place, so it was closed.</p>
       <Button type="button" variant="outline" size="sm" onClick={onShowAgain}>Show the page again</Button>
     </div>
   );

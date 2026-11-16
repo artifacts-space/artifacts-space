@@ -109,6 +109,8 @@ describe("pageSandbox", () => {
   it("should never let the page navigate the tab it is shown in, or start a download", () => {
     expect(pageSandbox).not.toContain("allow-top-navigation");
     expect(pageSandbox).not.toContain("allow-downloads");
+    // A tab the page opens keeps the sandbox, so it cannot be used to get around it.
+    expect(pageSandbox).not.toContain("allow-popups-to-escape-sandbox");
     expect(pageSandbox).toContain("allow-scripts");
   });
 });

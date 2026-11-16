@@ -77,7 +77,7 @@ test("should close a page that sends its frame to another address, and show it a
   allowPageError(/Framing .* violates the following Content Security Policy directive: "frame-ancestors 'none'"/, "The page host's 404 answer may not be framed, so the browser refuses to show it.");
   allowPageError("does not match the recipient window's origin", "The frame holds another document, so the site's question is not delivered, on purpose.");
   await page.goto("/dev/page-frame?page=leave");
-  await expect(page.locator("[data-slot=page-frame-left]")).toContainText("This page tried to show another address in its place, so it was closed.", { timeout: 15_000 });
+  await expect(page.locator("[data-slot=page-frame-left]")).toContainText("This page stopped answering, or tried to show another address in its place, so it was closed.", { timeout: 15_000 });
   await expect(page.locator(frameSelector)).toHaveCount(0);
   await page.getByRole("button", { name: "Show the page again" }).click();
   await expect(page.frameLocator(frameSelector).locator("#text")).toHaveText("Leaving.");

@@ -590,8 +590,9 @@ on a second domain (`src/lib/page-host/rules.ts`).
   site, to the page host, or to any other site; no form posts; no frames. A
   page cannot loosen it. Add a host to the list only for a public,
   read-only package or font host.
-- The iframe's sandbox (`pageSandbox`) never has `allow-top-navigation` or
-  `allow-downloads`. A page can still send its own frame to another
+- The iframe's sandbox (`pageSandbox`) never has `allow-top-navigation`,
+  `allow-downloads`, or `allow-popups-to-escape-sandbox`: a tab the page
+  opens keeps the sandbox. A page can still send its own frame to another
   address; the site notices and closes the frame (`usePageHandshake`,
   `PAGE_ANSWER_MS`). After each load of the frame the site asks a question
   with a fresh id, and takes an answer only from the frame's window, from

@@ -115,10 +115,12 @@ export function pageContentPolicy(siteOrigin: string): string {
  * own host), so browser storage works and stays with the artifact. It
  * cannot navigate the tab it is shown in, and it cannot start a download:
  * a file with a name the page chose, saved from under this site's header,
- * would read as this site's. Links may open a new tab, which is an ordinary
- * tab, not a sandboxed one.
+ * would read as this site's. Links may open a new tab. That tab keeps this
+ * sandbox (there is no `allow-popups-to-escape-sandbox`), so the page
+ * cannot use a tab it opened to do what it may not do here; the other site
+ * in it still runs its scripts and forms, but cannot start a download.
  */
-export const pageSandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox";
+export const pageSandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups";
 
 /** Headers of the frame document. No session exists on the page host, so the response is the same for everyone. */
 export function pageHostHeaders(siteOrigin: string, cache: boolean): Record<string, string> {
@@ -153,7 +155,7 @@ export const pageMessages = {
   shown: "artifact-page:shown",
   /** Site to frame: is a document of the page host still in the frame? Carries a fresh `id`. */
   ping: "artifact-page:ping",
-  /** Frame to site: yes, repeating the question's `id`. */
+  /** Frame to site: yes. It repeats the question's `id` and carries nothing else. */
   pong: "artifact-page:pong",
 } as const;
 
