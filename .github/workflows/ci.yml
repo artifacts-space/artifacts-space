@@ -142,14 +142,20 @@ jobs:
   # gallery had grown (screen components, section templates, more a11y
   # scans) and six shards took 10 to 20 minutes on main; one passed the
   # 25-minute limit on a pull request. With twelve shards (PR #187) ten took
-  # 5 to 10 minutes and two took 17 and 19: the ones holding the gallery
-  # accessibility specs (a11y-screen-more, a11y-fields, a11y-screen-display,
-  # a11y-scrollers), whose tests each load the whole gallery page. Shards are
-  # balanced by test count, not time, so more shards help those two little;
-  # a lighter gallery page, or splitting those specs, is the next step. Playwright splits
-  # whole files in order, balanced by the number of tests that are not
-  # skipped, so a shard's time varies with the files it gets. When the slowest
-  # shard passes 12 minutes, add numbers to `matrix.shard`; `--shard` takes
+  # 5 to 10 minutes and two took 15 to 22, and on 16 Nov one passed the
+  # limit (PR #189, cancelled at 25 minutes with 128 of 133 tests done): the
+  # two holding the gallery accessibility specs, whose tests each loaded the
+  # whole gallery page, about 20 seconds a test on a runner. Those specs now
+  # open the gallery with only the groups or specimens they read
+  # (`openGallery` in e2e/support/gallery.ts, `?show=`), and the two shards
+  # took AFTER_SLOW_SHARDS, the rest AFTER_OTHER_SHARDS (PR AFTER_PR). Only
+  # gallery.spec.ts and a11y-contrast.spec.ts draw the whole page; a new spec
+  # that reads the gallery uses `openGallery`. Playwright splits whole files
+  # in order, balanced by the number of tests that are not skipped (128 to
+  # 168 a shard), not by time, so a shard's time varies with the files it
+  # gets; splitting by test instead (`fullyParallel`) would balance the same
+  # counts and not the time. When the slowest shard passes 12 minutes, find
+  # what it loads first, then add numbers to `matrix.shard`; `--shard` takes
   # its total from the matrix.
   #
   # Every shard starts both web servers from playwright.config.ts, including

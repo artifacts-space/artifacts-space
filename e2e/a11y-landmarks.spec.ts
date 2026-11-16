@@ -2,6 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
+import { openGallery } from "./support/gallery";
 
 /*
  * A view names a part of itself as a group, never as a landmark: one screen
@@ -14,10 +15,9 @@ import { expectNoAxeViolations } from "./support/a11y";
 const group = (page: Page, name: string) => page.locator(`section#${name}`);
 const specimen = (page: Page, name: string, fixture: string) => group(page, name).locator(`[data-specimen="${fixture}"]`);
 
-/** The gallery is ready once React has hydrated it, which its ready mark says. */
-async function galleryReady(page: Page, name: string) {
-  await page.goto(`/dev/components#${name}`);
-  await expect(page.locator("[data-gallery-ready]")).toBeAttached({ timeout: 60_000 });
+/** Opens the gallery with one group alone, scrolled to it. */
+async function openGroup(page: Page, name: string) {
+  await openGallery(page, [name]);
   await group(page, name).scrollIntoViewIfNeeded();
 }
 
@@ -25,7 +25,7 @@ async function galleryReady(page: Page, name: string) {
 const landmarks = (scope: Locator) => scope.locator('[role=region], [role=navigation], [role=complementary], [role=search], [role=form], nav, aside, main, section[aria-label], section[aria-labelledby], form[aria-label], form[aria-labelledby]');
 
 test("should draw every Steps specimen as a named group with no landmark inside", async ({ page }) => {
-  await galleryReady(page, "Steps");
+  await openGroup(page, "Steps");
   const specimens = group(page, "Steps").locator("[data-specimen]");
   expect(await specimens.count()).toBeGreaterThan(1);
   await expect(landmarks(specimens)).toHaveCount(0);
@@ -35,14 +35,14 @@ test("should draw every Steps specimen as a named group with no landmark inside"
 });
 
 test("should draw every Calendar specimen with no landmark inside", async ({ page }) => {
-  await galleryReady(page, "Calendar");
+  await openGroup(page, "Calendar");
   await expect(landmarks(group(page, "Calendar").locator("[data-specimen]"))).toHaveCount(0);
   await expectNoAxeViolations(group(page, "Calendar"));
 });
 
 test("should open a pressed day's events in a named group that its button controls, and close it again", async ({ page, isMobile }) => {
   test.skip(isMobile, "below 36rem the month is drawn as a list, which has no days to press");
-  await galleryReady(page, "Calendar");
+  await openGallery(page, ["Calendar/Month, 15 events on one day"]);
   const month = specimen(page, "Calendar", "Month, 15 events on one day");
   await month.scrollIntoViewIfNeeded();
   const more = month.getByRole("button", { name: /^\+\d+ more$/ });
