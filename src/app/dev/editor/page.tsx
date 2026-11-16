@@ -23,7 +23,7 @@ async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/editor"
   const { kind, save, catchup } = await searchParams;
   if (kind === "media") return <MediaEditorFixture />;
   if (kind === "lists") return <MediaEditorFixture initial={listItemsFixtureMarkdown} />;
-  return <EditorFixture kind={isFixtureKind(kind) ? kind : "ui"} failingSaves={save === "fail"} agentSaves={save === "agent"} catchUp={catchup === "agent"} />;
+  return <EditorFixture kind={isFixtureKind(kind) ? kind : "ui"} failingSaves={save === "fail"} agentSaves={save === "agent"} catchUp={catchup === "agent" || catchup === "own-save" ? catchup : null} />;
 }
 
 /**

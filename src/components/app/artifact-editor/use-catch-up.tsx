@@ -106,7 +106,7 @@ export function useCatchUp({ artifact, knownUpdatedAt, stored, unsaved, onCaught
   useEffect(() => {
     if (!loader) return undefined;
     let alive = true;
-    const history = { running: false, lastStartedAt: null as number | null };
+    const history = { running: false, lastStartedAt: null as number | null, started: 0 };
     const check = () => {
       const asked = latestRef.current;
       const shown = asked.artifact;
@@ -114,6 +114,8 @@ export function useCatchUp({ artifact, knownUpdatedAt, stored, unsaved, onCaught
       if (!shouldCatchUp({ kind: shown.kind, stored: asked.stored, visible: document.visibilityState === "visible", unsaved: asked.unsaved, running: history.running, lastStartedAt: history.lastStartedAt, now })) return;
       history.running = true;
       history.lastStartedAt = now;
+      history.started += 1;
+      const mine = history.started;
       loader(shown.id, asked.known)
         .then((newer) => {
           const current = latestRef.current;
@@ -123,7 +125,8 @@ export function useCatchUp({ artifact, knownUpdatedAt, stored, unsaved, onCaught
           current.onCaughtUp(newer.artifact, describeCatchUp(shown, newer));
         })
         .catch(() => undefined)
-        .finally(() => { history.running = false; });
+        // A check that a later one replaced (it never answered in time) does not free the later one's slot.
+        .finally(() => { if (history.started === mine) history.running = false; });
     };
     const onVisible = () => { if (document.visibilityState === "visible") check(); };
     window.addEventListener("focus", check);

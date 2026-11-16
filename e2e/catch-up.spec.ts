@@ -83,6 +83,22 @@ test("should mark the changed frame on the full-screen board too", async ({ page
   await expect(screen.locator('[data-canvas-frame="sign-in"]')).not.toHaveAttribute("data-frame-changed");
 });
 
+test("should not report this tab's own cover save as news when the tab comes back", async ({ page }) => {
+  await openCanvas(page, "&catchup=own-save");
+  await page.getByRole("button", { name: "Save a cover (fixture)" }).click();
+  await comeBack(page);
+  await expect.poll(() => checks(page)).toBe(1);
+  await expect(notice(page)).toHaveCount(0);
+  await expect(frame(page, "ticket")).toBeVisible();
+});
+
+test("should report a save this tab did not make, even when the content is the same", async ({ page }) => {
+  await openCanvas(page, "&catchup=own-save");
+  await comeBack(page);
+  await expect(notice(page)).toContainText("@fixture changed this canvas. This is the new version.");
+  await expect(frame(page, "ticket")).toBeVisible();
+});
+
 test("should show an agent's save of an interface in the /app editor when the tab comes back", async ({ page, isMobile }) => {
   test.skip(isMobile, "the /app editor's wiring is the same on a phone; its layout is checked elsewhere");
   await page.setViewportSize({ width: 1440, height: 900 });

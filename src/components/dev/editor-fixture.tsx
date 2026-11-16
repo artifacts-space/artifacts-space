@@ -20,7 +20,7 @@ import { plainSheetFormat } from "@/lib/sheet-format/rules";
 import { sheetAtLimit } from "@/lib/ui/fixtures/formats";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
-import { CanvasAgentSave } from "./catch-up-fixture";
+import { CanvasCatchUp, type FixtureCatchUp } from "./catch-up-fixture";
 import { dataUi, fixtureArtifact, longJson, longMarkdown, longUi, shortUi, styledUi, type EditorFixtureKind } from "./fixture-content";
 
 const samples: Record<EditorFixtureKind, { kind: ArtifactKind; content: () => string }> = {
@@ -73,7 +73,7 @@ const keepSignalInTab = () => Promise.resolve(null);
  * `catchUp`, the editor finds an agent's save of the canvas when the tab
  * comes back (e2e/catch-up.spec.ts). The layout e2e test edits here.
  */
-export function EditorFixture({ kind, failingSaves = false, agentSaves = false, catchUp = false }: { kind: EditorFixtureKind; failingSaves?: boolean; agentSaves?: boolean; catchUp?: boolean }) {
+export function EditorFixture({ kind, failingSaves = false, agentSaves = false, catchUp = null }: { kind: EditorFixtureKind; failingSaves?: boolean; agentSaves?: boolean; catchUp?: FixtureCatchUp }) {
   const artifact = useMemo(() => fixtureArtifact({ id: `fixture-${kind}`, kind: samples[kind].kind, title: `Long ${kind} fixture`, content: samples[kind].content() }), [kind]);
   const save = useMemorySave(artifact, agentSaves);
   const onSaved = useCallback(() => undefined, []);
@@ -85,7 +85,7 @@ export function EditorFixture({ kind, failingSaves = false, agentSaves = false, 
         </StickyChrome>
         <main className={`mx-auto w-full py-12 sm:py-16 ${pageColumnClass(usesFullWidth(artifact.kind, false))}`}>
           <ConfirmationsProvider initial={[]}>
-            <CanvasAgentSave artifact={artifact} on={catchUp}>
+            <CanvasCatchUp artifact={artifact} mode={catchUp}>
             <PageInlineEditor artifact={artifact} reviewed={false} onSaved={onSaved} save={save} signalEditing={keepSignalInTab}>
               <InlineTitle>{artifact.title}</InlineTitle>
               <InlineSummary><p className="mt-4 text-md leading-7 text-muted-foreground">{artifact.summary}</p></InlineSummary>
@@ -100,7 +100,7 @@ export function EditorFixture({ kind, failingSaves = false, agentSaves = false, 
                 </SheetFill>
               </article>
             </PageInlineEditor>
-            </CanvasAgentSave>
+            </CanvasCatchUp>
           </ConfirmationsProvider>
           <p className="mt-10 text-sm leading-6 text-muted-foreground">Shared from artifacts.space, a shared artifact hub for coding agents.</p>
         </main>
