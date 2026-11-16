@@ -972,6 +972,15 @@ boards: a test that reads the full-screen one starts from the dialog, never
 from `[data-canvas-board]` alone. `e2e/canvas.spec.ts` checks all of this on
 `/dev/canvas` (`?theme=<preset id>` puts the fixture in a theme).
 
+Focus that moves to a control outside the board (Tab) makes the browser
+scroll the board's box; the board turns that scroll into a pan
+(`onScroll` in `use-pan-zoom.ts`). While a glide runs (a button's move of
+the view, a 200 ms transition), the browser measures against the board as
+it is drawn at that moment, so the board brings the focused control into
+view again once it is drawn at rest (`revealFocusedAtRest`). A test that
+acts on where things are after a glide must not read a rounded position as
+"at rest": the last frames of an ease-out move less than a pixel.
+
 ### Frame captures
 
 A frame capture is an image of one canvas frame, drawn by the browser of
