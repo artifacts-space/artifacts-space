@@ -243,6 +243,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
               theme={theme}
               onChange={(content) => { update("content", content); }}
               onShowSource={() => { if (!sourceOpen) toggleSource(); }}
+              onHideSource={() => { if (sourceOpen) toggleSource(); }}
             />
             </BlockMenuFor>
             </ArtifactSheetFormat>

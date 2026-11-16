@@ -53,7 +53,7 @@ export function InlineSummary({ children }: { children: React.ReactNode }) {
 export function InlineBody({ canComment = false, children }: { canComment?: boolean; children: React.ReactNode }) {
   const edit = usePageEdit();
   if (!edit) return children;
-  const { artifact, draft, revision, sourceOpen, update, showSource } = edit;
+  const { artifact, draft, revision, sourceOpen, update, showSource, hideSource } = edit;
   return (
     // While the rich editor's code loads, the read view stays in place.
     <BlockMenuFor artifact={artifact} canComment={canComment}>
@@ -69,6 +69,7 @@ export function InlineBody({ canComment = false, children }: { canComment?: bool
         sourceOpen={sourceOpen}
         onChange={(content) => { update("content", content); }}
         onShowSource={showSource}
+        onHideSource={hideSource}
       />
     </EditorLoadingFallback>
     </BlockMenuFor>
