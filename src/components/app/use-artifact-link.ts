@@ -88,6 +88,8 @@ function pinned(artifacts: ArtifactListItemDto[], item: ArtifactListItemDto): Ar
  * Links and Back are told apart by nothing but the URL (an entry Back
  * reaches never holds comment params), since React can draw Next's
  * traversal before the browser's `popstate` reaches any listener of ours.
+ * The `popstate` listener only catches a traversal Next drew in the same
+ * pass as the pick before it, which leaves the search unchanged.
  * `opened` is the last artifact a link or Back opened, for its comments and
  * to bring it into view.
  *
@@ -200,6 +202,25 @@ export function useArtifactLink({ initialArtifacts, target = null, failed = fals
     const now = window.location.search;
     if (now !== written.current) follow(now);
   }, [search, target, failed]);
+
+  // Back pressed before Next drew a pick's entry: Next draws both in one pass, so the search it hands React never
+  // changes and the effect above never runs. After the traversal has had its turn, the address bar is checked here.
+  const settleTraversal = useEffectEvent(() => {
+    const now = window.location.search;
+    if (written.current !== null && now !== written.current) follow(now);
+  });
+  useEffect(() => {
+    let pending: ReturnType<typeof setTimeout> | undefined;
+    const onTraversal = () => {
+      clearTimeout(pending);
+      pending = setTimeout(settleTraversal, 0);
+    };
+    window.addEventListener("popstate", onTraversal);
+    return () => {
+      clearTimeout(pending);
+      window.removeEventListener("popstate", onTraversal);
+    };
+  }, []);
 
   useRevealOpened(opened, list, detail);
 

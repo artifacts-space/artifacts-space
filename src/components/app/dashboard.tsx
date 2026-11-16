@@ -45,6 +45,8 @@ interface DetailPaneProps {
   loadArtifact: ArtifactLoader | undefined;
   /** How the artifact saves: the server action, or the fixture's store for artifacts New artifact made there. */
   save: SaveArtifact | undefined;
+  /** This tab's own saves of the artifacts blank pages became, which may land after the pane took one over. */
+  ownSaves: readonly ArtifactDto[];
 }
 
 /** Shown while the selected artifact's content loads, or when it could not. */
@@ -70,8 +72,8 @@ function withListProject(full: ArtifactDto | null, selected: ArtifactListItemDto
 }
 
 /** The editor for an artifact the viewer may edit, a read-only view for a teammate's, or the empty state. */
-function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact, save }: DetailPaneProps) {
-  const { full: loaded, failure, remember, retry } = useFullArtifact(selected, initialFull, loadArtifact);
+function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact, save, ownSaves }: DetailPaneProps) {
+  const { full: loaded, failure, remember, retry } = useFullArtifact(selected, initialFull, loadArtifact, ownSaves);
   const full = withListProject(loaded, selected);
   const access = useEditAccess(full, viewerId);
   const withdrawal = useWithdrawSharing(full?.id ?? "", onDeleted);
@@ -179,7 +181,7 @@ interface DashboardProps {
   dismissWelcome?: DismissWelcome;
 }
 
-interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate" | "save"> {
+interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate" | "save" | "ownSaves"> {
   fresh: ReturnType<typeof useNewArtifact>;
   api: NewArtifactApi;
   /** The project the list is filtered to, for a new artifact. */
@@ -206,7 +208,7 @@ function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpda
       />
     );
   }
-  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={full} loadArtifact={loadArtifact} save={api.update} />;
+  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={full} loadArtifact={loadArtifact} save={api.update} ownSaves={fresh.stored} />;
 }
 
 /** The card marked as open: the blank page's artifact once stored (none before), else the selected one. */

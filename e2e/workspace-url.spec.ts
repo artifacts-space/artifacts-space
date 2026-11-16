@@ -84,6 +84,28 @@ test("should name each picked artifact in the URL without asking the server, and
   await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspacenote01$/);
 });
 
+test("should open what the address names when Back comes before the pick's entry is drawn", async ({ page }) => {
+  await page.goto("/dev/workspace");
+  await expect(editor(page, "Long ui fixture")).toBeVisible();
+  await pick(page, "Long markdown fixture");
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspace000md$/);
+
+  // Back in the same task as the pick's push, so the router draws both in one pass and its search never changes.
+  await page.evaluate(() => {
+    const push = window.history.pushState.bind(window.history);
+    window.history.pushState = (data: unknown, unused: string, url?: string | URL | null) => {
+      window.history.pushState = push;
+      push(data, unused, url);
+      queueMicrotask(() => { window.history.back(); });
+    };
+  });
+  await card(page, "Note 2").click();
+
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspace000md$/);
+  await expect(editor(page, "Long markdown fixture")).toBeVisible();
+  await expect(selectedCard(page)).toContainText("Long markdown fixture");
+});
+
 for (const query of ["?project=design", "?tag=launch", "?scopes=1&team=fixture-shared-0"]) {
   test(`should keep the list's params when a pick names the artifact (${query})`, async ({ page }) => {
     await page.goto(`/dev/workspace${query}`);
