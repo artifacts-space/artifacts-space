@@ -190,8 +190,8 @@ dev user.
 
 ### Environment variables
 
-`.env.example` lists every variable, each with a comment. Three are needed to
-start:
+`.env.example` has a line, with a comment, for every variable you set in a
+file. Three are needed to start:
 
 | Variable | What it is |
 | --- | --- |
@@ -199,10 +199,11 @@ start:
 | `BETTER_AUTH_SECRET` | At least 32 characters, for example from `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | This site's origin, such as `http://localhost:3000` or `https://your-domain`. |
 
-Each of the others turns one thing on: GitHub and Google sign-in, email,
-file uploads, browser notifications, pages that run scripts, scheduled jobs.
-The full list, with what each one does and what happens without it, is in the
-docs: https://artifacts.space/docs/self-hosting#env
+Most of the others turn one thing on, such as GitHub and Google sign-in,
+email, file uploads, browser notifications, pages that run scripts, and the
+scheduled cleanup jobs. The full list, with what each one does and what
+happens without it, is in the docs:
+https://artifacts.space/docs/self-hosting#env
 
 Local `localhost` and `127.0.0.1` database URLs use the PostgreSQL TCP driver.
 Remote URLs use Neon's serverless driver. Users, sessions, OAuth clients, and
@@ -228,7 +229,11 @@ the `content-type` and `content-length` headers, and exposes `ETag`.
 1. Import the repository as a Next.js project.
 2. Add Postgres through the Neon integration, or set `DATABASE_URL` and
    `DATABASE_URL_UNPOOLED` yourself.
-3. Set the other variables above for Production (and Preview, if you use it).
+3. Set the other variables for Production (and Preview, if you use it). A
+   deployment needs at least `SENDIR_API_KEY` and `SENDIR_IDENTITY_ID`
+   (sign-in emails), the four `R2_*` values (file uploads), and `CRON_SECRET`
+   (the cleanup crons refuse to run without it). The
+   [full list](https://artifacts.space/docs/self-hosting#env) has the rest.
 4. Set `DATABASE_URL_UNPOOLED` for Production. Each production build applies
    pending migrations before the new code goes live; if one fails, the build
    fails and the old deployment keeps serving. Preview builds never migrate.
