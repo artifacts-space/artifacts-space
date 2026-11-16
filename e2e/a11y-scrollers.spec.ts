@@ -54,6 +54,27 @@ test("should make a diagram that is wider than its frame a named tab stop the ke
   await expect(frame).not.toHaveAttribute("role");
 });
 
+test("should keep a diagram inside a centered Box that is narrower than it, and let the keyboard scroll it", async ({ page }) => {
+  const name = "Centered, around a diagram wider than it";
+  await openGallery(page, [`Box/${name}`]);
+  const box = specimen(page, "Box", name);
+  await box.scrollIntoViewIfNeeded();
+  await expect(box.locator("[data-diagram-state]")).toHaveAttribute("data-diagram-state", "drawn", { timeout: diagramDrawTimeout });
+  // A phone-width screen, as a 390 pixel canvas frame is.
+  await restyle(box, { width: "390px" });
+  const edges = (target: Locator) => target.evaluate((element) => { const rect = element.getBoundingClientRect(); return { left: rect.left, right: rect.right }; });
+  const around = await edges(box);
+  const stop = box.getByRole("group", { name: "Booking flow" });
+  await expect(stop).toHaveAttribute("tabindex", "0");
+  const diagram = await edges(box.locator("[data-diagram-state]"));
+  expect(diagram.left, "the diagram starts inside the Box").toBeGreaterThanOrEqual(around.left - 0.5);
+  expect(diagram.right, "the diagram ends inside the Box").toBeLessThanOrEqual(around.right + 0.5);
+  const title = await edges(box.getByText("Booking flow", { exact: true }));
+  expect(title.left, "the diagram's title is on screen").toBeGreaterThanOrEqual(around.left - 0.5);
+  await expectKeyboardScrolls(page, stop, "ArrowRight");
+  await expectNoAxeViolations(box);
+});
+
 test("should make a failed diagram's source a named tab stop while it scrolls", async ({ page }) => {
   await openGallery(page, ["Diagram/Broken source"]);
   const broken = specimen(page, "Diagram", "Broken source");

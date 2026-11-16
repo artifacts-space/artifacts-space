@@ -31,6 +31,7 @@ export const boxFixtures: ComponentFixture[] = [
   { name: "Hidden above md", props: { hideAbove: "md", padding: "sm", surface: "muted", radius: "md" }, children: [text("Only shown on a narrow page column.")] },
   { name: "Scrolling row", props: { direction: "horizontal", overflow: "scroll", gap: "md", label: "Customer logos" }, children: Array.from({ length: 12 }, (_, index) => ({ type: "Placeholder", props: { variant: "logo", label: `Logo ${index + 1}` } })) },
   { name: "Clips to its radius", props: { overflow: "hidden", radius: "xl", border: "all", maxWidth: "sm" }, children: [{ type: "Placeholder", props: { radius: "none", label: "Cover" } }, text("The image above is cut to the corner.", { size: "sm" })] },
+  { name: "Centered, around a diagram wider than it", props: { direction: "vertical", align: "center", gap: "md", padding: "lg", surface: "muted" }, children: [{ type: "Heading", props: { text: "How a booking moves", level: 2, size: "lg", align: "center" } }, { type: "Diagram", props: { title: "Booking flow", code: "flowchart LR\n  a[Patient picks a time] --> b[Clinic confirms]\n  b --> c[Reminder goes out]\n  c --> d[Visit]" } }] },
   { name: "Empty", props: {} },
   { name: "Long label", props: { label: longLabel.slice(0, 120), padding: "md", border: "y" }, children: [text("Named for screen readers.")] },
 ];

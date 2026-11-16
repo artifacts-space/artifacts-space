@@ -219,6 +219,14 @@ export function TimelineView({ props }: ViewProps<"Timeline">) {
   );
 }
 
+/**
+ * A drawing keeps a least width so its text stays readable. In a Box that
+ * centers its children (or starts or ends them) a child is as wide as its
+ * content, so without a cap the drawing would run past both sides of a
+ * narrower Box; capped at the Box's width, its own frame scrolls instead.
+ */
+const diagramFits = "max-w-full";
+
 export function DiagramView({ props }: ViewProps<"Diagram">) {
-  return props.title ? <MermaidView code={props.code} title={props.title} /> : <MermaidView code={props.code} />;
+  return props.title ? <MermaidView code={props.code} title={props.title} className={diagramFits} /> : <MermaidView code={props.code} className={diagramFits} />;
 }
