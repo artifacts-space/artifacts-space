@@ -29,12 +29,13 @@ import type { BlankPageOptions } from "@/components/app/new-artifact/use-blank-p
 import { useBlankEditor } from "@/components/app/new-artifact/use-blank-editor";
 
 import { DetectedNotice } from "./detected-format-chip";
-import { detailBody, detailOuterClass, detailSection, gutterRoom, scrollbarRoom, stickyModeBar, useScrollbarRoom, useScrollPlace } from "./detail-scroll";
+import { detailBody, detailOuterClass, detailSection, gutterRoom, useScrollPlace } from "./detail-scroll";
 import { ShareBanner, TitleFields } from "./editor-sections";
 import { BlankToolbar, EditorToolbar, type SourceToggle } from "./editor-toolbar";
 import { FormatDialog } from "./format-dialog";
 import { hasInlineField, InlineContent } from "./inline-content";
-import { AgentSaveNotice, CatchUpNotice, ConflictNotice, openHistoryButton, SaveStatusBar } from "./save-status";
+import { headSurface, PaneHead, PinnedInPane } from "./pane-head";
+import { AgentSaveNotice, CatchUpNotice, ConflictNotice, isSaveProblem, openHistoryButton, SaveStatusBar } from "./save-status";
 import { useArtifactActions } from "./use-artifact-actions";
 import { useArtifactDraft } from "./use-artifact-draft";
 import { useAutosave } from "./use-autosave";
@@ -147,7 +148,6 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   const { draft, update, replace, reset, remount, revision } = useArtifactDraft(artifact);
   const [sourceOpen, setSourceOpen] = useState(false);
   const { outerRef, bodyRef, remember } = useScrollPlace(sourceOpen ? "source" : "page");
-  useScrollbarRoom(outerRef, bodyRef);
   const { page, sectionRef, titleRef, dragging, focusBody, filesApi, saveWith } = useBlankEditor({ blankPage, artifact, draft, replace, onUpdated, body: bodyRef, sourceOpen, focusRequest, save });
   const autosave = useAutosave({ artifact, draft, replaceDraft: replace, onUpdated, save: saveWith, problem: page.problem, idle: page.idle });
   const [formatOpen, setFormatOpen] = useState(false);
@@ -160,6 +160,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   const { dismissDetected } = page;
   const notice = <DetectedNotice detected={page.detected} onChange={() => { setFormatOpen(true); }} onDismiss={dismissDetected} />;
   const theme = useRenderTheme(artifact);
+  const surface = headSurface(theme);
   const saving = autosave.status.kind === "saving";
   const fullWidthShown = usesFullWidth(draft.kind, artifact.fullWidth);
   // The title, chips, and meta line sit in the content's column, so they line up with the body.
@@ -202,29 +203,32 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
       )}
       <div ref={outerRef} data-slot="detail-outer" className={detailOuterClass(draft.kind === "ui")}>
         {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} column={column} /> : null}
-        <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} titleRef={titleRef} onEnter={focusBody} column={column} />
-        <ArtifactOrganizers artifact={artifact} kind={draft.kind} onChangeFormat={() => { setFormatOpen(true); }} onUpdated={onUpdated} column={column} className={scrollbarRoom} hidden={page.blank} />
-        <SaveStatusBar
-          status={autosave.status}
-          dirty={autosave.dirty}
-          length={draft.content.length}
-          updatedAt={artifact.updatedAt}
-          updatedBy={artifact.updatedBy}
-          harness={artifact.harness}
-          stored={!page.blank}
-          id={page.blank ? undefined : artifact.id}
-          onRetry={autosave.retryNow}
-          column={column}
-          className={cn(stickyModeBar, scrollbarRoom)}
-        />
-        <ConflictNotice status={autosave.status} onLoadTheirs={autosave.loadTheirs} onKeepMine={autosave.keepMine} column={column} />
-        <AgentSaveNotice
-          show={autosave.agentSaved}
-          onDismiss={autosave.dismissAgentSaved}
-          column={column}
-          history={noticeHistory}
-        />
-        <CatchUpNotice words={catchUp.words} onDismiss={catchUp.dismiss} column={column} history={noticeHistory} />
+        {/* The title block is part of the page: it scrolls away with the body and sits on the body's surface, in the artifact's theme. */}
+        <PaneHead theme={theme}>
+          <TitleFields title={draft.title} icon={draft.icon} summary={draft.summary} update={update} titleRef={titleRef} onEnter={focusBody} column={column} className={surface} />
+          <ArtifactOrganizers artifact={artifact} kind={draft.kind} onChangeFormat={() => { setFormatOpen(true); }} onUpdated={onUpdated} column={column} className={cn(gutterRoom, surface)} hidden={page.blank} />
+          {/* A save that did not go through keeps the meta line in view; the notices that arrive always stay in view. */}
+          <PinnedInPane theme={theme} pinned={isSaveProblem(autosave.status)} slot="detail-status">
+            <SaveStatusBar
+              status={autosave.status}
+              dirty={autosave.dirty}
+              length={draft.content.length}
+              updatedAt={artifact.updatedAt}
+              updatedBy={artifact.updatedBy}
+              harness={artifact.harness}
+              stored={!page.blank}
+              id={page.blank ? undefined : artifact.id}
+              onRetry={autosave.retryNow}
+              column={column}
+              className={cn(gutterRoom, surface)}
+            />
+            <PinnedInPane theme={theme} slot="detail-notices">
+              <ConflictNotice status={autosave.status} onLoadTheirs={autosave.loadTheirs} onKeepMine={autosave.keepMine} column={column} />
+              <AgentSaveNotice show={autosave.agentSaved} onDismiss={autosave.dismissAgentSaved} column={column} history={noticeHistory} />
+              <CatchUpNotice words={catchUp.words} onDismiss={catchUp.dismiss} column={column} history={noticeHistory} />
+            </PinnedInPane>
+          </PinnedInPane>
+        </PaneHead>
         {/* A rendered view has no field to focus first, so the pane itself takes focus for Page Up/Down, Space, and the arrows. */}
         <div
           ref={bodyRef}

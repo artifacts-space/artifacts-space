@@ -6,8 +6,10 @@ import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipRea
 /**
  * The /app workspace is an app shell from md up: the page never scrolls, the
  * list and the artifact scroll on their own, and the header controls stay in
- * view. Measured on /dev/workspace, the real workspace with long artifacts
- * and a long list and no database.
+ * view. The artifact is one page under its toolbar (`detail-outer` scrolls
+ * the title block and the body together; e2e/pane-head.spec.ts). Measured on
+ * /dev/workspace, the real workspace with long artifacts and a long list and
+ * no database.
  */
 
 const desktop = { width: 1280, height: 800 };
@@ -27,6 +29,9 @@ async function expectPageDoesNotScroll(page: Page) {
 }
 
 const slot = (page: Page, name: string) => page.locator(`[data-slot=${name}]`);
+
+/** The box that scrolls the artifact: everything under its toolbar. */
+const pane = (page: Page) => slot(page, "detail-outer");
 
 /** A box's rendered width. */
 const widthOf = (box: Locator) => box.evaluate((element) => element.getBoundingClientRect().width);
@@ -128,7 +133,6 @@ async function openSidebarTop(page: Page, viewport?: { width: number; height: nu
 
 const controls = (page: Page) => [
   page.getByRole("button", { name: "History" }),
-  slot(page, "save-status"),
   page.getByRole("textbox", { name: "Search artifacts" }),
   slot(page, "artifact-list").getByRole("button").first(),
 ];
@@ -183,7 +187,7 @@ test.describe("desktop and tablet", () => {
     await expectPageDoesNotScroll(page);
     const tops = await controlTops(page);
 
-    const body = slot(page, "detail-body");
+    const body = pane(page);
     expect(await scrollToBottom(body), "the content pane scrolls").toBeGreaterThan(1000);
     await expectControlsInView(page);
     expect(await controlTops(page), "the controls do not move").toEqual(tops);
@@ -203,7 +207,8 @@ test.describe("desktop and tablet", () => {
     }
     const styles = await scrollBoxStyles(page);
     expect(styles.find((box) => box.name === "artifact-list")).toMatchObject({ overflowY: "auto", overscroll: "contain" });
-    expect(styles.find((box) => box.name === "detail-body")).toMatchObject({ overflowY: "auto", overscroll: "contain" });
+    expect(styles.find((box) => box.name === "detail-outer")).toMatchObject({ overflowY: "auto", overscroll: "contain" });
+    expect(styles.find((box) => box.name === "detail-body"), "the body never scrolls by itself").toMatchObject({ overflowY: "visible" });
   });
 
   test("should stack a long artifact above its files, fields, and comments without overlap on the page and in its source", async ({ page }) => {
@@ -215,10 +220,9 @@ test.describe("desktop and tablet", () => {
 
   test("should leave room under the last section when the artifact scrolls to its end", async ({ page }) => {
     await openWorkspace(page);
-    const body = slot(page, "detail-body");
-    await scrollToBottom(body);
-    const gap = await body.evaluate((element) => {
-      const last = element.lastElementChild?.getBoundingClientRect();
+    await scrollToBottom(pane(page));
+    const gap = await pane(page).evaluate((element) => {
+      const last = element.querySelector("[data-slot=detail-body]")?.lastElementChild?.getBoundingClientRect();
       return last ? element.getBoundingClientRect().bottom - last.bottom : 0;
     });
     expect(gap, "space between the last section and the pane's bottom edge").toBeGreaterThanOrEqual(32);
@@ -246,7 +250,7 @@ test.describe("desktop and tablet", () => {
 
     // The field grows with its text, so only the pane scrolls.
     expect(await source.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1);
-    expect(await scrollToBottom(slot(page, "detail-body"))).toBeGreaterThan(1000);
+    expect(await scrollToBottom(pane(page))).toBeGreaterThan(1000);
     await expectControlsInView(page);
     await expectPageDoesNotScroll(page);
     expect(await escapedElements(page)).toEqual([]);
@@ -254,7 +258,7 @@ test.describe("desktop and tablet", () => {
 
   test("should keep the place when opening the source and start a newly picked artifact at the top", async ({ page }) => {
     await openWorkspace(page);
-    const body = slot(page, "detail-body");
+    const body = pane(page);
     await body.evaluate((element) => { element.scrollTop = (element.scrollHeight - element.clientHeight) / 2; });
     await viewSource(page);
     const share = await body.evaluate((element) => element.scrollTop / (element.scrollHeight - element.clientHeight));
@@ -263,12 +267,12 @@ test.describe("desktop and tablet", () => {
 
     await slot(page, "artifact-list").getByRole("button", { name: /Long markdown fixture/ }).click();
     await expect(page.getByRole("textbox", { name: "Artifact title" })).toHaveValue("Long markdown fixture");
-    expect(await slot(page, "detail-body").evaluate((element) => element.scrollTop), "a new artifact starts at the top").toBe(0);
+    expect(await pane(page).evaluate((element) => element.scrollTop), "a new artifact starts at the top").toBe(0);
   });
 
   test("should scroll the rendered artifact from the keyboard and never the page", async ({ page }) => {
     await openWorkspace(page);
-    const body = slot(page, "detail-body");
+    const body = pane(page);
     await body.focus();
     await page.keyboard.press("PageDown");
     await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeGreaterThan(100);
@@ -283,7 +287,7 @@ test.describe("desktop and tablet", () => {
     const grid = page.getByRole("grid", { name: "CSV grid editor" });
     await expect(grid).toBeVisible();
     const sizes = await page.evaluate(() => {
-      const body = document.querySelector("[data-slot=detail-body]");
+      const body = document.querySelector("[data-slot=detail-outer]");
       const scroller = document.querySelector("[role=grid]");
       return { pane: body?.clientHeight ?? 0, grid: scroller?.getBoundingClientRect().height ?? Infinity, gridScrolls: (scroller?.scrollHeight ?? 0) > (scroller?.clientHeight ?? 0) };
     });
@@ -292,10 +296,10 @@ test.describe("desktop and tablet", () => {
     await expectPageDoesNotScroll(page);
   });
 
-  test("should let the title scroll away on a short viewport while the toolbar and save status bar stay", async ({ page }) => {
+  test("should let the title scroll away on a short viewport while the toolbar stays", async ({ page }) => {
     await openWorkspace(page, { width: 1280, height: 640 });
     await expectPageDoesNotScroll(page);
-    const outer = slot(page, "detail-outer");
+    const outer = pane(page);
     expect(await scrollToBottom(outer), "the whole area under the toolbar scrolls").toBeGreaterThan(1000);
     await expect(page.getByRole("textbox", { name: "Artifact title" })).not.toBeInViewport();
     await expectControlsInView(page);
@@ -308,7 +312,7 @@ test.describe("desktop and tablet", () => {
   test("should fill a tablet screen without a page scroll", async ({ page }) => {
     await openWorkspace(page, { width: 820, height: 1180 });
     await expectPageDoesNotScroll(page);
-    await scrollToBottom(slot(page, "detail-body"));
+    await scrollToBottom(pane(page));
     await expectControlsInView(page);
     await expectPageDoesNotScroll(page);
   });

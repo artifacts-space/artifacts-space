@@ -763,21 +763,28 @@ the artifact page and in the /app panes, and an interface's Text and List
 blocks follow the same cap. Plain text has no frame of its own, for readers
 or editors, and a comment's text fills its card.
 
-In the /app pane the rows above the box that scrolls the body (share
-notice, title, chips, meta line, save notices) leave the room the body
-leaves beside its column (`scrollbarRoom` in `detail-scroll.ts`): the
-body's scrollbar when it takes room, and for an interface the gutter its
-block handles hang in. That gutter is one variable, set by
-`detailOuterClass` from the artifact's kind alone, and rows inside the body
-(the body's surface, the source, the Files section) read it through
-`gutterRoom`, so the title never moves when View source opens. A band that
-spans the pane (a notice, the Files section) takes the `column` class for
-its content. Under View source the field's side padding is the column's.
-A new row must keep to this. `e2e/title-body-column.spec.ts` (fixtures:
-the editor in the pane and on the page, for Markdown, text, and interface
-artifacts), `e2e/title-body-column-db.spec.ts` (a reader on the real page,
-and the pane's read-only view), and `e2e/pane-header-column.spec.ts`
-measure both edges at several window widths.
+In the /app pane the toolbar stays and everything under it is one page
+that scrolls (`detailOuter` in `detail-scroll.ts`): the title block (icon,
+title, summary, chips, meta line) scrolls away with the body, as on a
+document page, and it sits on the body's surface in the artifact's theme
+(`PaneHead` and `headSurface` in `pane-head.tsx`; the theme's page color
+when themed, the card otherwise). Never pin the title block, and never
+give it a surface of its own. Two things stay in view while the page
+scrolls (`PinnedInPane`): a notice that arrives (someone else saved, an
+agent saved, a catch-up), and the meta line while a save has not gone
+through (`isSaveProblem`). Phones scroll the window, and nothing pins
+there. Every row that holds the content's column, above the body and
+inside it, leaves the block gutter on both sides (`gutterRoom`): one
+variable, set by `detailOuterClass` from the artifact's kind alone, so the
+title never moves when View source opens. A band that spans the pane (a
+notice, the Files section) takes the `column` class for its content.
+Under View source the field's side padding is the column's. A new row
+must keep to this. `e2e/title-body-column.spec.ts` (fixtures: the editor
+in the pane and on the page, for Markdown, text, and interface artifacts),
+`e2e/title-body-column-db.spec.ts` (a reader on the real page, and the
+pane's read-only view), and `e2e/pane-header-column.spec.ts` measure both
+edges at several window widths; `e2e/pane-head.spec.ts` checks that the
+title block scrolls away, what stays, and the surface.
 
 ### Themes
 

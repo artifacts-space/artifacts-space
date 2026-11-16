@@ -2,16 +2,15 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 /**
- * The /app pane's title block (icon, title, summary, chips, meta line) sits
- * above the box that scrolls the artifact's body. With scrollbars that take
- * room (Windows, Linux, and macOS with "Show scroll bars: Always"), the body
- * is narrower than the title block by the scrollbar, so both must still use
- * one column. Playwright hides scrollbars by default; this file shows them.
+ * The /app pane's title block (icon, title, summary, chips, meta line) and
+ * the artifact's body scroll in one box and must use one column, also with
+ * scrollbars that take room (Windows, Linux, and macOS with "Show scroll
+ * bars: Always"). Playwright hides scrollbars by default; this file shows them.
  * Measured on /dev/workspace, the real workspace without a database.
  */
 
 test.use({ launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] } });
-test.skip(({ isMobile }) => isMobile, "phones scroll the whole page: the title block and the body share one box");
+test.skip(({ isMobile }) => isMobile, "phones scroll the whole page, and their scrollbars take no room");
 
 /** A window wide enough that the centered column is narrower than the pane, and one where the column fills the pane. */
 const viewports = [
@@ -27,8 +26,8 @@ const edgesOf = (box: Locator) => box.evaluate((element) => {
   return { left, right };
 });
 
-/** The room the body's scrollbar takes: 0 with overlay scrollbars. */
-const scrollbarWidth = (page: Page) => slot(page, "detail-body").evaluate((element) => (element as HTMLElement).offsetWidth - element.clientWidth);
+/** The room the pane's scrollbar takes: 0 with overlay scrollbars. */
+const scrollbarWidth = (page: Page) => slot(page, "detail-outer").evaluate((element) => (element as HTMLElement).offsetWidth - element.clientWidth);
 
 /** Opens the long Markdown fixture, whose body is taller than the pane. */
 async function openLongDocument(page: Page, size: { width: number; height: number }) {
@@ -40,9 +39,9 @@ async function openLongDocument(page: Page, size: { width: number; height: numbe
 }
 
 for (const { name, size } of viewports) {
-  test(`should start the title, chips, and meta line where the body's text starts when the body shows a scrollbar, in ${name}`, async ({ page }) => {
+  test(`should start the title, chips, and meta line where the body's text starts when the pane shows a scrollbar, in ${name}`, async ({ page }) => {
     await openLongDocument(page, size);
-    expect(await scrollbarWidth(page), "the body's scrollbar takes room in this test").toBeGreaterThan(0);
+    expect(await scrollbarWidth(page), "the pane's scrollbar takes room in this test").toBeGreaterThan(0);
 
     const column = await edgesOf(slot(page, "detail-body").locator("[data-slot=page-column]").first());
     const text = await edgesOf(page.getByRole("textbox", { name: "Artifact content" }).locator(":scope > *").first());

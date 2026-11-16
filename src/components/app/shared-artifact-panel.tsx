@@ -1,7 +1,6 @@
 "use client";
 
 import { IconLoader2, IconLock } from "@tabler/icons-react";
-import { useRef } from "react";
 
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { VisibilityBadge } from "@/components/artifact-page/visibility-badge";
@@ -33,7 +32,8 @@ import { ArtifactBreadcrumb } from "./artifact-editor/editor-toolbar";
 import { PreviewSurface } from "./artifact-editor/preview-surface";
 import { ShowSidebarButton } from "./sidebar-visibility";
 import { KindChip } from "@/components/projects/artifact-organizers";
-import { detailBody, detailOuter, detailSection, scrollbarRoom, useScrollbarRoom } from "./artifact-editor/detail-scroll";
+import { detailBody, detailOuter, detailSection, gutterRoom } from "./artifact-editor/detail-scroll";
+import { headSurface, PaneHead } from "./artifact-editor/pane-head";
 import { useEditAccess, useWithdrawSharing } from "./use-edit-access";
 import { useRenderTheme } from "./use-render-theme";
 
@@ -83,10 +83,10 @@ function PanelChips({ kind, tags }: { kind: ArtifactDto["kind"]; tags: readonly 
 }
 
 /** The title (a link to its page), summary, format and tags, and the meta line, in the content's column. */
-function PanelHeader({ artifact, column, status }: { artifact: ArtifactDto; column: string; status: React.ReactNode }) {
+function PanelHeader({ artifact, column, status, className }: { artifact: ArtifactDto; column: string; status: React.ReactNode; className: string }) {
   const length = artifact.content.length;
   return (
-    <div className={cn("pt-6 pb-1 sm:pt-10", scrollbarRoom)}>
+    <div data-slot="panel-header" className={cn("pt-6 pb-1 sm:pt-10", gutterRoom, className)}>
       <div className={column}>
         <ArtifactIcon icon={artifact.icon} size="heading" className="mb-2 block" />
         <h2 className="text-3xl leading-tight font-semibold tracking-[-0.02em] sm:text-4xl">
@@ -119,9 +119,6 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
   // A CSV whose owner turned downloads off: no Copy, and the grid copies nothing, for a reader who cannot edit it.
   const exportable = mayExportCsv({ canEdit }, artifact);
   const column = previewColumnClass(usesFullWidth(artifact.kind, artifact.fullWidth));
-  const outerRef = useRef<HTMLDivElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  useScrollbarRoom(outerRef, bodyRef);
 
   return (
     // A Markdown artifact takes comments on its words: highlights in the text, threads in cards at them.
@@ -155,10 +152,13 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
           <OpenPageButton publicId={artifact.publicId} />
         </div>
       </div>
-      <div ref={outerRef} data-slot="detail-outer" className={detailOuter}>
-        <PanelHeader artifact={artifact} column={column} status={<PanelStatus artifact={artifact} teamName={team?.name ?? null} canEdit={canEdit} />} />
+      <div data-slot="detail-outer" className={detailOuter}>
+        {/* The title block is part of the page: it scrolls away with the body and sits on the body's surface, in the artifact's theme. */}
+        <PaneHead theme={theme}>
+          <PanelHeader artifact={artifact} column={column} status={<PanelStatus artifact={artifact} teamName={team?.name ?? null} canEdit={canEdit} />} className={headSurface(theme)} />
+        </PaneHead>
         {/* Read only, so nothing in the pane takes focus first: the pane does, for keyboard scrolling. */}
-        <div ref={bodyRef} data-slot="detail-body" role="region" aria-label="Content" tabIndex={0} className={detailBody}>
+        <div data-slot="detail-body" role="region" aria-label="Content" tabIndex={0} className={detailBody}>
           <PreviewSurface theme={theme} fullWidth={usesFullWidth(artifact.kind, artifact.fullWidth)} className="py-6 sm:py-8">
             <SheetKeyContext value={artifact.publicId}>
               <CsvExportContext value={exportable}>
