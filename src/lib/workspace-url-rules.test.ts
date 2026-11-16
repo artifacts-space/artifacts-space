@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { fixtureArtifact } from "@/components/dev/fixture-content";
 
 import { toArtifactListItem } from "./artifact-preview";
-import { addressStep, namedArtifact, searchNaming, selectionUrlWrite } from "./workspace-url-rules";
+import { addressStep, intentFor, namedArtifact, searchNaming, selectionUrlWrite } from "./workspace-url-rules";
 
 describe("namedArtifact", () => {
   it("should read the artifact when the query names one among other params", () => {
@@ -72,6 +72,32 @@ describe("selectionUrlWrite", () => {
   it("should write nothing when plain /app falls back with nothing named", () => {
     expect(selectionUrlWrite("", "next", "clear")).toBeNull();
     expect(selectionUrlWrite("?", null, null)).toBeNull();
+  });
+});
+
+describe("intentFor", () => {
+  it("should push when the artifact shown is the one the person picked", () => {
+    expect(intentFor({ mode: "push", id: "b" }, "b")).toBe("push");
+  });
+
+  it("should not push when a pick of the open artifact was left behind and the workspace falls back to another", () => {
+    // The person clicked the open card (no change, so no write took the note), then a filter left another artifact shown.
+    const intent = intentFor({ mode: "push", id: "a" }, "c");
+    expect(intent).toBeNull();
+    expect(selectionUrlWrite("?artifact=puba", "pubc", intent)).toEqual({ mode: "replace", search: "" });
+  });
+
+  it("should not push when nothing is shown any more", () => {
+    expect(intentFor({ mode: "push", id: "a" }, null)).toBeNull();
+  });
+
+  it("should clear whatever is shown after a delete", () => {
+    expect(intentFor({ mode: "clear" }, "next")).toBe("clear");
+    expect(intentFor({ mode: "clear" }, null)).toBe("clear");
+  });
+
+  it("should give no intent when none was noted", () => {
+    expect(intentFor(null, "a")).toBeNull();
   });
 });
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { withoutCommentHash } from "@/lib/app-link";
-import { namedArtifact, selectionUrlWrite, type SelectionIntent, type UrlWrite } from "@/lib/workspace-url-rules";
+import { intentFor, namedArtifact, selectionUrlWrite, type PendingIntent, type UrlWrite } from "@/lib/workspace-url-rules";
 
 /**
  * What the workspace's link handling and its selection share about the
@@ -12,7 +12,7 @@ import { namedArtifact, selectionUrlWrite, type SelectionIntent, type UrlWrite }
  * change the workspace made itself is never taken for a new link.
  */
 export interface UrlSync {
-  takeIntent: () => SelectionIntent;
+  takeIntent: () => PendingIntent;
   wrote: (search: string) => void;
   /** Notes the artifact plain /app shows (chosen implicitly), so Back to plain /app opens it again. */
   showsPlain: (publicId: string | null) => void;
@@ -37,17 +37,20 @@ export function writeUrl({ mode, search }: UrlWrite): string {
  * the person's pick pushes a history entry, a fallback with nothing chosen
  * replaces it with plain /app, and a change the address bar led (a link,
  * Back, Forward) writes nothing. The first render writes nothing either:
- * opening plain /app keeps it plain.
+ * opening plain /app keeps it plain. A pick counts only for the artifact it
+ * named, so a pick of the open artifact never makes a later change a push.
  */
-export function useSelectionInUrl(selected: { publicId: string } | null, sync: UrlSync) {
+export function useSelectionInUrl(selected: { id: string; publicId: string } | null, sync: UrlSync) {
   const shown = selected?.publicId ?? null;
+  const shownId = selected?.id ?? null;
   const previous = useRef(shown);
   const { takeIntent, wrote, showsPlain } = sync;
   useEffect(() => {
+    const intent = intentFor(takeIntent(), shownId);
     if (previous.current === shown) return;
     previous.current = shown;
-    const write = selectionUrlWrite(window.location.search, shown, takeIntent());
+    const write = selectionUrlWrite(window.location.search, shown, intent);
     if (write) wrote(writeUrl(write));
     if (!namedArtifact(window.location.search)) showsPlain(shown);
-  }, [shown, takeIntent, wrote, showsPlain]);
+  }, [shown, shownId, takeIntent, wrote, showsPlain]);
 }

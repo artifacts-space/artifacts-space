@@ -106,14 +106,37 @@ test("should open what the address names when Back comes before the pick's entry
   await expect(selectedCard(page)).toContainText("Long markdown fixture");
 });
 
+test("should add no entry when the person clicks the open artifact, and one for the next pick", async ({ page }) => {
+  await page.goto("/dev/workspace");
+  await expect(editor(page, "Long ui fixture")).toBeVisible();
+  await pick(page, "Long markdown fixture");
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspace000md$/);
+  const entries = await historyLength(page);
+
+  await card(page, "Long markdown fixture").click();
+  await expect(selectedCard(page)).toContainText("Long markdown fixture");
+  expect(await historyLength(page), "the open artifact's card adds no entry").toBe(entries);
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspace000md$/);
+
+  await pick(page, "Note 2");
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspacenote01$/);
+  expect(await historyLength(page)).toBe(entries + 1);
+  await page.goBack();
+  await expect(editor(page, "Long markdown fixture")).toBeVisible();
+});
+
 for (const query of ["?project=design", "?tag=launch", "?scopes=1&team=fixture-shared-0"]) {
   test(`should keep the list's params when a pick names the artifact (${query})`, async ({ page }) => {
     await page.goto(`/dev/workspace${query}`);
     await expect(list(page).locator("li").nth(1)).toBeVisible();
     await pickSecond(page);
-    const escaped = query.replace(/[?]/g, "\\?");
-    await expect(page).toHaveURL(new RegExp(`/dev/workspace${escaped}&artifact=[A-Za-z0-9]+$`));
-    const named = new URL(page.url()).searchParams.get("artifact");
+    await expect.poll(() => new URL(page.url()).searchParams.get("artifact")).toMatch(/^[A-Za-z0-9]+$/);
+    const url = new URL(page.url());
+    expect(url.pathname).toBe("/dev/workspace");
+    const kept = [...new URLSearchParams(query)];
+    expect([...url.searchParams].filter(([key]) => key !== "artifact"), "the list's params stay, and nothing else is added").toEqual(kept);
+    expect(url.searchParams.getAll("artifact")).toHaveLength(1);
+    const named = url.searchParams.get("artifact");
 
     await page.reload();
     await expect(list(page).locator("li").nth(1).getByRole("button").first()).toHaveAttribute("aria-current", "true");

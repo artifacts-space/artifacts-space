@@ -8,7 +8,7 @@ import { parseArtifactLinkSearch, withoutCommentHash, type ArtifactLink } from "
 import { linkedStart, linkNotice } from "@/lib/app-link-rules";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ActionResult, ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
-import { addressStep, namedArtifact, searchNaming, type SelectionIntent } from "@/lib/workspace-url-rules";
+import { addressStep, namedArtifact, searchNaming, type PendingIntent } from "@/lib/workspace-url-rules";
 
 import type { ArtifactLoader } from "./use-full-artifact";
 import { writeUrl, type UrlSync } from "./use-selection-url";
@@ -108,7 +108,7 @@ export function useArtifactLink({ initialArtifacts, target = null, failed = fals
   /** Artifacts the address bar's changes loaded in full, so the pane opens them without loading them again. */
   const [held, setHeld] = useState<readonly ArtifactDto[]>([]);
   const written = useRef<string | null>(null);
-  const intent = useRef<SelectionIntent>(null);
+  const intent = useRef<PendingIntent>(null);
   /** Artifacts deleted in this visit, so Back to one says it is gone instead of opening an older answer of the server. */
   const deleted = useRef<Set<string>>(new Set());
   /** The artifact plain /app shows, chosen implicitly: the first load's when it named none. */
@@ -225,12 +225,12 @@ export function useArtifactLink({ initialArtifacts, target = null, failed = fals
   useRevealOpened(opened, list, detail);
 
   const pick = useCallback((id: string) => {
-    intent.current = "push";
+    intent.current = { mode: "push", id };
     setSelectedId(id);
   }, []);
   const afterDelete = useCallback((removedId: string, nextId: string) => {
     deleted.current.add(removedId);
-    intent.current = "clear";
+    intent.current = { mode: "clear" };
     setSelectedId(nextId);
   }, []);
 

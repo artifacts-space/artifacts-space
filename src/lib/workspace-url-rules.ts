@@ -27,6 +27,21 @@ export interface UrlWrite {
  */
 export type SelectionIntent = "push" | "clear" | null;
 
+/**
+ * An intent noted before the selection changes: a pick names the artifact it
+ * opens, so it counts only for that artifact. A pick of the artifact already
+ * open changes nothing and leaves its note behind; the note must not turn a
+ * later change nobody chose into a history entry.
+ */
+export type PendingIntent = { mode: "push"; id: string } | { mode: "clear" } | null;
+
+/** The intent behind showing `shownId` (an artifact's id, or null for none): a pick counts only for the artifact it named. */
+export function intentFor(pending: PendingIntent, shownId: string | null): SelectionIntent {
+  if (pending === null) return null;
+  if (pending.mode === "clear") return "clear";
+  return pending.id === shownId ? "push" : null;
+}
+
 /** The artifact the query string names, or null when it names none or a malformed one. */
 export function namedArtifact(search: string): string | null {
   return parseArtifactLinkSearch(new URLSearchParams(search))?.publicId ?? null;
