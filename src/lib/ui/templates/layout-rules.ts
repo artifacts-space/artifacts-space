@@ -28,9 +28,11 @@ const elementOf = (fragment: TemplateFragment, key: string): TemplateElement | u
 function browserFrameProblems({ fragment, slots }: UiTemplate): string[] {
   return Object.entries(fragment.elements).flatMap(([key, element]) => {
     if (element.type !== "Placeholder" || element.props?.frame !== "browser") return [];
-    const address = element.props.address;
+    const address: unknown = element.props.address;
     const problems: string[] = [];
-    if (typeof address !== "string" || address.trim() === "") problems.push(`element "${key}" draws a browser frame with no \`address\`. Write an example address on https://example.com, so the window's bar is not empty.`);
+    // An expression ($state, $item, $template) is only known once it resolves, so only a missing or blank string is named.
+    const missing = address === undefined || (typeof address === "string" && address.trim() === "");
+    if (missing) problems.push(`element "${key}" draws a browser frame with no \`address\`. Write an example address on https://example.com, so the window's bar is not empty.`);
     if (!slots.some((slot) => "element" in slot && slot.element === key && slot.prop === "address")) problems.push(`element "${key}" draws a browser frame, but no slot names its \`address\`.`);
     return problems;
   });

@@ -30,6 +30,10 @@ describe("layoutProblems, browser frames", () => {
     expect(layoutProblems(templateWith({ shot: shot({ address: " " }) }, ["title", "shot"], [addressSlot])).join("\n")).toMatch(/no `address`/);
   });
 
+  it("should accept a browser frame when its address is an expression read from state", () => {
+    expect(layoutProblems(templateWith({ shot: shot({ address: { $state: "/address" } }) }, ["title", "shot"], [addressSlot]))).toEqual([]);
+  });
+
   it("should name a browser frame whose address no slot names", () => {
     expect(layoutProblems(templateWith({ shot: shot({ address: "app.example.com" }) }, ["title", "shot"])).join("\n")).toMatch(/no slot names its `address`/);
   });
