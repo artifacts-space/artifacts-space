@@ -2,7 +2,8 @@ import { expect, test } from "./support/test";
 
 /**
  * Links into the workspace (from notifications): `?artifact=<id>` selects
- * that artifact, and `&comments=1` opens its Comments dialog. Checked on
+ * that artifact, and `&comments=1` opens its Comments dialog once: it leaves
+ * the address bar, which keeps naming the artifact. Checked on
  * /dev/workspace, the real workspace without a database.
  */
 
@@ -11,7 +12,7 @@ test("should open the linked artifact with its comments dialog when the link ask
   await expect(page.getByRole("region", { name: "Edit Note 2" })).toBeAttached();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Comments on Note 2" })).toBeVisible();
-  await expect(page).toHaveURL(/\/dev\/workspace$/);
+  await expect(page).toHaveURL(/\/dev\/workspace\?artifact=fixtureworkspacenote01$/);
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
 });
@@ -22,7 +23,8 @@ test("should open the linked artifact at the top when the link does not ask for 
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("should open the first artifact when the linked one does not exist", async ({ page }) => {
+test("should open the first artifact and leave plain /app when the linked one does not exist", async ({ page }) => {
   await page.goto("/dev/workspace?artifact=nothingHere&comments=1");
   await expect(page.getByRole("region", { name: "Edit Long ui fixture" })).toBeVisible();
+  await expect(page).toHaveURL(/\/dev\/workspace$/);
 });

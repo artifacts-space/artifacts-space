@@ -74,8 +74,13 @@ async function chooseInInbox(page: Page, seeded: Seeded, text: string, commentId
   // The row is a real link: it opens in a new tab with a middle-click, and names the comment.
   await expect(row.getByRole("link", { name: seeded.title })).toHaveAttribute("href", `/app?artifact=${seeded.publicId}&comment=${commentId}`);
   await row.click();
-  // The link is acted on once and leaves the address bar.
-  await expect(page).toHaveURL(/\/app$/);
+  // The comment is acted on once and leaves the address bar, which keeps naming the artifact.
+  await expect(page).toHaveURL(artifactUrl(seeded.publicId));
+}
+
+/** The workspace's address once a link to the artifact was acted on: the artifact, and no comment params. */
+function artifactUrl(publicId: string): RegExp {
+  return new RegExp(`/app\\?artifact=${publicId}$`);
 }
 
 /** The Comments dialog. The card at the words is a dialog too (a popover), so it is told apart by its heading. */
@@ -136,6 +141,10 @@ test("should open the Comments list at a comment on the whole artifact when it i
 
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toHaveCount(0);
+  // A reload keeps the artifact open and does not open the comment again: the link acted once.
+  await page.reload();
+  await expect(page.getByRole("region", { name: `Edit ${seeded.title}` })).toBeVisible();
+  await expect(dialog(page)).toHaveCount(0);
 });
 
 test("should open the Comments list at a reply when the reply is chosen in the Inbox", async ({ page }, testInfo) => {
@@ -150,11 +159,11 @@ test("should send an old thread link to the artifact at its comment when the lin
   await watchForCommentsDialog(page);
 
   await page.goto(`/threads/${seeded.publicId}#comment-${seeded.thread}`);
-  await expect(page).toHaveURL(/\/app$/);
+  await expect(page).toHaveURL(artifactUrl(seeded.publicId));
   await expectLinked(dialog(page).locator(`#comment-${seeded.thread}`));
 
   await page.goto(`/threads/${seeded.publicId}#comment-${seeded.inline}`);
-  await expect(page).toHaveURL(/\/app$/);
+  await expect(page).toHaveURL(artifactUrl(seeded.publicId));
   await expect(card(page)).toContainText("Is this still true?");
   await expectLinked(card(page).locator(`#comment-${seeded.inline}`));
   expect(await commentsDialogSeen(page), "an old link to a comment on words never opens the Comments dialog first").toBe(false);

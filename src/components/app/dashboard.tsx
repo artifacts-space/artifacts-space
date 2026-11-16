@@ -12,6 +12,7 @@ import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
 import { TeamWelcome, type DismissWelcome } from "@/components/app/team-welcome";
 import { useEditAccess, useWithdrawSharing } from "@/components/app/use-edit-access";
 import { useArtifactLink } from "@/components/app/use-artifact-link";
+import { useSelectionInUrl } from "@/components/app/use-selection-url";
 import { useFullArtifact, type ArtifactLoader } from "@/components/app/use-full-artifact";
 import { useListFilters, useWorkspaceList } from "@/components/app/use-workspace-list";
 import { useDashboardProjects } from "@/components/app/use-dashboard-projects";
@@ -224,6 +225,11 @@ function createIn(scopeTeam: ShareTeam | null, start: () => void): (() => void) 
   return scopeTeam ? null : start;
 }
 
+/** The full artifacts in hand: the page's own, plus any the address bar's changes loaded; the same array when there are none. */
+function withHeld(initial: readonly ArtifactDto[] | undefined, held: readonly ArtifactDto[]): readonly ArtifactDto[] | undefined {
+  return held.length === 0 ? initial : [...(initial ?? []), ...held];
+}
+
 /** A link that opens an artifact (a notification, a pasted URL) closes the blank page, so the pane shows what was asked for. */
 function useLinkLeavesNewArtifact(opened: unknown, leave: () => void) {
   useEffect(() => { if (opened) leave(); }, [opened, leave]);
@@ -235,17 +241,19 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const { artifacts, setArtifacts, selectedId, setSelectedId, notice, dismissNotice, opened } = useArtifactLink({ initialArtifacts, target: linkTarget, failed: linkFailed, onHandled: onLinkHandled, list: listRef, detail: detailRef });
+  const { artifacts, setArtifacts, selectedId, pick, afterDelete, notice, dismissNotice, opened, held, urlSync } = useArtifactLink({ initialArtifacts, target: linkTarget, failed: linkFailed, onHandled: onLinkHandled, loadArtifact, list: listRef, detail: detailRef });
   const listFilters = useListFilters();
   const { query, setQuery, kind, setKind, view, setView, clearFilters } = listFilters;
   const { hidden: sidebarHidden, hide: hideSidebar, visibility } = useSidebarToggle(shellRef, sidebarRef);
-  const fresh = useNewArtifact({ setArtifacts, setSelectedId, clearFilters });
+  const fresh = useNewArtifact({ setArtifacts, setSelectedId: pick, clearFilters });
   useLinkLeavesNewArtifact(opened, fresh.leave);
   const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath, viewerId });
   const entryKeys = useMemo(() => sidebar.projects.entries.map((entry) => entry.key), [sidebar.projects.entries]);
   const { counts, partial, filtered, groups, narrowed } = useWorkspaceList({ artifacts, filters: listFilters, projectFilter, tagFilter, teamId: scopeTeam?.id ?? null, viewerId, entryKeys, totals: facets });
 
   const selected = pickSelected(artifacts, filtered, selectedId);
+  useSelectionInUrl(selected, urlSync);
+  const fullInHand = useMemo(() => withHeld(initialFull, held), [initialFull, held]);
 
   function updated(artifact: ArtifactDto) {
     fresh.refresh(artifact);
@@ -256,7 +264,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
     fresh.deleted(id);
     setArtifacts((current) => {
       const next = current.filter((artifact) => artifact.id !== id);
-      setSelectedId(next[0]?.id ?? "");
+      afterDelete(id, next[0]?.id ?? "");
       return next;
     });
   }
@@ -312,7 +320,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             origin={origin}
             onUpdated={updated}
             onDeleted={deleted}
-            initialFull={initialFull}
+            initialFull={fullInHand}
             loadArtifact={loadArtifact}
           />
           </div>

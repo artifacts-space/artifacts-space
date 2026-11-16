@@ -12,8 +12,9 @@ const loadFailed = "The artifact could not be loaded. Check your connection and 
 
 /**
  * The artifacts held so far, seeded from `initial` and taking new ones when
- * `initial` brings new ids. Compared by ids (seedKey), not by array
- * identity, so a new array with the same artifacts changes nothing.
+ * `initial` brings new ids or later saves of held ones. Compared by ids and
+ * save times (seedKey), not by array identity, so a new array with the same
+ * artifacts changes nothing.
  */
 function useLoaded(initial: readonly ArtifactDto[] | undefined) {
   const [loaded, setLoaded] = useState(() => byId(initial));

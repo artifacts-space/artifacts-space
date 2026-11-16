@@ -18,6 +18,10 @@ describe("seedKey", () => {
     expect(seedKey([note("a"), note("c")])).not.toBe(seedKey([note("a")]));
   });
 
+  it("should change when the seed brings a new save of an artifact it had", () => {
+    expect(seedKey([{ ...note("a"), updatedAt: "2026-11-15T10:00:01.000Z" }])).not.toBe(seedKey([{ ...note("a"), updatedAt: "2026-11-15T10:00:00.000Z" }]));
+  });
+
   it("should treat no seed and an empty seed alike", () => {
     expect(seedKey(undefined)).toBe(seedKey([]));
   });
@@ -37,5 +41,16 @@ describe("withMissing", () => {
     expect(next).not.toBe(held);
     expect(next.get("a")?.content).toBe("just saved");
     expect(next.has("b")).toBe(true);
+  });
+
+  it("should replace a held artifact when the seed holds a later save of it", () => {
+    const held = byId([{ ...note("a", "before the last save"), updatedAt: "2026-11-15T10:00:00.000Z" }]);
+    const next = withMissing(held, [{ ...note("a", "after the last save"), updatedAt: "2026-11-15T10:00:01.000Z" }]);
+    expect(next.get("a")?.content).toBe("after the last save");
+  });
+
+  it("should keep a held artifact when the seed holds an earlier save of it", () => {
+    const held = byId([{ ...note("a", "just saved"), updatedAt: "2026-11-15T10:00:01.000Z" }]);
+    expect(withMissing(held, [{ ...note("a", "older copy"), updatedAt: "2026-11-15T10:00:00.000Z" }])).toBe(held);
   });
 });
