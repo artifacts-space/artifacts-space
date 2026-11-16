@@ -180,6 +180,9 @@ test.describe("on a desktop", () => {
     const screen = page.getByRole("dialog", { name: "Canvas, full screen" });
     await expect(screen.locator("[data-canvas-board]")).toHaveAttribute("data-canvas-board", "board");
     expect(await tokensOf("[data-canvas-full-screen] .artifact-theme")).toEqual(inPage);
+    // Read at 100%, where every frame's text is at its real size.
+    await screen.getByRole("button", { name: /Show at 100%/ }).click();
+    await expect(async () => { await expectNoAxeViolations(screen, { only: ["color-contrast"] }); }).toPass({ timeout: 20_000 });
   });
 
   test("should close full screen when the window becomes too narrow for a board", async ({ page }) => {
