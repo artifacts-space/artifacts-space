@@ -18,6 +18,8 @@ import {
   frameHasProblems,
   frameImageStates,
   imagesOff,
+  linkNotReady,
+  linkWaitSeconds,
   noSuchPart,
   notDrawnYet,
   themeUnreadable,
@@ -146,6 +148,17 @@ async function linkTo(row: FrameCaptureRecord, facts: FrameImageFacts): Promise<
   return { state: "link", facts, url: signed.url, expiresAt: signed.expiresAt };
 }
 
+/**
+ * A link to one part, signed only once the drawer's upload URLs have ended
+ * and the stored object still passes its check: after that nobody can put
+ * the object again, so the link serves what was checked.
+ */
+async function serveLink(row: FrameCaptureRecord, box: PartBox, facts: FrameImageFacts, now: Date): Promise<FrameImageResult> {
+  const wait = linkWaitSeconds(row.startedAt, now);
+  if (wait > 0) return refused(linkNotReady(wait));
+  return (await storedStillChecks(row, box, facts.part)) ? linkTo(row, facts) : removeFailed(row, now);
+}
+
 /** Hands out one part of a ready capture, after checking what is stored once more. */
 async function servePart(row: FrameCaptureRecord, frameId: string, wanted: { part: number; link: boolean }, now: Date): Promise<FrameImageResult> {
   const geometry = captureGeometry(row.width, row.height);
@@ -153,7 +166,7 @@ async function servePart(row: FrameCaptureRecord, frameId: string, wanted: { par
   const box = partBox(geometry, row.width, wanted.part);
   if (!box) return refused(noSuchPart(row.partCount));
   const facts = factsOf(row, frameId, wanted.part, box);
-  if (wanted.link) return (await storedStillChecks(row, box, wanted.part)) ? linkTo(row, facts) : removeFailed(row, now);
+  if (wanted.link) return serveLink(row, box, facts, now);
   const bytes = await checkedBytes(row, box, wanted.part);
   return bytes ? { state: "image", facts, bytes } : removeFailed(row, now);
 }

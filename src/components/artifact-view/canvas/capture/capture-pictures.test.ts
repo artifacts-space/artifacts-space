@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { maxPictureBytes } from "./capture-host-rules";
 import { blankPicture, fetchPicture, loadPictures, type PictureCache } from "./capture-pictures";
 
 /* A picture request that never answers must not hold the capture pass: one pass runs at a time, so a stalled one would stop every later one. */
@@ -41,6 +42,31 @@ describe("fetchPicture reasons", () => {
     expect(await fetchPicture("/api/files/one")).toEqual({ problem: "empty" });
     vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))));
     expect(await fetchPicture("/api/files/one")).toEqual({ problem: "network" });
+  });
+});
+
+describe("fetchPicture with a picture the host cannot use", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("should say too-large for a picture over what the host inlines", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(new Blob([new Uint8Array(maxPictureBytes + 1)]), { status: 200 }))));
+    expect(await fetchPicture("/api/files/one")).toEqual({ problem: "too-large" });
+  });
+
+  it("should say unreadable when the browser cannot turn the picture into a data URL", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(new Blob(["picture"]), { status: 200 }))));
+    class FailingReader {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      result: string | null = null;
+      readAsDataURL() {
+        queueMicrotask(() => this.onerror?.());
+      }
+    }
+    vi.stubGlobal("FileReader", FailingReader);
+    expect(await fetchPicture("/api/files/one")).toEqual({ problem: "unreadable" });
   });
 });
 

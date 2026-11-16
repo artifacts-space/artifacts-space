@@ -10,6 +10,8 @@ import {
   frameImageText,
   imagesOff,
   modeNotDrawn,
+  linkNotReady,
+  linkWaitSeconds,
   noSuchPart,
   notDrawnYet,
   themeUnreadable,
@@ -110,6 +112,17 @@ describe("refusals", () => {
   it("should say how many parts the image has when a part past the last is asked for", () => {
     expect(noSuchPart(1).message).toBe("This frame's image has no such part. It has 1 part: leave `part` out, or pass 1.");
     expect(noSuchPart(4)).toEqual({ code: "part_out_of_range", message: "This frame's image has no such part. It has 4 parts: pass `part` from 1 to 4." });
+  });
+
+  it("should make a link wait until the drawer's upload URLs have ended, and no longer", () => {
+    const startedAt = new Date("2026-11-16T09:00:00.000Z");
+    const after = (ms: number) => new Date(startedAt.getTime() + ms);
+    expect(linkWaitSeconds(startedAt, after(0))).toBe(captureLimits.removalGraceMs / 1000);
+    expect(linkWaitSeconds(startedAt, after(captureLimits.uploadUrlSeconds * 1000))).toBeGreaterThan(0);
+    expect(linkWaitSeconds(startedAt, after(captureLimits.removalGraceMs - 500))).toBe(1);
+    expect(linkWaitSeconds(startedAt, after(captureLimits.removalGraceMs))).toBe(0);
+    expect(linkWaitSeconds(startedAt, after(captureLimits.removalGraceMs * 10))).toBe(0);
+    expect(linkNotReady(42)).toEqual({ code: "frame_link_not_ready", message: "This image was drawn moments ago, so a link to it is not ready yet. Call again in 42 seconds, or leave `as` out to get the picture itself." });
   });
 });
 

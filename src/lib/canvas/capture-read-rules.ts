@@ -30,7 +30,7 @@ export interface FrameImageFacts {
 
 /** Why a frame has no image to hand out. Each is a typed tool error, never a picture. */
 export interface FrameImageRefusal {
-  code: "frame_image_not_drawn" | "frame_has_problems" | "frame_images_off" | "frame_images_full" | "theme_unreadable" | "mode_not_drawn" | "part_out_of_range";
+  code: "frame_image_not_drawn" | "frame_has_problems" | "frame_images_off" | "frame_images_full" | "theme_unreadable" | "mode_not_drawn" | "part_out_of_range" | "frame_link_not_ready";
   message: string;
   /** The tool to call next, when one helps. */
   nextStep?: "canvas_frame_get";
@@ -80,6 +80,21 @@ export function modeNotDrawn(pinned: CaptureMode, asked: CaptureMode): FrameImag
 export function noSuchPart(partCount: number): FrameImageRefusal {
   const range = partCount === 1 ? "It has 1 part: leave `part` out, or pass 1." : `It has ${String(partCount)} parts: pass \`part\` from 1 to ${String(partCount)}.`;
   return { code: "part_out_of_range", message: `This frame's image has no such part. ${range}` };
+}
+
+/**
+ * How many seconds until a link to a capture may be handed out: none once
+ * the upload URLs its drawer got can no longer work. Until then the stored
+ * object could still be put again after its check, and a link, unlike a
+ * picture read through the server, would then serve bytes nobody checked.
+ */
+export function linkWaitSeconds(startedAt: Date, now: Date): number {
+  return Math.max(0, Math.ceil((captureLimits.removalGraceMs - (now.getTime() - startedAt.getTime())) / 1000));
+}
+
+/** The image was drawn moments ago, so no link to it is handed out yet. The picture itself is. */
+export function linkNotReady(seconds: number): FrameImageRefusal {
+  return { code: "frame_link_not_ready", message: `This image was drawn moments ago, so a link to it is not ready yet. Call again in ${String(seconds)} seconds, or leave \`as\` out to get the picture itself.` };
 }
 
 /**

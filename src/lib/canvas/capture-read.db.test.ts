@@ -63,7 +63,9 @@ describe.runIf(Boolean(databaseUrl))("reading frame captures with a database", a
   type Mode = "light" | "dark";
   const counted = async (name: string, subject: string) => (await getDb().select().from(rateLimitBucket).where(eq(rateLimitBucket.key, `${name}:${subject}`))).reduce((sum, bucketRow) => sum + bucketRow.count, 0);
   const captureById = async (id: string) => (await getDb().select().from(frameCapture).where(eq(frameCapture.id, id)))[0];
-  const read = (userId: string, input: { frameId?: string; mode?: Mode; part?: number; as?: "image" | "link" } = {}) => readFrameImage(userId, { publicId, frameId: "home", ...input });
+  const read = (userId: string, input: { frameId?: string; mode?: Mode; part?: number; as?: "image" | "link" } = {}, now?: Date) => readFrameImage(userId, { publicId, frameId: "home", ...input }, now);
+  /** A moment after the upload URLs of a capture drawn now have ended. */
+  const uploadsEnded = () => new Date(Date.now() + captureLimits.removalGraceMs + 1000);
 
   async function canvasRow() {
     const [row] = await getDb().select().from(artifact).where(eq(artifact.id, canvasId));
@@ -331,7 +333,7 @@ describe.runIf(Boolean(databaseUrl))("reading frame captures with a database", a
       const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
       const captureId = await draw();
       swap(captureObjectKey(canvasId, captureId, 1));
-      expect(await read(users.ada, { as: "link" })).toEqual({ state: "refused", refusal: notDrawnYet });
+      expect(await read(users.ada, { as: "link" }, uploadsEnded())).toEqual({ state: "refused", refusal: notDrawnYet });
       expect(bucket.links).toEqual([]);
       expect((await captureById(captureId))?.status ?? "gone").not.toBe("ready");
       logged.mockRestore();
@@ -352,7 +354,7 @@ describe.runIf(Boolean(databaseUrl))("reading frame captures with a database", a
   describe("a link", () => {
     it("should sign a link to the checked part that works as long as a file link, with the capture's own type, and read no whole object", async () => {
       const captureId = await draw("home", "dark", 3120);
-      const result = await read(users.ada, { as: "link", mode: "dark", part: 2 });
+      const result = await read(users.ada, { as: "link", mode: "dark", part: 2 }, uploadsEnded());
       if (result.state !== "link") throw new Error(`Expected a link, got ${result.state}.`);
       const key = captureObjectKey(canvasId, captureId, 2);
       expect(bucket.links).toEqual([{ key, contentType: "image/webp", disposition: `inline; filename="frame-home-dark-2.webp"; filename*=UTF-8''frame-home-dark-2.webp`, expiresIn: 15 * 60 }]);
@@ -360,6 +362,20 @@ describe.runIf(Boolean(databaseUrl))("reading frame captures with a database", a
       expect(result.facts).toMatchObject({ mode: "dark", part: 2, partCount: 4 });
       expect(bucket.heads.at(-1)).toBe(key);
       expect(bucket.reads).toEqual([]);
+    });
+  });
+
+  describe("a link to an image drawn moments ago", () => {
+    it("should sign no link while the drawer's upload URLs can still work, and hand out the picture meanwhile", async () => {
+      const captureId = await draw();
+      const early = await refusal(read(users.ada, { as: "link" }));
+      expect(early.code).toBe("frame_link_not_ready");
+      expect(bucket.links).toEqual([]);
+      // The picture goes through the server, which checks the very bytes it hands out, so it does not wait.
+      expect((await read(users.ada)).state).toBe("image");
+      // The capture is kept: waiting is not a failed check.
+      expect((await captureById(captureId))?.status).toBe("ready");
+      expect((await read(users.ada, { as: "link" }, uploadsEnded())).state).toBe("link");
     });
   });
 

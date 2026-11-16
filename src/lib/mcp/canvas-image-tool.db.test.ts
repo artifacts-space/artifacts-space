@@ -180,6 +180,12 @@ describe.runIf(Boolean(databaseUrl))("canvas_frame_image with a database", async
     await drawHome(canvas.id);
     const result = await (await agentOf(member))("canvas_frame_image", { id: canvas.publicId, frameId: "home" });
     expect(result.images).toEqual([{ type: "image", data: pictureBase64, mimeType: "image/webp" }]);
+    // A link is signed only once the drawer's upload URLs have ended: until then the answer says how long to wait.
+    const early = await (await agentOf(member))("canvas_frame_image", { id: canvas.publicId, frameId: "home", as: "link" });
+    expect(early.isError).toBe(true);
+    expect(early.text).toContain("a link to it is not ready yet");
+    expect(bucket.links).toEqual([]);
+    await getDb().update(frameCapture).set({ startedAt: new Date(Date.now() - 10 * 60_000) }).where(eq(frameCapture.artifactId, canvas.id));
     const link = await (await agentOf(member))("canvas_frame_image", { id: canvas.publicId, frameId: "home", as: "link" });
     expect(link.images).toEqual([]);
     expect(link.text.endsWith(`: https://r2.test/${bucket.links[0]?.key ?? "none"}?signed=1`)).toBe(true);

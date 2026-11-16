@@ -1015,11 +1015,15 @@ capture, PUTs its parts straight to R2, and finishes it
   drawer's upload URLs work for two minutes after start, so the object
   could have been put again). A part that fails is never served: its
   capture is removed and the answer is "no image yet". A link (`as: "link"`)
-  is signed only after the same check of the object's head and first bytes,
+  is signed only once those upload URLs have ended (`linkWaitSeconds`;
+  until then the answer says how long to wait, since a link, unlike a
+  picture read through the server, would serve whatever was put after the
+  check) and after the same check of the object's head and first bytes. It
   works as long as a file link, and answers with the capture's own type.
   No image is a typed tool error with a code (`frame_image_not_drawn`,
   `frame_has_problems`, `frame_images_off`, `frame_images_full`,
-  `theme_unreadable`, `mode_not_drawn`, `part_out_of_range`); the cap is
+  `theme_unreadable`, `mode_not_drawn`, `part_out_of_range`,
+  `frame_link_not_ready`); the cap is
   named only when not even one more part fits. Where images are off, the
   read says so before it reads or counts anything. Reads are limited per
   person (`frameImageRead`), counted before the first read of the database

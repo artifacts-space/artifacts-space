@@ -24,7 +24,7 @@ const inputSchema = {
   frameId: z.string().min(1).max(80).describe("The frame's id, from canvas_frames_list"),
   mode: z.enum(captureModes).optional().describe('"light" or "dark". Left out: light, or the one mode the canvas\'s theme always uses.'),
   part: z.number().int().min(1).max(captureLimits.maxParts).optional().describe("Which part of the image, from 1. Left out: 1. The result says how many parts there are."),
-  as: z.enum(["image", "link"]).optional().describe(`"image" (the default) returns the picture itself. "link" returns a link to it that works for about ${String(fileLimits.downloadUrlSeconds / 60)} minutes, for a client that cannot show pictures from tools.`),
+  as: z.enum(["image", "link"]).optional().describe(`"image" (the default) returns the picture itself. "link" returns a link to it that works for about ${String(fileLimits.downloadUrlSeconds / 60)} minutes, for a client that cannot show pictures from tools. A link to an image drawn in the last few minutes is not ready yet, and the answer says when to call again.`),
 };
 
 const description =
