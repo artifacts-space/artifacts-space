@@ -120,7 +120,7 @@ export default function JsonRenderPage() {
       <DocsH page={page} id="canvas" />
       <Prose>
         <p>
-          A <code>canvas</code> artifact is a board of frames for mocking up websites and app screens. Each frame is one screen at a width you choose, and its <code>spec</code> is a ui spec, so every component and rule on these pages works inside a frame. Readers drag to move the board and zoom in to read a frame; on a phone the frames stack in the page, each scaled to fit. No HTML or CSS is involved, and each frame keeps its own state.
+          A <code>canvas</code> artifact is a board of frames for mocking up websites and app screens. Each frame is one screen at a width you choose, and its <code>spec</code> is a ui spec, so every component and rule on these pages works inside a frame. Readers drag to move the board, zoom in to read a frame, and open the board full screen to give it the whole window; on a phone the frames stack in the page, each scaled to fit. No HTML or CSS is involved, and each frame keeps its own state.
         </p>
       </Prose>
       <FactTable

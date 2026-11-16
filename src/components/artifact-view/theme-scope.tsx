@@ -10,7 +10,7 @@ import { surfaceEngine } from "@/lib/themes/surface-scope";
 import { themeBackdropStyle, themeKey, themeScopeProps } from "@/lib/themes/style";
 import { cn } from "@/lib/utils";
 
-import { ThemeScopeContext, type ThemeScopeValue } from "./theme-scope-context";
+import { ThemeScopeContext, ThemeSourceContext, type ThemeScopeValue, type ThemeSource } from "./theme-scope-context";
 
 /** One vendored face's stylesheet. React hoists it into <head> once, however many scopes use it. */
 function FontStylesheet({ href }: { href: string }) {
@@ -19,9 +19,9 @@ function FontStylesheet({ href }: { href: string }) {
 
 type ThemeScopeProps = Omit<ComponentProps<"div">, "style"> & {
   /** A validated theme (from `resolveTheme` or a preset). Defaults to the site theme. */
-  theme?: Theme | null;
+  theme?: Theme | null | undefined;
   /** Forces a mode whatever the theme and the reader say (the /preview panels). */
-  mode?: PaletteMode;
+  mode?: PaletteMode | undefined;
   children: ReactNode;
 };
 
@@ -42,14 +42,17 @@ export function ThemeScope({ theme, mode, className, children, ...rest }: ThemeS
     const key = themeKey(resolved);
     return { mode: props.modeClass, key, surfaces: surfaceEngine(resolved, props.modeClass, key) };
   }, [props.modeClass, resolved]);
+  const source = useMemo<ThemeSource>(() => ({ theme: resolved, mode }), [resolved, mode]);
   for (const href of props.preloads) preload(href, { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
   return (
-    <ThemeScopeContext.Provider value={context}>
-      {props.stylesheets.map((href) => <FontStylesheet key={href} href={href} />)}
-      <div {...rest} className={cn("artifact-theme", props.modeClass, className)} style={props.style}>
-        {children}
-      </div>
-    </ThemeScopeContext.Provider>
+    <ThemeSourceContext.Provider value={source}>
+      <ThemeScopeContext.Provider value={context}>
+        {props.stylesheets.map((href) => <FontStylesheet key={href} href={href} />)}
+        <div {...rest} className={cn("artifact-theme", props.modeClass, className)} style={props.style}>
+          {children}
+        </div>
+      </ThemeScopeContext.Provider>
+    </ThemeSourceContext.Provider>
   );
 }
 

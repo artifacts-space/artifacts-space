@@ -4,6 +4,7 @@ import { useTheme } from "next-themes";
 import { createContext, useContext } from "react";
 
 import type { PaletteMode } from "@/lib/themes/derive";
+import type { Theme } from "@/lib/themes/schema";
 import type { StrongScope, StrongSurface, SurfaceEngine } from "@/lib/themes/surface-scope";
 
 /** What a ThemeScope tells the views inside it. Kept apart from ThemeScope so a view can read it without loading the theme engine. */
@@ -21,6 +22,25 @@ export interface ThemeScopeValue {
 }
 
 export const ThemeScopeContext = createContext<ThemeScopeValue | null>(null);
+
+/**
+ * The theme a ThemeScope applies, and the mode it forces, if any. It is the
+ * whole scope's theme, never the palette of a strong surface (an inverse or
+ * primary Box) inside it: something opened from inside such a Box that must
+ * look like the Box needs that surface's own values, which this does not carry.
+ */
+export interface ThemeSource {
+  theme: Theme;
+  mode: PaletteMode | undefined;
+}
+
+/**
+ * The nearest ThemeScope's own theme. A scope's tokens reach only the elements
+ * inside its wrapper, so content that is drawn elsewhere in the document (a
+ * dialog) reads the theme here and wraps itself in a ThemeScope of its own.
+ * Null outside any scope, where the site theme applies.
+ */
+export const ThemeSourceContext = createContext<ThemeSource | null>(null);
 
 /** True when the nearest scope shows dark: its palette is dark, or it follows the reader and the page is dark (light, inside a surface that flips the mode). */
 export function useDarkTheme(): boolean {

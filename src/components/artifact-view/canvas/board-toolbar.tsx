@@ -1,6 +1,6 @@
 "use client";
 
-import { IconFrame, IconMinus, IconPlus } from "@tabler/icons-react";
+import { IconArrowsMaximize, IconArrowsMinimize, IconFrame, IconMinus, IconPlus } from "@tabler/icons-react";
 
 import { IconButton } from "@/components/icon-button";
 import { Button } from "@/components/ui/button";
@@ -23,15 +23,23 @@ interface BoardToolbarProps {
    * menu then returns focus to its button.
    */
   focusPickedFrame: () => boolean;
+  /** True on the board that fills the window; false on the board in the page. */
+  fullScreen: boolean;
+  /** Opens the board over the whole window, or closes that view. */
+  onFullScreenChange: (fullScreen: boolean) => void;
 }
+
+/** The name of the button that opens full screen. The page finds the button by it, to hand the focus back when full screen closes. */
+export const fullScreenLabel = "Full screen";
 
 /**
  * The board's controls, floating in its lower right corner: a menu that goes
  * to any frame without a pointer, zoom out, the current zoom (press for
- * 100%), zoom in, and Fit. Every control is a real button and its own tab
- * stop, so the bar is a labelled group, not a toolbar with arrow-key focus.
+ * 100%), zoom in, Fit, and full screen (or, on the full-screen board, the
+ * way back). Every control is a real button and its own tab stop, so the bar
+ * is a labelled group, not a toolbar with arrow-key focus.
  */
-export function BoardToolbar({ frames, zoom, onZoomIn, onZoomOut, onActualSize, onFit, onShowFrame, focusPickedFrame }: BoardToolbarProps) {
+export function BoardToolbar({ frames, zoom, onZoomIn, onZoomOut, onActualSize, onFit, onShowFrame, focusPickedFrame, fullScreen, onFullScreenChange }: BoardToolbarProps) {
   return (
     <div
       role="group"
@@ -70,6 +78,10 @@ export function BoardToolbar({ frames, zoom, onZoomIn, onZoomOut, onActualSize, 
       <Button type="button" variant="ghost" size="sm" onClick={onFit}>
         Fit
       </Button>
+      <span aria-hidden className="mx-0.5 h-4 w-px bg-border" />
+      <IconButton label={fullScreen ? "Exit full screen" : fullScreenLabel} onClick={() => { onFullScreenChange(!fullScreen); }}>
+        {fullScreen ? <IconArrowsMinimize /> : <IconArrowsMaximize />}
+      </IconButton>
     </div>
   );
 }

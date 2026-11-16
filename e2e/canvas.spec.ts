@@ -132,6 +132,71 @@ test.describe("on a desktop", () => {
     await expect.poll(async () => Math.round((await boxOf(frameBody(page, "home-phone"))).y - pane.y)).toBe(69);
   });
 
+  test("should fill the window when a reader presses Full screen, and come back to the page with the button or Escape", async ({ page }) => {
+    await open(page, "site", "board");
+    const fitted = await zoomOf(page);
+    const enter = page.getByRole("group", { name: "Canvas view" }).getByRole("button", { name: "Full screen", exact: true });
+    await enter.click();
+    const screen = page.getByRole("dialog", { name: "Canvas, full screen" });
+    const full = screen.locator("[data-canvas-board]");
+    await expect(full).toHaveAttribute("data-canvas-board", "board");
+    expect(await boxOf(full)).toEqual({ x: 0, y: 0, width: 1440, height: 900 });
+    await expect(full.locator("[data-canvas-frame]")).toHaveCount(4);
+    // The same frames fit a larger window at a larger scale.
+    await expect.poll(async () => Number.parseInt((await full.getAttribute("data-canvas-zoom")) ?? "", 10)).toBeGreaterThan(fitted);
+    // The board has focus, so the arrow keys move it at once.
+    await expect(full).toBeFocused();
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await expectNoAxeViolations(screen);
+    // Its menu opens over it.
+    await screen.getByRole("button", { name: "Frames" }).click();
+    await page.getByRole("menuitem", { name: /Home, phone/ }).click();
+    await expect(full).toHaveAttribute("data-canvas-zoom", "100%");
+    await expect(full.locator('[data-canvas-frame="home-phone"]')).toBeFocused();
+
+    await screen.getByRole("button", { name: "Exit full screen" }).click();
+    await expect(screen).toBeHidden();
+    await expect(enter).toBeFocused();
+    // The board in the page is as the reader left it.
+    await expect(board(page)).toHaveAttribute("data-canvas-zoom", `${String(fitted)}%`);
+
+    await enter.click();
+    await expect(full).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(screen).toBeHidden();
+    await expect(enter).toBeFocused();
+  });
+
+  test("should keep the artifact's theme on the full-screen board", async ({ page }) => {
+    await page.goto("/dev/canvas?fixture=flow&theme=paper");
+    await expect(board(page)).toHaveAttribute("data-canvas-board", "board");
+    const tokensOf = (scope: string) => page.locator(scope).evaluate((element) => {
+      const style = getComputedStyle(element);
+      return ["--background", "--primary", "--theme-font-body"].map((name) => style.getPropertyValue(name).trim());
+    });
+    const inPage = await tokensOf("[data-fixture-theme=paper]");
+    expect(inPage.every((value) => value !== "")).toBe(true);
+    await page.getByRole("button", { name: "Full screen", exact: true }).click();
+    const screen = page.getByRole("dialog", { name: "Canvas, full screen" });
+    await expect(screen.locator("[data-canvas-board]")).toHaveAttribute("data-canvas-board", "board");
+    expect(await tokensOf("[data-canvas-full-screen] .artifact-theme")).toEqual(inPage);
+    // Read at 100%, where every frame's text is at its real size.
+    await screen.getByRole("button", { name: /Show at 100%/ }).click();
+    await expect(async () => { await expectNoAxeViolations(screen, { only: ["color-contrast"] }); }).toPass({ timeout: 20_000 });
+  });
+
+  test("should close full screen when the window becomes too narrow for a board", async ({ page }) => {
+    await open(page, "flow", "board");
+    await page.getByRole("button", { name: "Full screen", exact: true }).click();
+    const screen = page.getByRole("dialog", { name: "Canvas, full screen" });
+    await expect(screen.locator("[data-canvas-board]")).toHaveAttribute("data-canvas-board", "board");
+    await page.setViewportSize({ width: 600, height: 900 });
+    await expect(screen).toBeHidden();
+    await expect(board(page)).toHaveAttribute("data-canvas-board", "stacked");
+    // The button that opened full screen is gone with the board's controls, so the canvas itself takes the focus: it never falls to the page.
+    await expect(page.locator(":focus").locator("[data-canvas-page-board]")).toHaveCount(1);
+  });
+
   test("should bring a control into view, without scrolling the board's box, when focus moves to one outside it", async ({ page }) => {
     await open(page, "flow", "board");
     await page.getByRole("button", { name: /Show at 100%/ }).click();

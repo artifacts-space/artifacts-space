@@ -1,7 +1,9 @@
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { appFlowCanvas, brokenFrameCanvas, emptyCanvas, largeCanvas, placedCanvas, siteMockupCanvas } from "@/lib/canvas/fixtures";
 import { canvasLimits, frameSizes } from "@/lib/canvas/limits";
+import { presetTheme } from "@/lib/themes/resolve";
 import { CANVAS_VERSION } from "@/lib/canvas/version";
 import { UI_SPEC_VERSION } from "@/lib/ui/version";
 import { findTemplate } from "@/lib/ui/templates/index";
@@ -77,10 +79,14 @@ const fixtures: Record<CanvasFixtureName, { title: string; content: string }> = 
  * with text above and a tall block below so the page scrolls past the board.
  * The canvas e2e tests read it. With `capture`, the page also mounts a
  * capture host that draws the frames through a stand-in API
- * (canvas-capture-fixture.tsx); without it there is no host.
+ * (canvas-capture-fixture.tsx); without it there is no host. With `theme`
+ * (a built-in preset's id), the canvas sits in that theme, as an artifact
+ * with a theme does on its page.
  */
-export function CanvasFixture({ name, capture = false }: { name: CanvasFixtureName; capture?: boolean }) {
+export function CanvasFixture({ name, capture = false, theme }: { name: CanvasFixtureName; capture?: boolean; theme?: string | undefined }) {
   const fixture = fixtures[name];
+  const view = <ArtifactView kind="canvas" content={fixture.content} title={fixture.title} />;
+  const preset = theme === undefined ? undefined : presetTheme(theme);
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pb-24 sm:px-6">
       <header className="flex flex-wrap items-center gap-3 py-4">
@@ -88,7 +94,7 @@ export function CanvasFixture({ name, capture = false }: { name: CanvasFixtureNa
         <span className="text-xs text-muted-foreground">{fixture.title} · development only</span>
         <div className="ml-auto"><ThemeSwitcher /></div>
       </header>
-      {capture ? <CanvasCaptureFixture title={fixture.title} content={fixture.content} /> : <ArtifactView kind="canvas" content={fixture.content} title={fixture.title} />}
+      {capture ? <CanvasCaptureFixture title={fixture.title} content={fixture.content} /> : preset ? <ThemeScope theme={preset} data-fixture-theme={theme}>{view}</ThemeScope> : view}
       <p data-fixture-below="" className="mt-6 h-[120vh] text-md text-muted-foreground">The page continues below the canvas, so a reader can always scroll past it.</p>
     </main>
   );

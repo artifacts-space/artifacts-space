@@ -17,8 +17,8 @@ function isFixtureName(value: unknown): value is CanvasFixtureName {
 }
 
 async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/canvas">["searchParams"] }) {
-  const { fixture, capture } = await searchParams;
-  return <CanvasFixture name={isFixtureName(fixture) ? fixture : "site"} capture={capture === "1"} />;
+  const { fixture, capture, theme } = await searchParams;
+  return <CanvasFixture name={isFixtureName(fixture) ? fixture : "site"} capture={capture === "1"} theme={typeof theme === "string" ? theme : undefined} />;
 }
 
 /**
@@ -30,7 +30,9 @@ async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/canvas"
  * screen of section templates in three frames), or pictures (one frame
  * with uploaded pictures). `?capture=1` adds a capture host that draws the
  * frames through a stand-in API, with no database and no file storage;
- * without it the page has no host. Returns 404 in every other environment.
+ * without it the page has no host. `?theme=` (a built-in preset's id, such
+ * as paper) puts the canvas in that theme. Returns 404 in every other
+ * environment.
  */
 export default function CanvasFixturePage({ searchParams }: PageProps<"/dev/canvas">) {
   if (process.env.NODE_ENV !== "development") notFound();
