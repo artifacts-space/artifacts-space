@@ -21,8 +21,11 @@ export type CaptureStatus = (typeof captureStatuses)[number];
 export const captureTypes = ["image/webp", "image/jpeg"] as const;
 export type CaptureType = (typeof captureTypes)[number];
 
-/** Raise this when a release changes how frames draw, so every image is drawn again. */
-export const CAPTURE_REVISION = 1;
+/**
+ * Raise this when a release changes how frames draw, so every image is drawn again.
+ * 2: a Diagram keeps inside a centered Box, and a tab that is not selected has the secondary text color.
+ */
+export const CAPTURE_REVISION = 2;
 
 /** How long a part's upload URL works, in seconds. Parts are small, so this is short. */
 const uploadUrlSeconds = 120;
