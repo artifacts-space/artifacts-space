@@ -1,9 +1,12 @@
-import type { Page } from "@playwright/test";
+import { createHash, randomUUID } from "node:crypto";
+
+import type { APIRequestContext, Page } from "@playwright/test";
 import { Pool } from "pg";
 
-import { captureGeometry, captureObjectKeys } from "../src/lib/canvas/capture-rules";
+import { captureGeometry, captureObjectKeys, partBox } from "../src/lib/canvas/capture-rules";
+import { readImageHeader } from "../src/lib/files/image-size-rules";
 
-import { cleanUp, createTestArtifact, readyDevUser } from "./support/local-db";
+import { cleanUp, createTestArtifact, createTestUser, readyDevUser } from "./support/local-db";
 import { localStorageEnabled, localStorageSkipReason, storedObjectExists } from "./support/team-icon-db";
 import { expect, test } from "./support/test";
 
@@ -15,12 +18,15 @@ import { expect, test } from "./support/test";
  * store (E2E_LOCAL_R2=1, R2_ENDPOINT on this machine) that accepts PUTs from
  * the test page's origin, and skip without them. The fixture checks
  * (frame-captures.spec.ts) read the pixels; these prove the real server
- * accepts what the tab uploads.
+ * accepts what the tab uploads, and that an agent of someone who may edit
+ * the canvas reads each part back over MCP at exactly its size.
  */
 
 test.skip(!localStorageEnabled(), localStorageSkipReason);
 
 const created: string[] = [];
+const createdUsers: string[] = [];
+const createdTokens: string[] = [];
 let pool: Pool | null = null;
 
 function db(): Pool {
@@ -31,9 +37,10 @@ function db(): Pool {
 test.afterAll(async () => {
   // Captures have no link to their artifact, so they are removed here by hand; the throwaway store keeps their objects.
   if (created.length > 0) await db().query(`delete from frame_capture where artifact_id in (select id from artifact where public_id = any($1))`, [created]);
+  if (createdTokens.length > 0) await db().query(`delete from api_token where id = any($1)`, [createdTokens]);
   await pool?.end();
   pool = null;
-  await cleanUp(created, []);
+  await cleanUp(created, createdUsers);
 });
 
 const screen = (heading: string) => ({
@@ -96,19 +103,73 @@ async function expectCurrentImages(publicId: string) {
   expect(rows.find((row) => row.width === 390)?.height).toBeGreaterThanOrEqual(844);
 }
 
+/** An access token for `userId`, stored as the app stores one: only its hash. */
+async function agentTokenFor(userId: string): Promise<string> {
+  const id = randomUUID();
+  const secret = `e2e-frame-image-${randomUUID()}`;
+  await db().query(`insert into api_token (id, user_id, name, prefix, token_hash) values ($1, $2, 'Frame image e2e', 'e2e…', $3)`, [id, userId, createHash("sha256").update(secret).digest("hex")]);
+  createdTokens.push(id);
+  return secret;
+}
+
+interface ImageToolResult {
+  isError?: boolean;
+  content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[];
+}
+
+/** Calls canvas_frame_image over the real MCP endpoint, as an agent holding `token`. */
+async function frameImage(request: APIRequestContext, token: string, args: Record<string, unknown>): Promise<ImageToolResult> {
+  const response = await request.post("/api/mcp", {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json, text/event-stream", "Content-Type": "application/json" },
+    data: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "canvas_frame_image", arguments: args } },
+  });
+  expect(response.status(), "the MCP endpoint answers").toBe(200);
+  return ((await response.json()) as { result: ImageToolResult }).result;
+}
+
+/** An agent of someone who may edit reads every part of every image, and each is a picture of exactly its part's size. */
+async function expectAgentReadsEveryPart(request: APIRequestContext, token: string, publicId: string) {
+  const frameIds = new Map([[1440, "home-desktop"], [390, "home-phone"]]);
+  for (const row of await capturesOf(publicId)) {
+    const geometry = captureGeometry(row.width, row.height);
+    for (let part = 1; part <= row.part_count; part += 1) {
+      const name = `${String(row.width)} ${row.mode} part ${String(part)}`;
+      const result = await frameImage(request, token, { id: publicId, frameId: frameIds.get(row.width), mode: row.mode, part });
+      expect(result.isError, name).not.toBe(true);
+      const [text, image] = result.content;
+      if (text?.type !== "text" || image?.type !== "image") throw new Error(`${name}: expected a text block, then a picture.`);
+      expect(text.text, name).toContain(`in ${row.mode} mode.`);
+      expect(text.text, name).toContain("in a browser by someone who may edit the canvas.");
+      expect(image.mimeType, name).toBe(row.content_type);
+      const bytes = Buffer.from(image.data, "base64");
+      const box = partBox(geometry, row.width, part);
+      expect(readImageHeader(bytes), `${name} is a picture of its part's size`).toEqual({ type: row.content_type, width: box?.width, height: box?.height });
+    }
+  }
+}
+
 test.describe("frame captures with a database and file storage", () => {
   test.beforeEach(({ isMobile }) => {
     test.skip(isMobile, "the host draws only in a window at least 640 pixels wide");
   });
 
-  test("should draw a canvas's frames from the /app editor, and the server should accept every part", async ({ page }, testInfo) => {
+  test("should draw a canvas's frames from the /app editor, and the server should accept every part and hand each to the editor's agent", async ({ page, request }, testInfo) => {
     const title = `Captured in the app ${testInfo.project.name} ${String(Date.now())}`;
-    const publicId = await createTestArtifact({ userId: await signIn(page), title, content: canvasOf("Welcome back"), visibility: "private", theme: null, kind: "canvas" });
+    const userId = await signIn(page);
+    const publicId = await createTestArtifact({ userId, title, content: canvasOf("Welcome back"), visibility: "private", theme: null, kind: "canvas" });
     created.push(publicId);
 
     await page.goto(`/app?artifact=${publicId}`);
     await expect(host(page)).toHaveAttribute("data-frame-capture-passes", "1", { timeout: 60_000 });
     await expectCurrentImages(publicId);
+
+    // The editor's agent reads each part back; someone else's agent gets no picture.
+    await expectAgentReadsEveryPart(request, await agentTokenFor(userId), publicId);
+    const stranger = await createTestUser();
+    createdUsers.push(stranger);
+    const refused = await frameImage(request, await agentTokenFor(stranger), { id: publicId, frameId: "home-desktop" });
+    expect(refused.isError).toBe(true);
+    expect(refused.content).toEqual([{ type: "text", text: "Artifact not found, or you cannot edit it. Only people and agents who can edit a canvas get images of its frames." }]);
 
     // Coming back to the tab asks again; nothing is needed, so nothing new is stored.
     await page.reload();

@@ -117,6 +117,16 @@ export async function listLiveCaptures(artifactId: string): Promise<LiveCapture[
     .where(and(eq(frameCapture.artifactId, artifactId), ne(frameCapture.status, "removed")));
 }
 
+/** The ready capture of one drawing of a canvas, or null. A canvas has at most one for a content and mode. */
+export async function getReadyCapture(artifactId: string, drawing: CaptureDrawing): Promise<FrameCaptureRecord | null> {
+  const [row] = await getDb()
+    .select()
+    .from(frameCapture)
+    .where(and(eq(frameCapture.artifactId, artifactId), eq(frameCapture.frameHash, drawing.frameHash), eq(frameCapture.mode, drawing.mode), eq(frameCapture.status, "ready")))
+    .limit(1);
+  return row ?? null;
+}
+
 /** How many captures a person started within the last hour and has not finished. */
 export async function countPendingCaptures(userId: string, now: Date = new Date()): Promise<number> {
   const since = new Date(now.getTime() - captureLimits.pendingTtlMs);

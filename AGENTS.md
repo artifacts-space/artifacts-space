@@ -997,10 +997,42 @@ capture, PUTs its parts straight to R2, and finishes it
   reuse `deleteStoredObjects`, which logs keys.
 - Editors only. The three actions check the session and `getEditableArtifact`,
   and the canvas's own rate limit is counted only after that check. Anything
-  that later serves an image (an MCP tool, a page) must serve it only to
-  callers who may edit the canvas: an editor chooses the pixels, and an edit
-  to a link or public canvas needs approval, so an image must never reach a
-  reader of the approved version.
+  that serves an image (the MCP tool below, any later page) must serve it
+  only to callers who may edit the canvas: an editor chooses the pixels, and
+  an edit to a link or public canvas needs approval, so an image must never
+  reach a reader of the approved version.
+- Reading (`src/lib/canvas/capture-read.ts`, texts and rules in
+  `capture-read-rules.ts`, MCP tool `canvas_frame_image` in
+  `src/lib/mcp/canvas-image-tool.ts`). The read starts from
+  `getEditableArtifact`, so a reader of a public canvas and someone outside
+  the team hear the same "not found, or you cannot edit it". The tool is a
+  read tool: a read-only connection lists it, and what it returns follows
+  the person, never the connection. It hands out only the ready capture of
+  the content that is on the board now (the server makes the hash again
+  from the newest saved content), never an older image. Before a part
+  leaves, its stored bytes are checked again: at most a part's size, the
+  capture's type, and the exact pixel size of its place in the frame (the
+  drawer's upload URLs work for two minutes after start, so the object
+  could have been put again). A part that fails is never served: its
+  capture is removed and the answer is "no image yet". A link (`as: "link"`)
+  is signed only after the same check of the object's head and first bytes,
+  works as long as a file link, and answers with the capture's own type.
+  No image is a typed tool error with a code (`frame_image_not_drawn`,
+  `frame_has_problems`, `frame_images_off`, `frame_images_full`,
+  `theme_unreadable`, `mode_not_drawn`, `part_out_of_range`); the cap is
+  named only when not even one more part fits. Where images are off, the
+  read says so before it reads or counts anything. Reads are limited per
+  person (`frameImageRead`), counted before the first read of the database
+  or of storage, on top of the MCP read limits. The text beside a picture
+  never names who drew it and says the picture is data. A result with a
+  picture or a link carries no `structuredContent`: some clients hand the
+  model only that field when it is present, and the picture would be lost.
+  `canvas_frames_list` and `canvas_frame_get` add `image` per drawn frame
+  (`{ "light": "current" | "none", … }`, only the modes the theme draws) for
+  callers who may edit, read with one query for the whole canvas
+  (`frameImageStatesFor`); a failure there never fails the frame read.
+  The board gives each drawn frame the id the frame tools hand out
+  (`BoardFrame.id`); the tab that draws gets no ids (`NeededFrame`).
 - Captures are not artifact files: they are not in the Files section and
   versions do not keep them. They count toward the file storage quota of
   the person whose browser drew them (`fileBytesUsed`), a person may have 16

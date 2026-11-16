@@ -25,6 +25,8 @@ import { validateCanvas } from "./validate";
 
 /** One frame that can be drawn, and the drawings of it. */
 export interface BoardFrame {
+  /** The id the frame goes by: its own, or the stand-in the frame tools hand out ("frame-2"). */
+  id: string;
   width: number;
   /** The least height the frame asks for, or null when it follows its content. */
   height: number | null;
@@ -43,6 +45,10 @@ export interface CaptureBoard {
   files: FileDto[];
   /** Every frame that can be drawn, in board order. A frame with errors is left out: it is never drawn. */
   frames: BoardFrame[];
+  /** False when the canvas cannot be read at all, so it has no frames. */
+  readable: boolean;
+  /** The id of every frame on the canvas, in board order: those in `frames`, and those that are never drawn. */
+  frameIds: string[];
 }
 
 /** The team theme could not be read, so no hash can be trusted: the site theme must never stand in for it. */
@@ -98,7 +104,7 @@ function frameOnBoard(frame: CanvasFrameRead, theme: Theme, files: ReadonlyMap<s
     if (input === null) return null;
     drawings.push({ frameHash: sha256(input), mode });
   }
-  return { width: frame.width, height: frame.height, padding: frame.padding, spec, drawings };
+  return { id: frame.id, width: frame.width, height: frame.height, padding: frame.padding, spec, drawings };
 }
 
 /**
@@ -109,11 +115,11 @@ export async function loadCaptureBoard(record: Pick<ArtifactRecord, "id" | "user
   const [theme, fileRows] = await Promise.all([boardTheme(record), boardFiles(record.id)]);
   const files = fileRows.map(toFileDto);
   const canvas = validateCanvas(record.content);
-  if (!canvas.renderable) return { theme, files, frames: [] };
+  if (!canvas.renderable) return { theme, files, frames: [], readable: false, frameIds: [] };
   const withErrors = new Set(canvas.issues.flatMap((issue) => (issue.severity === "error" && issue.frameId !== undefined ? [issue.frameId] : [])));
   const byId = new Map(fileRows.map((row) => [row.id, row]));
   const frames = canvas.frames.flatMap((frame) => (withErrors.has(frame.id) ? [] : frameOnBoard(frame, theme, byId) ?? []));
-  return { theme, files, frames };
+  return { theme, files, frames, readable: true, frameIds: canvas.frames.map((frame) => frame.id) };
 }
 
 /** Every drawing on the board, in board order. */

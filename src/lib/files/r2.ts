@@ -231,6 +231,25 @@ export async function streamObject(config: R2Config, key: string, maxBytes: numb
   return { body: response.body, size };
 }
 
+/** A whole small object read into memory, or why it was not read. */
+export type ObjectRead = { state: "found"; bytes: Uint8Array<ArrayBuffer>; contentType: string } | { state: "missing" } | { state: "too-large" };
+
+/**
+ * Reads a whole small object into memory. R2 is asked for at most
+ * `maxBytes + 1` bytes (Range), so no more than that is ever held, and an
+ * object larger than `maxBytes` is "too-large", never returned. For objects
+ * that are checked before they are passed on, such as one part of a frame
+ * image.
+ */
+export async function readObject(config: R2Config, key: string, maxBytes: number): Promise<ObjectRead> {
+  const response = await send(config, "GET", "GET", key, { Range: `bytes=0-${String(maxBytes)}` });
+  if (response.status === 404) return { state: "missing" };
+  if (!response.ok) throw new R2Error("GET", response.status);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.length > maxBytes) return { state: "too-large" };
+  return { state: "found", bytes, contentType: response.headers.get("content-type") ?? "" };
+}
+
 /** Deletes an object. Deleting one that is already gone succeeds. */
 export async function deleteObject(config: R2Config, key: string): Promise<void> {
   const response = await send(config, "DELETE", "DELETE", key);

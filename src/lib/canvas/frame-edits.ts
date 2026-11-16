@@ -145,9 +145,14 @@ function listIds(ids: readonly string[]): string {
   return ids.length === 0 ? "This canvas has no frames yet." : `The frames are: ${ids.map((id) => `"${id}"`).join(", ")}.`;
 }
 
+/** What a caller hears when a canvas has no frame with the id it asked for: the ids the canvas has. */
+export function noSuchFrameMessage(frameId: string, ids: readonly string[]): string {
+  return `No frame has the id "${frameId}". ${listIds(ids)}`;
+}
+
 function indexOfFrame(board: OpenBoard, frameId: string): number {
   const index = board.ids.indexOf(frameId);
-  if (index === -1) throw new CanvasEditError(`No frame has the id "${frameId}". ${listIds(board.ids)}`);
+  if (index === -1) throw new CanvasEditError(noSuchFrameMessage(frameId, board.ids));
   return index;
 }
 
