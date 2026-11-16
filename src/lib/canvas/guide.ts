@@ -50,7 +50,7 @@ export function buildCanvasGuide(): string {
   return [
     `# canvas artifacts (format version ${String(CANVAS_VERSION)})`,
     "A canvas is a board of frames for mocking up websites and app screens. People pan and zoom the board, and each frame is drawn at its real width with the artifacts.space component set.",
-    `${earlierFormatNote} Use this guide to read or change a canvas that exists.`,
+    `${earlierFormatNote} Use this guide to read or change a canvas that exists. The rules stay complete, because changing a canvas includes adding frames to it.`,
     "## Rules",
     rules.map((rule, index) => `${String(index + 1)}. ${rule}`).join("\n"),
     "## Changing one frame",

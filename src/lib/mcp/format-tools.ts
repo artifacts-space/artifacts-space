@@ -89,7 +89,7 @@ export function formatGuide(kind?: FormatKind): string {
   if (kind) return `${formatInfo[kind].label} (${kind}): ${formatInfo[kind].agent}`;
   const lines = artifactKinds.map((item) => `- ${item}: ${formatInfo[item].agent}`);
   const uiHint = (artifactKinds as readonly string[]).includes("ui")
-    ? ["", 'For a real web page with its own styles and scripts, call artifacts_formats_guide with kind "html" to get the rules and an example. For rich pages built from our components, call it with kind "ui" to get the component reference and an example. For a board of website and app screens built from our components, call it with kind "canvas".']
+    ? ["", `For anything visual or interactive (a mockup, a prototype, a dashboard, a report with charts), write a web page: call artifacts_formats_guide with kind "html" to get the rules and an example. The ui and canvas formats are earlier formats, kept for the artifacts that use them: to read or change one, call it with kind "ui" or kind "canvas".`]
     : [];
   return ["Artifact formats:", ...lines, ...uiHint, "", ICON_GUIDE, "", THEME_GUIDE, "", COVER_GUIDE].join("\n");
 }
@@ -113,7 +113,7 @@ export function registerFormatTools(server: McpServer, access: McpAccess) {
     "artifacts_formats_guide",
     {
       title: "Artifact formats guide",
-      description: "Explains every artifact format. With kind \"html\", returns the rules and an example for a web page that runs in a sandbox. With kind \"ui\", returns the component reference, rules, and an example for rich pages. With kind \"canvas\", returns the rules and an example for a board of website and app mockups. Read it before creating an html, ui, or canvas artifact.",
+      description: "Explains every artifact format. With kind \"html\", returns the rules and an example for a web page that runs in a sandbox: read it before creating one. With kind \"ui\" or \"canvas\", returns the rules, the component reference, and an example of those earlier formats: read it before changing an artifact that uses one.",
       inputSchema: { kind: z.enum(artifactKinds).optional().describe("Format to explain. Omit for an overview.") },
     },
     ({ kind }) => text(formatGuide(kind)),

@@ -67,12 +67,12 @@ export const formatInfo: Record<FormatKind, FormatInfo> = {
   },
   ui: {
     label: "Interface",
-    helper: "A rich page, such as a dashboard or report, built from our components.",
+    helper: "An earlier format: a dashboard or report built from our components. For a new page, choose HTML.",
     agent: `An earlier format, kept for artifacts that already use it: a json-render spec on the artifacts.space component set. ${newVisualWork} Read artifacts_formats_guide with kind "ui" before changing one.`,
   },
   canvas: {
     label: "Canvas",
-    helper: "A board of screens: mockups of websites and apps, built from our components.",
+    helper: "An earlier format: a board of screens built from our components. For a new mockup, choose HTML.",
     agent: `An earlier format, kept for artifacts that already use it: a board of frames, each one screen that holds a json-render spec on the artifacts.space component set. No HTML or CSS. ${newVisualWork} Read artifacts_formats_guide with kind "canvas" before changing one.`,
   },
   file: {
