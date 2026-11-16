@@ -55,6 +55,9 @@ function unknownPropWarnings(key: string, type: UiComponentName, props: Record<s
     .map((prop) => specWarning("unknown_prop", `Element "${key}" (${type}): prop "${prop}" is not a ${type} prop and is ignored. Known props: ${known.join(", ") || "none"}.`, key));
 }
 
+/** How a message names each paired element, with its article. */
+const pairedNames = { Grid: "a Grid", Tabs: "a Tabs element", Accordion: "an Accordion" } satisfies Record<keyof typeof pairedChildren, string>;
+
 /**
  * A paired prop matches children by their place in the spec, and `repeat`
  * draws one written child once per item, so the two do not go together.
@@ -62,9 +65,6 @@ function unknownPropWarnings(key: string, type: UiComponentName, props: Record<s
  * spec uses it. Tabs and Accordion with `repeat` drew before this check
  * existed, so they get a warning and still draw as they did.
  */
-/** How a message names each paired element, with its article. */
-const pairedNames = { Grid: "a Grid", Tabs: "a Tabs element", Accordion: "an Accordion" } satisfies Record<keyof typeof pairedChildren, string>;
-
 function repeatedPairing(key: string, type: keyof typeof pairedChildren, element: UiElement): UiSpecIssue[] {
   const prop = pairedChildren[type];
   if (element.repeat === undefined || element.props[prop] === undefined) return [];
