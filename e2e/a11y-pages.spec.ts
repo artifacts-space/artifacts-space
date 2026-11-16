@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
+import { openGallery } from "./support/gallery";
 import { unreachableSidewaysScrollers } from "./support/scrollers";
 
 /*
@@ -17,7 +18,7 @@ import { unreachableSidewaysScrollers } from "./support/scrollers";
 const linkButton = (page: Page) => page.getByRole("button", { name: "Email me a sign-in link" });
 
 test("should pass axe on the sheet grid with a cell selected", async ({ page }) => {
-  await page.goto("/dev/components#formats");
+  await openGallery(page, ["formats/csv · Sheet at the size limit"]);
   const grid = page.locator('[data-specimen="csv · Sheet at the size limit"]').getByRole("grid", { name: "CSV table" });
   await grid.scrollIntoViewIfNeeded();
   await grid.getByRole("gridcell", { name: "r1c1", exact: true }).click();
@@ -34,14 +35,14 @@ test("should pass axe on the sheet editor", async ({ page }) => {
 });
 
 test("should pass axe on two boards that share column titles, naming each column as a group", async ({ page }) => {
-  await page.goto("/dev/components#Board");
+  await openGallery(page, ["Board"]);
   const boards = page.locator("section#Board");
   const sprint = boards.locator('[data-specimen="Sprint"]');
   const next = boards.locator('[data-specimen="Next sprint, same columns"]');
   await expect(sprint.getByRole("heading", { name: /^To do/ })).toBeVisible();
   await expect(next.getByRole("heading", { name: /^To do/ })).toBeVisible();
   // The widest board scrolls at every width: once it is a tab stop, the boards have measured themselves.
-  // That needs the whole gallery interactive, which takes longer than the default 5 s on a slow machine.
+  // That needs the page interactive, which takes longer than the default 5 s on a slow machine.
   await expect(boards.locator('[data-specimen="8 columns, 50 cards, long text"] figure > [role=group]')).toHaveAttribute("tabindex", "0", { timeout: 30_000 });
   // Each column keeps its name for assistive technology, as a group rather than a landmark.
   await expect(sprint.getByRole("group", { name: /^To do\s*, 2 cards$/ })).toHaveCount(1);
@@ -52,10 +53,10 @@ test("should pass axe on two boards that share column titles, naming each column
 
 test("should name a scrolling board without a title \"Board\"", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/dev/components#Board");
+  await openGallery(page, ["Board/Empty columns"]);
   const untitled = page.locator('section#Board [data-specimen="Empty columns"] figure');
   await expect(untitled.locator("figcaption")).toHaveCount(0);
-  // It takes its own name once it scrolls, which needs the whole gallery interactive.
+  // It takes its own name once it scrolls, which needs the page interactive.
   await expect(untitled.getByRole("group", { name: "Board", exact: true })).toHaveAttribute("tabindex", "0", { timeout: 30_000 });
 });
 

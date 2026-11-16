@@ -1,7 +1,7 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
+import { openGallery, specimen } from "./support/gallery";
 
 /*
  * Text fields and the pieces a form screen is drawn with (Input, Textarea,
@@ -11,23 +11,12 @@ import { expectNoAxeViolations } from "./support/a11y";
  * typed into, focused, or filled by a password manager.
  */
 
-const specimen = (page: Page, group: string, name: string) => page.locator(`section#${group} [data-specimen="${name}"]`);
-
-/**
- * The gallery is ready once React has hydrated it, which its ready mark
- * says. The server's HTML is on screen, and its fields editable, before
- * that: a scan writes a marker on what it scans, and a marker written on
- * HTML React has yet to check is a hydration mismatch.
- */
-async function galleryReady(page: Page) {
-  await page.goto("/dev/components#Input");
-  await expect(page.locator("section#Input")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator("[data-gallery-ready]")).toBeAttached({ timeout: 60_000 });
-}
+const signIn = "specs/Sign-in screen";
 
 test("should pass axe on the Input, Textarea, Avatar, Button, Badge, List, Select, and Image groups of the gallery", async ({ page }) => {
-  await galleryReady(page);
-  for (const group of ["Input", "Textarea", "Avatar", "Button", "Badge", "List", "Select", "Image"]) {
+  const groups = ["Input", "Textarea", "Avatar", "Button", "Badge", "List", "Select", "Image"];
+  await openGallery(page, groups);
+  for (const group of groups) {
     const section = page.locator(`section#${group}`);
     await section.scrollIntoViewIfNeeded();
     await expectNoAxeViolations(section);
@@ -35,7 +24,7 @@ test("should pass axe on the Input, Textarea, Avatar, Button, Badge, List, Selec
 });
 
 test("should pass axe on the sign-in screen and mirror what is typed in the email field on the page only", async ({ page }) => {
-  await galleryReady(page);
+  await openGallery(page, [signIn]);
   const screen = specimen(page, "specs", "Sign-in screen");
   await screen.scrollIntoViewIfNeeded();
   await expectNoAxeViolations(screen);
@@ -49,7 +38,7 @@ test("should pass axe on the sign-in screen and mirror what is typed in the emai
 });
 
 test("should draw the password field as a stand-in that takes no focus and no typing", async ({ page, isMobile }) => {
-  await galleryReady(page);
+  await openGallery(page, [signIn]);
   const screen = specimen(page, "specs", "Sign-in screen");
   await screen.scrollIntoViewIfNeeded();
   await expect(page.locator('input[type="password"]')).toHaveCount(0);
@@ -72,7 +61,7 @@ test("should draw the password field as a stand-in that takes no focus and no ty
 });
 
 test("should show a Textarea at least as tall as its rows, and let it grow with what is typed", async ({ page }) => {
-  await galleryReady(page);
+  await openGallery(page, ["Textarea/Two rows", "Textarea/Normal", "Textarea/Six rows"]);
   const height = (name: string) => specimen(page, "Textarea", name).getByRole("textbox").evaluate((element) => element.getBoundingClientRect().height);
   const two = await height("Two rows");
   const four = await height("Normal");
@@ -97,7 +86,7 @@ test("should show a Textarea at least as tall as its rows, and let it grow with 
 });
 
 test("should name the password stand-in once, describe it, and show it disabled", async ({ page }) => {
-  await galleryReady(page);
+  await openGallery(page, ["Input/Password stand-in", "Input/Password stand-in, disabled", "Input/Disabled"]);
   const plain = specimen(page, "Input", "Password stand-in");
   await plain.scrollIntoViewIfNeeded();
   const standIn = plain.locator("[data-password-stand-in]");
@@ -120,7 +109,7 @@ test("should name the password stand-in once, describe it, and show it disabled"
 });
 
 test("should mark every text field in the gallery so browsers and password managers skip it", async ({ page }) => {
-  await galleryReady(page);
+  await openGallery(page, ["Input", "Textarea", signIn]);
   const fields = await page.locator("section#Input input, section#Textarea textarea, section#specs [data-specimen='Sign-in screen'] input").evaluateAll((elements) =>
     elements.map((element) => ({
       autocomplete: element.getAttribute("autocomplete"),
