@@ -9,7 +9,7 @@ import type { ArtifactKind } from "@/lib/artifact-types";
 import { cn } from "@/lib/utils";
 
 /** Formats whose content has rules a person can break while typing. */
-const checkedKinds: ReadonlySet<string> = new Set(["json", "csv", "svg", "mermaid", "ui", "canvas"]);
+const checkedKinds: ReadonlySet<string> = new Set(["html", "json", "csv", "svg", "mermaid", "ui", "canvas"]);
 
 /** Whether the editor checks this format as you type. */
 export function isCheckedKind(kind: ArtifactKind): boolean {

@@ -101,14 +101,15 @@ export function pageLabelOf(host: string | null, base: string | null): string | 
 }
 
 /**
- * The label for an artifact's page host: a hash of its id, so the host name
- * says nothing about the artifact (not its id, and never its public id,
- * which is the key to a link-shared artifact). The same artifact always gets
- * the same host, so what its page stores in the browser stays with it and
- * out of every other artifact's reach.
+ * The label for an artifact's page host: a hash of the artifact's public
+ * id, which every reader of the artifact already holds. The host name says
+ * nothing about the artifact: the public id is the key to a link-shared
+ * artifact, and a 128-bit hash of it cannot be turned back into it. The
+ * same artifact always gets the same host, so what its page stores in the
+ * browser stays with it and out of every other artifact's reach.
  */
-export async function pageLabelFor(artifactId: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`artifact-page:v1:${artifactId}`));
+export async function pageLabelFor(pageKey: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`artifact-page:v1:${pageKey}`));
   return Array.from(new Uint8Array(digest).slice(0, 16), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -217,5 +218,10 @@ export const pageMessages = {
  * No answer means the frame holds a document of another origin (the page
  * navigated its frame to another address), and the site closes it. Long
  * enough for a heavy page that keeps its thread busy while it starts.
+ *
+ * The time runs from the first load that is still unanswered, not from the
+ * latest one: a frame that keeps loading documents of another origin must
+ * not push its own deadline back each time. An answer ends the wait, and
+ * the next load starts a new one.
  */
 export const PAGE_ANSWER_MS = 8000;

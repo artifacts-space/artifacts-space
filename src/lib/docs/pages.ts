@@ -120,6 +120,7 @@ export const docsPages = [
       h2("overview", "Overview"),
       h2("limits", "Size limits"),
       h2("markdown", "Markdown"),
+      h2("html", "HTML"),
       h2("code", "Code"),
       h2("text", "Text"),
       h2("json", "JSON"),

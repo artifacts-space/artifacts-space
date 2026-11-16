@@ -1,6 +1,7 @@
 import { formatInfo } from "@/lib/artifact-formats";
 import { updateCheckOptions, validateArtifactContent } from "@/lib/artifact-content";
 import type { ArtifactKind } from "@/lib/artifact-types";
+import { htmlStarter } from "@/lib/html/rules";
 
 /**
  * Why the artifact's content cannot switch to `kind`, or null when it can.
@@ -23,10 +24,11 @@ export function formatSwitchProblem(kind: ArtifactKind, content: string, page: {
 /** Formats a blank page may switch to with nothing in it: they take any text, so the first words typed make them valid. */
 const startsEmptyOnBlank: ReadonlySet<ArtifactKind> = new Set(["text", "code"]);
 
-/** A small valid start for formats that cannot begin empty, so an empty page can become a table, an interface, a canvas, or a diagram. */
+/** A small valid start for formats that cannot begin empty, so an empty page can become a web page, a table, an interface, a canvas, or a diagram. */
 const starterPage = { version: 1, root: "page", elements: { page: { type: "Stack", props: {}, children: ["title"] }, title: { type: "Heading", props: { text: "Untitled", level: 1 } } } };
 
 const starters: Partial<Record<ArtifactKind, string>> = {
+  html: htmlStarter,
   csv: "Name,Value\n,",
   json: "{}",
   svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"></svg>',

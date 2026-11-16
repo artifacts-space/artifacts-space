@@ -243,6 +243,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
               language={draft.language}
               title={draft.title}
               files={artifact.files}
+              pageKey={artifact.publicId}
               revision={revision}
               sourceOpen={sourceOpen}
               fullWidth={fullWidthShown}

@@ -21,7 +21,7 @@ import { sheetAtLimit } from "@/lib/ui/fixtures/formats";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
 import { CanvasCatchUp, type FixtureCatchUp } from "./catch-up-fixture";
-import { dataUi, fixtureArtifact, longJson, longMarkdown, longUi, shortUi, styledUi, type EditorFixtureKind } from "./fixture-content";
+import { counterPage, dataUi, fixtureArtifact, longJson, longMarkdown, longUi, shortUi, styledUi, type EditorFixtureKind } from "./fixture-content";
 
 const samples: Record<EditorFixtureKind, { kind: ArtifactKind; content: () => string }> = {
   ui: { kind: "ui", content: longUi },
@@ -32,6 +32,7 @@ const samples: Record<EditorFixtureKind, { kind: ArtifactKind; content: () => st
   data: { kind: "ui", content: dataUi },
   sheet: { kind: "csv", content: sheetAtLimit },
   canvas: { kind: "canvas", content: () => JSON.stringify(appFlowCanvas, null, 2) },
+  html: { kind: "html", content: counterPage },
 };
 
 /** Sheet formatting kept in memory, so the format menus work without a database. */

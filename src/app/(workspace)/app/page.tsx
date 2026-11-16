@@ -6,6 +6,7 @@ import type { ShareTeam } from "@/components/app/share-teams-context";
 import { toShareTeams } from "@/components/app/share-teams";
 import { ServerCatchUp } from "@/components/app/artifact-editor/use-catch-up";
 import { ServerFrameCaptures } from "@/components/artifact-view/canvas/capture/capture-api-context";
+import { ServerPageHost } from "@/components/artifact-view/server-page-host";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { parseArtifactLink, type ArtifactLink } from "@/lib/app-link";
 import { toArtifactListItem } from "@/lib/artifact-preview";
@@ -88,6 +89,8 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
 
   return (
     // Editors in the workspace draw the frames of a canvas for agents (frame-capture-host.tsx). Fixture pages do not wrap themselves in this, so they draw none.
+    // HTML artifacts run in a sandbox on this deployment's page host; a fixture page has none, so its pages show their source.
+    <ServerPageHost>
     <ServerFrameCaptures>
     {/* An open canvas or interface takes a newer save when the tab comes back (use-catch-up.tsx). Fixture pages have no server to ask. */}
     <ServerCatchUp>
@@ -110,5 +113,6 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
     />
     </ServerCatchUp>
     </ServerFrameCaptures>
+    </ServerPageHost>
   );
 }

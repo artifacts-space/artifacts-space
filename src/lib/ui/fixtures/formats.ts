@@ -27,6 +27,7 @@ export const formatFixtures: FormatFixture[] = [
   { name: "Markdown", kind: "markdown", content: "# Release plan\n\nShip **2.4** on Friday. See [the board](https://example.com).\n\n## Steps\n\n1. Freeze main\n2. Tag\n\n- [x] Notes written\n- [ ] Announce\n\n> Keep it small.\n\n```ts\nconst ok = true;\n```\n\n| Owner | Task |\n|---|---|\n| Ada | Tag |\n\n<script>alert('raw html is skipped')</script>\n\n[javascript link](javascript:alert(1)) ![tracking pixel](https://example.com/p.gif)" },
   { name: "Markdown, long", kind: "markdown", content: `${longText(4000)}\n\n${"x".repeat(400)}` },
   { name: "Code", kind: "code", language: "typescript", content: "export function greet(name: string) {\n  return `Hello, ${name}`;\n}\n" },
+  { name: "HTML page, where no page host is set up", kind: "html", content: '<!doctype html>\n<html lang="en">\n<head><title>Hello</title></head>\n<body><h1>Hello</h1><script>document.title = "ran";</script></body>\n</html>' },
   { name: "Text", kind: "text", content: `Plain text keeps\n  its spacing.\n\n${longText(600)}` },
   { name: "JSON", kind: "json", content: '{"name":"artifacts","tags":["agents","mcp"],"nested":{"ok":true,"count":3}}' },
   { name: "JSON, invalid", kind: "json", content: '{ "name": "artifacts", tags: [1, 2 }' },

@@ -6,6 +6,7 @@ import { blockHues } from "@/lib/block-colors/block-color-rules";
 import { formatInfo, type FormatKind } from "@/lib/artifact-formats";
 import { artifactKinds } from "@/lib/artifact-types";
 import { buildCanvasGuide } from "@/lib/canvas/guide";
+import { buildHtmlGuide } from "@/lib/html/guide";
 import type { McpAccess } from "@/lib/oauth/scopes";
 import { buildUiGuide } from "@/lib/ui/guide";
 
@@ -83,11 +84,12 @@ function text(value: string) {
 export function formatGuide(kind?: FormatKind): string {
   if (kind === "ui") return buildUiGuide();
   if (kind === "canvas") return buildCanvasGuide();
+  if (kind === "html") return buildHtmlGuide();
   if (kind === "markdown") return `${formatInfo.markdown.label} (markdown): ${formatInfo.markdown.agent}\n\n${MARKDOWN_DIAGRAM_GUIDE}\n\n${MARKDOWN_MEDIA_GUIDE}\n\n${MARKDOWN_COLOR_GUIDE}`;
   if (kind) return `${formatInfo[kind].label} (${kind}): ${formatInfo[kind].agent}`;
   const lines = artifactKinds.map((item) => `- ${item}: ${formatInfo[item].agent}`);
   const uiHint = (artifactKinds as readonly string[]).includes("ui")
-    ? ["", 'For rich pages, call artifacts_formats_guide with kind "ui" to get the component reference and an example. For mockups of websites and app screens, call it with kind "canvas".']
+    ? ["", 'For a real web page with its own styles and scripts, call artifacts_formats_guide with kind "html" to get the rules and an example. For rich pages built from our components, call it with kind "ui" to get the component reference and an example. For a board of website and app screens built from our components, call it with kind "canvas".']
     : [];
   return ["Artifact formats:", ...lines, ...uiHint, "", ICON_GUIDE, "", THEME_GUIDE, "", COVER_GUIDE].join("\n");
 }
@@ -111,7 +113,7 @@ export function registerFormatTools(server: McpServer, access: McpAccess) {
     "artifacts_formats_guide",
     {
       title: "Artifact formats guide",
-      description: "Explains every artifact format. With kind \"ui\", returns the component reference, rules, and an example for rich pages. With kind \"canvas\", returns the rules and an example for a board of website and app mockups. Read it before creating a ui or canvas artifact.",
+      description: "Explains every artifact format. With kind \"html\", returns the rules and an example for a web page that runs in a sandbox. With kind \"ui\", returns the component reference, rules, and an example for rich pages. With kind \"canvas\", returns the rules and an example for a board of website and app mockups. Read it before creating an html, ui, or canvas artifact.",
       inputSchema: { kind: z.enum(artifactKinds).optional().describe("Format to explain. Omit for an overview.") },
     },
     ({ kind }) => text(formatGuide(kind)),

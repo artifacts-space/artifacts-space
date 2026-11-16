@@ -1,5 +1,6 @@
 import {
   IconAlignLeft,
+  IconAppWindow,
   IconBraces,
   IconCode,
   IconFileText,
@@ -19,6 +20,7 @@ export const kinds: ArtifactKind[] = [...artifactKinds];
 
 export const kindIcons: Record<FormatKind, typeof IconFileText> = {
   markdown: IconFileText,
+  html: IconAppWindow,
   code: IconCode,
   text: IconAlignLeft,
   json: IconBraces,
@@ -33,6 +35,7 @@ export const kindIcons: Record<FormatKind, typeof IconFileText> = {
 /** Text color class per format. The colors are tokens in globals.css. */
 export const kindColors: Record<FormatKind, string> = {
   markdown: "text-kind-markdown",
+  html: "text-kind-html",
   code: "text-kind-code",
   text: "text-kind-text",
   json: "text-kind-json",

@@ -165,7 +165,7 @@ export function SharedArtifactPanel({ artifact, viewerId, onUpdated, onWithdrawn
                 <ArtifactSheetFormat artifactId={null} stored={artifact.sheetFormat}>
                   <ReaderBlockMenu publicId={artifact.publicId} enabled={artifact.kind === "markdown"}>
                     <InlineCommentSurface>
-                      <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} />
+                      <ArtifactView kind={artifact.kind} content={artifact.content} title={artifact.title} language={artifact.language} files={artifact.files} pageKey={artifact.publicId} />
                     </InlineCommentSurface>
                   </ReaderBlockMenu>
                 </ArtifactSheetFormat>

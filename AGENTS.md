@@ -563,10 +563,12 @@ A page with scripts that an agent or a person wrote never runs on this site's
 origin. It runs on a page host: `<label>.<PAGE_HOST>`, one host per artifact
 on a second domain (`src/lib/page-host/rules.ts`).
 
-- The label is a hash of the artifact's id (`pageLabelFor`), 32 hex
-  characters. It says nothing about the artifact, and never contains the
-  public id, which is the key to a link-shared artifact. One host per
-  artifact keeps each page's browser storage apart.
+- The label is a hash of the artifact's public id (`pageLabelFor`), 32 hex
+  characters. Every reader already holds the public id, so no internal id
+  reaches a reader for this. The label says nothing about the artifact: the
+  public id is the key to a link-shared artifact, and the hash cannot be
+  turned back into it. One host per artifact keeps each page's browser
+  storage apart.
 - A page host serves one thing: the frame document at `/`
   (`frame-document.ts`). The proxy answers every request whose Host looks
   like a page host, whole, before any app code (`pageHostResponse`, and the
@@ -618,6 +620,20 @@ on a second domain (`src/lib/page-host/rules.ts`).
   `PAGE_HOST` is set for the build as well as at run time. The domain
   itself (no label) is not covered: never point it at this app.
   `rules.ts` has no `@/` import, because `next.config.ts` loads it.
+- The `html` format is what runs there (`src/lib/html/rules.ts`,
+  `HtmlView`). Its save check only asks for `<!doctype html>` at the start:
+  the content is never parsed or sanitized, because the sandbox is the
+  boundary. Never render HTML content any other way: not with
+  `dangerouslySetInnerHTML`, not in an iframe on this origin, not through
+  `srcDoc`. A view shows the running page only inside `ServerPageHost` (the
+  artifact page and `/app`); everywhere else, and where no page host is
+  set up, `HtmlView` shows the source as text. `pageKey` on `ArtifactView`
+  is the artifact's public id. Link previews and search read the page as
+  text (`htmlText`), never as markup. Readers of a link-shared or public
+  HTML page who cannot edit it see a note that the page is its author's,
+  with the Report link (`SharedPageNotice`). Agents read the rules in
+  `buildHtmlGuide`, which lists the same hosts as `pageContentPolicy`; a
+  test keeps them equal.
 - `PAGE_HOST` unset (and not `next dev`): no page runs, and `PageFrame`
   draws nothing (`usePagesCanRun`). Tests: `rules.test.ts`,
   `proxy.test.ts`, `e2e/page-frame.spec.ts` on `/dev/page-frame`, and

@@ -10,6 +10,8 @@ import { TitleTheme } from "@/components/artifact-theme/title-theme";
 import { AddCoverButton } from "@/components/artifact-cover/add-cover-button";
 import { ArtifactCover } from "@/components/artifact-cover/artifact-cover";
 import { ApprovedArticle } from "@/components/artifact-page/approved-article";
+import { ServerPageHost } from "@/components/artifact-view/server-page-host";
+import { ViewNotice } from "@/components/artifact-view/view-notice";
 import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
 import { ArtifactPageFooter } from "@/components/artifact-page/artifact-page-footer";
 import { ArtifactPageTheme } from "@/components/artifact-page/artifact-page-theme";
@@ -46,6 +48,7 @@ import { loadActor } from "@/lib/agents/queries";
 import { loadArtifactByline } from "@/lib/artifact-byline";
 import { iconTitlePrefix } from "@/lib/artifact-icons";
 import type { ArtifactEditorDto } from "@/lib/artifact-types";
+import { showsAuthorNote } from "@/lib/html/rules";
 import { artifactOgMetadata, artifactPagePath } from "@/lib/og/artifact-og";
 import { hasWidthSetting, bodyFillsColumnClass, pageColumnClass, usesFullWidth } from "@/lib/page-width/rules";
 import { pageOrganizersFor } from "@/lib/projects/page-project";
@@ -138,8 +141,9 @@ function PendingEditNotice({ viewable }: { viewable: ViewableArtifact }) {
 /** The artifact itself: the shared cached render for an approved version, or a fresh render of the latest. */
 function ArtifactBody({ viewable, files }: { viewable: ViewableArtifact; files: FileDto[] }) {
   const { view, version } = viewable;
-  if (version.versionId) return <ApprovedArticle versionId={version.versionId} savedAt={viewable.served.updatedAt.toISOString()} files={files} />;
-  return <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} />;
+  const pageKey = viewable.record.publicId;
+  if (version.versionId) return <ApprovedArticle versionId={version.versionId} savedAt={viewable.served.updatedAt.toISOString()} files={files} pageKey={pageKey} />;
+  return <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} pageKey={pageKey} />;
 }
 
 /** Who saved the version this reader sees, or null when they are gone. Shares the byline's lookup when it is the author (loadActor). */
@@ -306,6 +310,21 @@ function LinkableBody({ viewable, files, canComment }: { viewable: ViewableArtif
   );
 }
 
+/**
+ * Above an HTML page that is shared by link or with everyone, for readers
+ * who cannot edit it: the page is its author's, not this site's, so a form
+ * in it that asks for a password is not ours. With the Report link, here
+ * where the page is, as well as in the footer.
+ */
+function SharedPageNotice({ viewable }: { viewable: ViewableArtifact }) {
+  if (!showsAuthorNote({ kind: viewable.view.kind, canEdit: viewable.canEdit, visibility: viewable.record.visibility })) return null;
+  return (
+    <ViewNotice title="This page was made by its author, not by artifacts.space." className="mb-4">
+      <p>It runs in a sandbox, apart from your account. Do not type a password or payment details into it. <ReportDialog publicId={viewable.record.publicId} /></p>
+    </ViewNotice>
+  );
+}
+
 /** Whether this reader may take a CSV's data out: editors always; everyone else while "Allow CSV download" is on. */
 function exportsCsv(viewable: ViewableArtifact): boolean {
   return mayExportCsv({ canEdit: viewable.canEdit }, { kind: viewable.view.kind, allowCsvDownload: viewable.record.allowCsvDownload });
@@ -394,6 +413,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   return (
     // The header, comments, and footer wear the artifact theme's colors (none for an unthemed artifact) and swap with it.
     <ArtifactPageTheme theme={theme} className="min-h-screen">
+      {/* An HTML artifact's page runs in a sandbox on this deployment's page host. */}
+      <ServerPageHost>
       {/* For editors, the in-place editor below publishes its save status and More menu to the header above it. */}
       <PageEditorChromeProvider>
         <StickyChrome>
@@ -423,6 +444,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
                   <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />
                   <PageConflictNotice />
                   <article className="mt-10" data-block-links="">
+                    <SharedPageNotice viewable={viewable} />
                     {/* A CSV's grid fills the window under the header, as a sheet does. */}
                     <SheetFill artifactKey={record.publicId}>
                       {/* Banding and column alignment, the same for every reader; editors change them from the grid. */}
@@ -443,6 +465,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
           </main>
         </ThemeBackdrop>
       </PageEditorChromeProvider>
+      </ServerPageHost>
       {/* Cookieless view count for the author; people who can edit are never counted (the server checks too). */}
       {countsViews(record.visibility) && !viewable.canEdit ? <ViewBeacon publicId={record.publicId} /> : null}
       <ArtifactPageFooter column={column} />

@@ -65,6 +65,7 @@ export function InlineBody({ canComment = false, children }: { canComment?: bool
         language={draft.language}
         title={draft.title}
         files={artifact.files}
+        pageKey={artifact.publicId}
         revision={revision}
         sourceOpen={sourceOpen}
         onChange={(content) => { update("content", content); }}

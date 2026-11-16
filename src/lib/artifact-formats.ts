@@ -1,3 +1,5 @@
+import { artifactKinds, type ArtifactKind } from "./artifact-types";
+
 /** What people and agents are told about one artifact format. */
 export interface FormatInfo {
   /** Short display name. */
@@ -8,15 +10,20 @@ export interface FormatInfo {
   agent: string;
 }
 
-/** Every artifact format, in picker order. Server-safe: no React, no icons. */
-export const formatKinds = ["markdown", "code", "text", "json", "csv", "svg", "mermaid", "ui", "canvas", "file"] as const;
-export type FormatKind = (typeof formatKinds)[number];
+/** Every artifact format, in picker order: the one list in artifact-types.ts. Server-safe: no React, no icons. */
+export const formatKinds = artifactKinds;
+export type FormatKind = ArtifactKind;
 
 export const formatInfo: Record<FormatKind, FormatInfo> = {
   markdown: {
     label: "Markdown",
     helper: "Readable prose with headings, lists, tables, and links.",
     agent: "GitHub-flavored Markdown, shown as formatted prose. Raw HTML is not rendered. A fenced code block with the language `mermaid` draws as a diagram, so keep diagrams in the document. Uploaded images, video, audio, and files embed as ![alt](/api/files/<file id>) on its own line; artifacts_formats_guide with kind \"markdown\" explains how.",
+  },
+  html: {
+    label: "HTML",
+    helper: "A web page with its own styles and scripts. It runs in a sandbox.",
+    agent: "A full web page: one HTML document with its own CSS and JavaScript, shown running in a sandbox. Use it for anything visual or interactive: mockups, prototypes, dashboards, reports, explainers. It must start with <!doctype html>. Read artifacts_formats_guide with kind \"html\" before writing one.",
   },
   code: {
     label: "Code",

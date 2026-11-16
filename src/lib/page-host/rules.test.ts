@@ -58,12 +58,12 @@ describe("page host names", () => {
 });
 
 describe("pageLabelFor", () => {
-  it("should give each artifact its own stable label that does not contain its id", async () => {
-    const one = await pageLabelFor("3f2a1b4c-0000-4000-8000-000000000001");
+  it("should give each artifact its own stable label that does not contain its public id", async () => {
+    const one = await pageLabelFor("CXpyuB2wc5uTJmRsdqZyKy");
     expect(one).toMatch(/^[0-9a-f]{32}$/);
-    expect(await pageLabelFor("3f2a1b4c-0000-4000-8000-000000000001")).toBe(one);
-    expect(await pageLabelFor("3f2a1b4c-0000-4000-8000-000000000002")).not.toBe(one);
-    expect(one).not.toContain("3f2a1b4c");
+    expect(await pageLabelFor("CXpyuB2wc5uTJmRsdqZyKy")).toBe(one);
+    expect(await pageLabelFor("CXpyuB2wc5uTJmRsdqZyKz")).not.toBe(one);
+    expect(one.toLowerCase()).not.toContain("cxpyub2w");
   });
 });
 

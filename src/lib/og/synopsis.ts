@@ -1,6 +1,7 @@
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { canvasOutline, frameCountLabel } from "@/lib/canvas/outline";
 import { parseCsv } from "@/lib/csv";
+import { htmlText, htmlTitle } from "@/lib/html/rules";
 
 import type { Synopsis } from "./synopsis-types";
 import { uiSynopsis } from "./synopsis-ui";
@@ -23,6 +24,7 @@ export interface SynopsisInput {
 /** The short label for each kind, shown above the title. */
 export const ogKindLabels: Record<ArtifactKind, string> = {
   markdown: "Markdown",
+  html: "Web page",
   code: "Code",
   text: "Text",
   json: "JSON",
@@ -117,10 +119,17 @@ function canvasSynopsis(content: string): Synopsis {
   return { type: "glyph", glyph: "page", label: "Canvas", detail: frames && frames.length > 0 ? frameCountLabel(frames.length) : null };
 }
 
+/** The words on the page as prose; a page with no words (a drawing, a script-only page) shows the page glyph. */
+function htmlSynopsis(content: string): Synopsis {
+  const words = htmlText(content);
+  return words ? proseSynopsis(words, false) : { type: "glyph", glyph: "page", label: "Web page", detail: htmlTitle(content) || null };
+}
+
 const builders: Record<ArtifactKind, (input: SynopsisInput) => Synopsis> = {
   canvas: ({ content }) => canvasSynopsis(content),
   ui: ({ content }) => uiSynopsis(content) ?? { type: "glyph", glyph: "page", label: "Dashboard", detail: null },
   markdown: ({ content }) => proseSynopsis(content, true),
+  html: ({ content }) => htmlSynopsis(content),
   text: ({ content }) => proseSynopsis(content, false),
   csv: ({ content }) => csvSynopsis(content),
   code: ({ content, language }) => codeSynopsis(content, language || "Code"),

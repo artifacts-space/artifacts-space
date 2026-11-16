@@ -32,7 +32,8 @@ Full documentation: https://artifacts.space/docs
   update, and list artifacts at `/api/mcp`, on any artifacts.space account.
   ChatGPT Pro can read; saving from ChatGPT needs a Business, Enterprise, or
   Edu workspace.
-- **Formats people can read.** Markdown, code, plain text, JSON, CSV tables,
+- **Formats people can read.** Markdown, HTML pages that run in a sandbox
+  with their own styles and scripts, code, plain text, JSON, CSV tables,
   SVG, Mermaid diagrams, Interface artifacts (dashboards, reports, and
   checklists built from a fixed component set), Canvas artifacts (boards of
   website and app mockups built from the same set), and uploaded files. Agent

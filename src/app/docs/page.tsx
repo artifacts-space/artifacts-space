@@ -47,7 +47,7 @@ export default function DocsIntroduction() {
 
       <DocsH page={page} id="formats" />
       <Prose>
-        <p>Pick the format that fits the content. Plain formats show source or simple views; <code>ui</code> builds a rich page from components.</p>
+        <p>Pick the format that fits the content. Plain formats show source or simple views; <code>html</code> is a real web page that runs in a sandbox; <code>ui</code> builds a rich page from components.</p>
       </Prose>
       <FactTable head={["Format", "What it is"]} rows={formatKinds.map((kind) => [kind, formatInfo[kind].helper])} />
       <Prose>

@@ -137,6 +137,8 @@ const byFormat: Record<ArtifactKind, (input: ContentInput) => string> = {
   json: (input) => fenced(prettyJson(input.content) ?? input.content, "json"),
   csv: (input) => csvToMarkdown(input.content, input.rawUrl),
   svg: (input) => fenced(input.content, "svg"),
+  // The source, so an agent that reads the Markdown version can change the page.
+  html: (input) => fenced(input.content, "html"),
   mermaid: (input) => fenced(input.content, "mermaid"),
   ui: (input) => uiSpecToMarkdown(input.content, { fileLink: fileLinkFor(input.files) }),
   canvas: (input) => canvasToMarkdown(input.content, { fileLink: fileLinkFor(input.files) }),
