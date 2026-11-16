@@ -22,6 +22,7 @@ export interface PageEdit {
   /** View source is open: the raw content replaces the rendered artifact. */
   sourceOpen: boolean;
   showSource: () => void;
+  hideSource: () => void;
 }
 
 export const PageEditContext = createContext<PageEdit | null>(null);

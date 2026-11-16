@@ -63,6 +63,7 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
     revision,
     sourceOpen,
     showSource: () => { if (!sourceOpen) toggleSource(); },
+    hideSource: () => { if (sourceOpen) toggleSource(); },
   }), [artifact, draft, update, revision, sourceOpen, toggleSource]);
 
   return { artifact, draft, replace, sourceOpen, toggleSource, onUpdated, restored, start, value };
