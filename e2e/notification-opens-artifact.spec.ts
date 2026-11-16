@@ -1,5 +1,5 @@
 import type { Page, Request } from "@playwright/test";
-import { expect, test } from "./support/test";
+import { expect as baseExpect, test } from "./support/test";
 
 /**
  * Choosing a notification while the workspace is already open: the bell's
@@ -9,29 +9,12 @@ import { expect, test } from "./support/test";
  */
 
 /*
- * These tests fail now and then on a cold dev server (the first tests of a CI shard): the notification's click is
- * taken, and the artifact never opens. One cause is proven: the router drops a link that is still loading when
- * anything writes the address bar in that time. Which write does it there is not known yet, so a failed test keeps
- * its trace (CI uploads test-results), and the page notes every write of the address bar and who made it.
- * Issue #207 tracks it. Remove the trace and the notes with the fix they point at: a trace is kept for every test
- * of this file until then.
+ * A wait in this file may take 15 seconds, not the usual 5. On a cold dev server (the first tests of a CI shard)
+ * the browser needed 4.3 seconds to draw a notification's page after the server had answered, on a machine where
+ * one pick in the list took 2 seconds, and the usual wait ended just before the comments opened (issue #207). The
+ * link was never lost. A wait still ends as soon as what it waits for is there.
  */
-test.use({ trace: "retain-on-failure" });
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    for (const name of ["pushState", "replaceState"] as const) {
-      const original = window.history[name].bind(window.history);
-      window.history[name] = (state: unknown, unused: string, url?: string | URL | null) => {
-        const stack = new Error().stack ?? "";
-        const frames = stack.split("\n").slice(2, 5).map((line) => line.trim()).join(" < ");
-        const ours = stack.includes("writeUrl") ? (stack.includes("settleUrl") ? "the workspace, for a link" : "the workspace, for the selection") : null;
-        const who = ours ?? (stack.includes("HistoryUpdater") ? "the router" : `another writer (${frames})`);
-        console.debug(`[address] ${name} by ${who}: ${String(url)} (was ${window.location.search || "plain"})`);
-        original(state, unused, url);
-      };
-    }
-  });
-});
+const expect = baseExpect.configure({ timeout: 15_000 });
 
 const editor = (page: Page, title: string) => page.getByRole("region", { name: `Edit ${title}` });
 const selectedCard = (page: Page) => page.locator('[data-slot="artifact-list"] [aria-current="true"]');
@@ -98,10 +81,11 @@ test("should open the same artifact again when the same notification is chosen t
 test("should open the comments again when the same notification is chosen twice on a slow CPU", async ({ page }) => {
   // A slow CPU makes Next draw the workspace's own address writes late, in one pass with the second link, whose
   // address then equals the first link's: nothing React sees changes, and only the new history entry says so.
-  test.slow();
+  // Six times slower again than the cold shard the file's 15 seconds are for: this test failed there with 15.
+  test.setTimeout(180_000);
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
-  const drawn = { timeout: 15_000 };
+  const drawn = { timeout: 45_000 };
   await page.goto("/dev/workspace");
   await chooseNotification(page, "mentioned you on Long markdown fixture");
   await expect(commentsHeading(page, "Long markdown fixture")).toBeVisible(drawn);
