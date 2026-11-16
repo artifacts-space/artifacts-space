@@ -86,11 +86,14 @@ interface Tally {
   unjudged: number;
 }
 
-/** Saves the edited document and counts how it was saved. */
+/** A marker with nothing after it: the list has no item map (markdown-list-items.ts), so every edit to it is written whole by design. */
+const emptyMarker = /^[ \t>]*(?:[-+*]|\d{1,9}[.)])[ \t]*$/m;
+
+/** Saves the edited document and counts how it was saved; lists without an item map are checked but not counted. */
 function record(what: string, markdown: string, doc: JSONContent, loaded: Loaded, tally: Tally) {
   const { outcome, saved } = outcomeOf(doc, loaded);
   if (outcome === "wrong") tally.problems.push(`${what} is neither the whole-list writing nor a patch that reads back\n${markdown}---\n${saved}`);
-  else tally[outcome] += 1;
+  else if (!emptyMarker.test(markdown)) tally[outcome] += 1;
 }
 
 const edits = Object.entries(listEdits);

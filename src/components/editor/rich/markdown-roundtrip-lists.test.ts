@@ -207,8 +207,10 @@ describe("the two ways an edited list is saved", () => {
     const { saved, whole } = editBothWays("* a\n* b\n", (doc) => {
       doc.content?.[0]?.content?.push(item(emptyParagraph(), { type: "bulletList", content: [item(paragraph("typed"))] }));
     });
-    expect(saved).toBe(whole);
-    expect(saved).toBe("- a\n- b\n- \n  - typed\n");
+    // The editor reads an item that starts with a list, so the new item is written over the list as it was, and `a` and `b` keep their marker.
+    expect(saved).toBe("* a\n* b\n* \n  - typed\n");
+    expect(whole).toBe("- a\n- b\n- \n  - typed\n");
+    expect(parseMarkdown(saved).rawBlocks).toBe(0);
   });
 
   it("should save the whole list as the round trip's own writer does when the first numbered item is emptied", () => {
@@ -240,10 +242,10 @@ describe("the two ways an edited list is saved", () => {
       const text = find(doc, "paragraph", "gamma");
       text.content = [...(text.content ?? []), { type: "hardBreak" }, { type: "text", text: "  edited" }];
     });
-    // The line is stored without the spaces it starts with: with them, the list would load as written the next time.
-    expect(saved).toBe("* top\n  - [x] gamma  \n    edited\n\n    more\n* last\n");
+    // The line keeps its spaces, indented under the item, and the list still loads formatted with them.
+    expect(saved).toBe("* top\n  - [x] gamma  \n      edited\n\n    more\n* last\n");
     expect(parseMarkdown(saved).rawBlocks).toBe(0);
-    expect(find(reloaded(saved), "paragraph", "gamma").content?.map((node) => node.text ?? "/")).toEqual(["gamma", "/", "edited"]);
+    expect(find(reloaded(saved), "paragraph", "gamma").content?.map((node) => node.text ?? "/")).toEqual(["gamma", "/", "  edited"]);
   });
 
   it("should keep the spaces that end an item's first line when a block under it is edited", () => {

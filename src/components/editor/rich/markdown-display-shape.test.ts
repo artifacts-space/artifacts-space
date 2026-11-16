@@ -21,6 +21,14 @@ describe("lists the read view reads differently", () => {
     expect(parseMarkdown("- a\n-\n- c\n").rawBlocks).toBe(0);
   });
 
+  it("should keep the list as written when an item's text is a heading or sits over a line of dashes", () => {
+    // The editor reads both as a paragraph in the item; the read view draws a heading.
+    expect(parseMarkdown("- # A\n- b\n").rawBlocks).toBe(1);
+    expect(parseMarkdown("- a\n  ---\n- b\n").rawBlocks).toBe(1);
+    expect(parseMarkdown("1. a\n   ===\n2. b\n").rawBlocks).toBe(1);
+    expect(parseMarkdown("- a #\n- b\n").rawBlocks).toBe(0);
+  });
+
   it("should keep the list as written when a line under an item is read as text by the read view", () => {
     expect(parseMarkdown("1. a\n    2. b\n").rawBlocks).toBe(1);
     expect(parseMarkdown("1.     code\n2. b\n").rawBlocks).toBe(1);
