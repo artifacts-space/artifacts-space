@@ -1,10 +1,11 @@
 "use client";
 
-import { useId, useMemo, useRef, type CSSProperties } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 
 import { boundsOf, zoomPercent, type BoardView, type Box } from "@/lib/canvas/view-rules";
 import { cn } from "@/lib/utils";
 
+import { BoardFullScreen } from "./board-full-screen";
 import { BoardToolbar } from "./board-toolbar";
 import { CanvasFrame, unmeasuredHeight, type BoardFrame } from "./canvas-frame";
 import { useBoardWindow, useFrameHeights, type BoardMode } from "./use-board-measure";
@@ -37,11 +38,18 @@ function viewVariables(view: BoardView): CSSProperties {
  * pans the board, and two fingers zoom it (see `usePinch`).
  */
 const windowBase =
-  "relative min-w-0 overflow-x-clip outline-none [--canvas-mode:stacked] focus-visible:ring-3 focus-visible:ring-ring/50 @[640px]/canvas:h-[clamp(24rem,72dvh,52rem)] @[640px]/canvas:touch-pan-y @[640px]/canvas:overflow-hidden @[640px]/canvas:rounded-xl @[640px]/canvas:border @[640px]/canvas:border-card-edge @[640px]/canvas:bg-muted/40 @[640px]/canvas:[--canvas-mode:board]";
+  "relative min-w-0 overflow-x-clip outline-none [--canvas-mode:stacked] focus-visible:ring-3 focus-visible:ring-ring/50 @[640px]/canvas:touch-pan-y @[640px]/canvas:overflow-hidden @[640px]/canvas:bg-muted/40 @[640px]/canvas:[--canvas-mode:board]";
 
-function windowClass(mode: BoardMode, dragging: boolean): string {
+/** The board in the page: a window of a fixed height, with an edge. */
+const windowInPage = "@[640px]/canvas:h-[clamp(24rem,72dvh,52rem)] @[640px]/canvas:rounded-xl @[640px]/canvas:border @[640px]/canvas:border-card-edge";
+
+/** The full-screen board: the whole window, so its focus ring is drawn inside it. */
+const windowOnScreen = "focus-visible:ring-inset @[640px]/canvas:h-dvh";
+
+function windowClass(mode: BoardMode, dragging: boolean, fullScreen: boolean): string {
   return cn(
     windowBase,
+    fullScreen ? windowOnScreen : windowInPage,
     // Until the script has fitted the board, its window keeps its room but shows nothing. Stacked frames need no script and show at once.
     mode === "measuring" && "@[640px]/canvas:invisible",
     mode === "board" && (dragging ? "cursor-grabbing select-none" : "cursor-grab"),
@@ -62,22 +70,32 @@ function boardProps(mode: BoardMode, board: PanZoom, hintId: string) {
   return { tabIndex: 0, "aria-describedby": hintId, "data-canvas-zoom": zoomPercent(board.view.zoom), ...board.handlers };
 }
 
+/** Marks the board in the page, so focus can return to its Full screen button. */
+const pageBoardAttribute = "data-canvas-page-board";
+
+interface BoardProps {
+  frames: readonly BoardFrame[];
+  /** True for the board that fills the window; false for the board in the page. */
+  fullScreen: boolean;
+  onFullScreenChange: (fullScreen: boolean) => void;
+}
+
 /**
- * The canvas viewer. In a column at least 640 pixels wide it is a board: a
- * fixed-height window onto frames at their places, panned by drag and zoomed
- * with the toolbar, Ctrl/⌘ + wheel, or two fingers. A plain wheel and a
- * vertical swipe are never taken, so the page always scrolls. In a narrower
- * column (a phone) the frames stack in the page, each scaled to the column,
- * with no board to pan.
- *
- * The styles choose between the two from the column's width, and place and
- * scale every frame, so the server's markup already has its final layout: a
- * stacked canvas shows before any script runs, and nothing on the page moves
- * when scripts start. Both draw the same elements, so a frame keeps its
- * on-page state when the column crosses that width. The script adds what
- * only it can: the board's fit, pan, zoom, and controls.
+ * The full-screen board takes focus as soon as it is a board, so the arrow
+ * keys move it at once. Full screen is for the board only: when its window
+ * becomes too narrow for one, it closes, and the page shows the stacked
+ * frames.
  */
-export function CanvasBoard({ frames }: { frames: readonly BoardFrame[] }) {
+function useFullScreenBoard(windowRef: RefObject<HTMLElement | null>, mode: BoardMode, fullScreen: boolean, onFullScreenChange: (fullScreen: boolean) => void): void {
+  useEffect(() => {
+    if (!fullScreen) return;
+    if (mode === "board") windowRef.current?.focus({ preventScroll: true });
+    if (mode === "stacked") onFullScreenChange(false);
+  }, [windowRef, mode, fullScreen, onFullScreenChange]);
+}
+
+/** One board: the window, its controls, and the frames. The page draws one, and full screen draws a second one over the whole window. */
+function Board({ frames, fullScreen, onFullScreenChange }: BoardProps) {
   const windowRef = useRef<HTMLDivElement>(null);
   const hintId = useId();
   const { mode, size } = useBoardWindow(windowRef);
@@ -88,6 +106,7 @@ export function CanvasBoard({ frames }: { frames: readonly BoardFrame[] }) {
     return box ? { ...box, y: box.y - labelRoom, height: box.height + labelRoom } : null;
   }, [frames, heights]);
   const board = usePanZoom(windowRef, bounds, size, onBoard);
+  useFullScreenBoard(windowRef, mode, fullScreen, onFullScreenChange);
 
   const picked = useRef<string | null>(null);
   const showFrame = (frame: BoardFrame) => {
@@ -104,13 +123,13 @@ export function CanvasBoard({ frames }: { frames: readonly BoardFrame[] }) {
   };
 
   return (
-    <div className="@container/canvas min-w-0">
+    <div className="@container/canvas min-w-0" {...(fullScreen ? {} : { [pageBoardAttribute]: "" })}>
       <div
         ref={windowRef}
         role="group"
         aria-label={`Canvas, ${String(frames.length)} ${frames.length === 1 ? "frame" : "frames"}`}
         data-canvas-board={mode}
-        className={windowClass(mode, board.dragging)}
+        className={windowClass(mode, board.dragging, fullScreen)}
         {...boardProps(mode, board, hintId)}
       >
         {onBoard ? (
@@ -118,7 +137,18 @@ export function CanvasBoard({ frames }: { frames: readonly BoardFrame[] }) {
             <p id={hintId} className="sr-only">
               Drag to move the board. Hold Control or Command and scroll, or pinch with two fingers, to zoom. With the board focused, arrow keys move it, plus and minus zoom, and 0 fits every frame. The Frames menu goes to any frame.
             </p>
-            <BoardToolbar frames={frames} zoom={board.view.zoom} onZoomIn={board.zoomIn} onZoomOut={board.zoomOut} onActualSize={board.actualSize} onFit={board.fit} onShowFrame={showFrame} focusPickedFrame={focusPickedFrame} />
+            <BoardToolbar
+              frames={frames}
+              zoom={board.view.zoom}
+              onZoomIn={board.zoomIn}
+              onZoomOut={board.zoomOut}
+              onActualSize={board.actualSize}
+              onFit={board.fit}
+              onShowFrame={showFrame}
+              focusPickedFrame={focusPickedFrame}
+              fullScreen={fullScreen}
+              onFullScreenChange={onFullScreenChange}
+            />
           </>
         ) : null}
         <div data-canvas-world="" className={worldClass(board)} style={viewVariables(board.view)}>
@@ -127,6 +157,45 @@ export function CanvasBoard({ frames }: { frames: readonly BoardFrame[] }) {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The canvas viewer. In a column at least 640 pixels wide it is a board: a
+ * fixed-height window onto frames at their places, panned by drag and zoomed
+ * with the toolbar, Ctrl/⌘ + wheel, or two fingers. A plain wheel and a
+ * vertical swipe are never taken, so the page always scrolls. In a narrower
+ * column (a phone) the frames stack in the page, each scaled to the column,
+ * with no board to pan.
+ *
+ * The styles choose between the two from the column's width, and place and
+ * scale every frame, so the server's markup already has its final layout: a
+ * stacked canvas shows before any script runs, and nothing on the page moves
+ * when scripts start. Both draw the same elements, so a frame keeps its
+ * on-page state when the column crosses that width. The script adds what
+ * only it can: the board's fit, pan, zoom, and controls.
+ *
+ * The board's Full screen button opens a second board over the whole window
+ * (BoardFullScreen), and the board in the page stays where it is. The second
+ * board fits its frames again and draws them from their specs, so it starts
+ * from each frame's first state, not from what a reader changed in the page.
+ */
+export function CanvasBoard({ frames }: { frames: readonly BoardFrame[] }) {
+  const [fullScreen, setFullScreen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // Back in the page, focus goes to the button that opened full screen, or to the page's board when its controls are gone (a narrow window).
+  const focusPageBoard = () => {
+    const pageBoard = rootRef.current?.querySelector<HTMLElement>(`[${pageBoardAttribute}]`);
+    const target = pageBoard?.querySelector<HTMLElement>("[data-canvas-toolbar] button:last-of-type") ?? pageBoard?.querySelector<HTMLElement>("[data-canvas-board]");
+    target?.focus({ preventScroll: true });
+  };
+  return (
+    <div ref={rootRef} className="min-w-0">
+      <Board frames={frames} fullScreen={false} onFullScreenChange={setFullScreen} />
+      <BoardFullScreen open={fullScreen} onOpenChange={setFullScreen} onClosed={focusPageBoard}>
+        <Board frames={frames} fullScreen onFullScreenChange={setFullScreen} />
+      </BoardFullScreen>
     </div>
   );
 }

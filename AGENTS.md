@@ -708,6 +708,11 @@ Default preset must equal the tokens in `globals.css` (a test checks it).
 Theme fonts other than Geist are vendored in `public/fonts/v1/<id>/` and load
 only where a theme uses them; never add one to the root layout.
 
+A scope's tokens reach only the elements inside its wrapper. Content that is
+drawn elsewhere in the document (a dialog) reads the nearest scope's theme
+from `ThemeSourceContext` (`theme-scope-context.ts`) and wraps itself in a
+`ThemeScope` of its own, as the canvas board's full screen does.
+
 Team presets and the team default live in `src/lib/themes/team-preset-rules.ts`
 (pure rules), `team-presets.ts` (storage), and `artifact-theme-context.ts`
 (what an artifact resolves against). Artifacts store a team preset as a live
@@ -950,6 +955,22 @@ open only at `/api/files/<id>/copies/<copyId>`, for people who may edit, and
 never cached. A copy is kept while any version in the history was saved while
 it was current (`copies.ts`), goes with its file or artifact, and counts
 toward its uploader's file storage quota.
+
+### Canvas board
+
+The canvas viewer (`src/components/artifact-view/canvas/canvas-board.tsx`) is
+a board in a column at least 640 pixels wide and stacked frames in a narrower
+one; the styles decide, so the server's markup has its final layout. The
+board's Full screen button opens a second board in a dialog over the whole
+window (`board-full-screen.tsx`): Escape or the same button closes it, focus
+returns to the button, and it closes by itself when the window becomes too
+narrow for a board. The dialog is outside the artifact's `ThemeScope` and its
+comment surface, so it applies the theme again (see Themes) and carries
+`data-comment-skip`. The second board draws the frames from their specs, so
+it starts from each frame's first state. While it is open the page holds two
+boards: a test that reads the full-screen one starts from the dialog, never
+from `[data-canvas-board]` alone. `e2e/canvas.spec.ts` checks all of this on
+`/dev/canvas` (`?theme=<preset id>` puts the fixture in a theme).
 
 ### Frame captures
 
