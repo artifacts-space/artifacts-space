@@ -218,5 +218,10 @@ export const pageMessages = {
  * No answer means the frame holds a document of another origin (the page
  * navigated its frame to another address), and the site closes it. Long
  * enough for a heavy page that keeps its thread busy while it starts.
+ *
+ * The time runs from the first load that is still unanswered, not from the
+ * latest one: a frame that keeps loading documents of another origin must
+ * not push its own deadline back each time. An answer ends the wait, and
+ * the next load starts a new one.
  */
 export const PAGE_ANSWER_MS = 8000;
