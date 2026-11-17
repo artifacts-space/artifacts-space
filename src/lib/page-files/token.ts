@@ -96,6 +96,18 @@ function expiryFor(now: Date): number {
   return Math.floor(now.getTime() / 1000 / step) * step + pageTokenLimits.lifeSeconds;
 }
 
+/** Seals a grant into a token that ends at `expires` (seconds since the epoch). */
+function sealPageToken(grant: PageGrant, expires: number, secret: string): PageToken {
+  const keys = keysFor(secret);
+  const held = Buffer.from(JSON.stringify([grant.artifactId, grant.asOf?.getTime() ?? 0, expires, grant.stamp]));
+  const host = bound(grant.label);
+  const nonce = createHmac("sha256", keys.nonce).update(host).update("\n").update(held).digest().subarray(0, nonceBytes);
+  const cipher = createCipheriv("aes-256-gcm", keys.seal, nonce);
+  cipher.setAAD(host);
+  const sealed = Buffer.concat([cipher.update(held), cipher.final()]);
+  return { token: Buffer.concat([nonce, cipher.getAuthTag(), sealed]).toString("base64url"), expiresAt: new Date(expires * 1000) };
+}
+
 /**
  * Makes the token for a grant. Call only for a viewer who passed the
  * artifact's access check. Two calls within one step for the same grant
@@ -104,15 +116,20 @@ function expiryFor(now: Date): number {
  * two different tokens.
  */
 export function mintPageToken(grant: PageGrant, now: Date = new Date(), secret: string = pageTokenSecret()): PageToken {
-  const keys = keysFor(secret);
-  const expires = expiryFor(now);
-  const held = Buffer.from(JSON.stringify([grant.artifactId, grant.asOf?.getTime() ?? 0, expires, grant.stamp]));
-  const host = bound(grant.label);
-  const nonce = createHmac("sha256", keys.nonce).update(host).update("\n").update(held).digest().subarray(0, nonceBytes);
-  const cipher = createCipheriv("aes-256-gcm", keys.seal, nonce);
-  cipher.setAAD(host);
-  const sealed = Buffer.concat([cipher.update(held), cipher.final()]);
-  return { token: Buffer.concat([nonce, cipher.getAuthTag(), sealed]).toString("base64url"), expiresAt: new Date(expires * 1000) };
+  return sealPageToken(grant, expiryFor(now), secret);
+}
+
+/**
+ * A token that ends sooner than one made now would: at `endsAt`, in whole
+ * seconds. For the development fixture, whose tests need a token that ends
+ * within seconds (src/app/dev/page-frame/actions.ts). It can only shorten a
+ * token's life: an end later than the usual one throws, so nothing can use
+ * this to make a token that outlives pageTokenLimits.
+ */
+export function mintShorterPageToken(grant: PageGrant, endsAt: Date, now: Date = new Date(), secret: string = pageTokenSecret()): PageToken {
+  const expires = Math.floor(endsAt.getTime() / 1000);
+  if (expires > expiryFor(now)) throw new RangeError("A page files token cannot end later than the usual one.");
+  return sealPageToken(grant, expires, secret);
 }
 
 /** The shape of a token in an address: base64url, and no longer than any token made here. */

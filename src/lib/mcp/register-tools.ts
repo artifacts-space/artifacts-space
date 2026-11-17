@@ -8,6 +8,7 @@ import { registerArtifactTools } from "./artifact-tools";
 import { registerCanvasTools } from "./canvas-tools";
 import { registerFileTools } from "./file-tools";
 import { registerFormatTools } from "./format-tools";
+import { registerPageFileTools } from "./page-file-tools";
 import { registerProjectTools } from "./project-tools";
 import { registerTagTools } from "./tag-tools";
 import { registerTeamTools } from "./team-tools";
@@ -33,6 +34,7 @@ export function registerAllTools(server: McpServer, userId: string, access: McpA
   registerTemplateTools(server, access);
   registerThemeTools(server, userId, access);
   registerFileTools(server, userId, access, harness);
+  registerPageFileTools(server, userId, access, harness);
   registerTeamTools(server, userId, access);
   registerVersionTools(server, userId, access, harness);
   registerViewTools(server, userId, access);

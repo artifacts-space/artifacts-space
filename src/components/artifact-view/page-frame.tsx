@@ -8,6 +8,8 @@ import { askAgainOnFailure } from "@/lib/page-files/rules";
 import { PAGE_ANSWER_MS, pageFramePath, pageLabelFor, pageMessages, pageOrigin, pageSandbox } from "@/lib/page-host/rules";
 import { cn } from "@/lib/utils";
 
+import { usePassRenewal, type PagePass } from "./page-renewal";
+
 /**
  * Asks the server where a page loads its files from: the token for its
  * frame's address, for this viewer (src/lib/page-files/actions.ts). Null
@@ -97,14 +99,32 @@ interface HeldAddress {
  * address that is about to end. When no address can be made, the page runs
  * at `/` without its files.
  *
- * A page that stays open is not given a new address while it runs, on
- * purpose: the token is part of the frame's address, so a new one would
- * load the page again and drop what the reader did in it. A file the page
- * first asks for after its address ended (10 to 15 minutes, pageTokenLimits)
- * gets a 404 until the next load; the guide tells agents to load what the
- * page needs when it starts.
+ * A page that stays open gets its next address without loading again:
+ * the address in the frame's `src` stays the one this load started on, and
+ * the frame document moves its own address when the site hands it the next
+ * one (usePassRenewal). `pass` is what that needs: when this load's address
+ * ends, and how to ask for the next; null for a page without files.
  */
-function usePagePath(pageKey: string, filesKey: string | undefined, load: string): string | null {
+function usePagePath(pageKey: string, filesKey: string | undefined, load: string): { path: string | null; pass: PagePass | null } {
+  const { path, address } = useSettledAddress(pageKey, filesKey, load);
+  return { path, pass: usePagePass(pageKey, address) };
+}
+
+/** What a running page's renewal needs (usePassRenewal): when the address this load started on ends, and how to ask for the next. Null without an address. */
+function usePagePass(pageKey: string, held: { token: string; endsAt: number } | null): PagePass | null {
+  const { address } = useContext(PageHostContext);
+  const versionId = useContext(PageVersionContext);
+  const token = held?.token ?? null;
+  const endsAt = held?.endsAt ?? 0;
+  // One object per address, so the renewal starts once per load and not on every render.
+  return useMemo(() => {
+    if (!address || token === null) return null;
+    return { endsAt, ask: () => address({ pageKey, ...(versionId === null ? {} : { versionId }) }) };
+  }, [address, token, endsAt, pageKey, versionId]);
+}
+
+/** The path one load of the page starts on, and the files address behind it, once settled (see usePagePath). */
+function useSettledAddress(pageKey: string, filesKey: string | undefined, load: string): { path: string | null; address: { token: string; endsAt: number } | null } {
   const { address } = useContext(PageHostContext);
   const versionId = useContext(PageVersionContext);
   const [held, setHeld] = useState<HeldAddress | null>(null);
@@ -125,8 +145,14 @@ function usePagePath(pageKey: string, filesKey: string | undefined, load: string
       .catch(() => { if (alive) setHeld({ key, load, token: null, endsAt: 0 }); });
     return () => { alive = false; };
   }, [wanted, settled, mine, address, pageKey, versionId, key, load]);
-  if (!wanted) return pageFramePath(null);
-  return mine && settled ? pageFramePath(mine.token) : null;
+  if (!wanted) return { path: pageFramePath(null), address: null };
+  return startOf(settled ? mine : null);
+}
+
+/** Where a load starts once its address is settled (`held`): the path, and the files address behind it when one was made. Nothing until then. */
+function startOf(held: HeldAddress | null): { path: string | null; address: { token: string; endsAt: number } | null } {
+  if (!held) return { path: null, address: null };
+  return { path: pageFramePath(held.token), address: held.token === null ? null : { token: held.token, endsAt: held.endsAt } };
 }
 
 /** Counts up each time the HTML changes, so a new version loads in a fresh frame document. */
@@ -148,6 +174,8 @@ interface Handshake {
   html: string;
   /** The frame holds another document: the page sent it to another address. */
   onLeft: () => void;
+  /** The frame document loaded (again) and waits for the page: called before the page is sent. */
+  onReady: () => void;
 }
 
 /** A question the site asked the frame and still waits on: its id, and the timer that closes the frame. */
@@ -175,7 +203,7 @@ interface OpenQuestion {
  * this listens. The listener is added in a layout effect, so even a frame
  * document from the browser's cache cannot answer first.
  */
-function usePageHandshake({ frameRef, origin, html, onLeft }: Handshake) {
+function usePageHandshake({ frameRef, origin, html, onLeft, onReady }: Handshake) {
   const [shown, setShown] = useState(false);
   const questionRef = useRef<OpenQuestion | null>(null);
 
@@ -202,6 +230,8 @@ function usePageHandshake({ frameRef, origin, html, onLeft }: Handshake) {
       if (!frame || event.source !== frame || event.origin !== origin) return;
       const message = readMessage(event.data);
       if (message.type === pageMessages.ready) {
+        // Before the page: a frame document that loaded again moves to the newest files address first, so the page starts under it.
+        onReady();
         send();
         ask();
       }
@@ -210,7 +240,7 @@ function usePageHandshake({ frameRef, origin, html, onLeft }: Handshake) {
     };
     window.addEventListener("message", onMessage);
     return () => { window.removeEventListener("message", onMessage); };
-  }, [frameRef, origin, send, ask, settle]);
+  }, [frameRef, origin, send, ask, settle, onReady]);
   useEffect(() => settle, [settle]);
 
   const onLoad = useCallback(() => {
@@ -224,15 +254,24 @@ interface PageWindowProps {
   origin: string;
   /** The frame document's path on the page host (pageFramePath). */
   path: string;
+  /** The files address this load started on, for a page with files: renewed while the page stays open. */
+  pass: PagePass | null;
   html: string;
   title: string;
   onLeft: () => void;
 }
 
-/** One load of the frame document, with the page written into it. */
-function PageWindow({ origin, path, html, title, onLeft }: PageWindowProps) {
+/**
+ * One load of the frame document, with the page written into it. `path` is
+ * the address this load started on and stays that for the whole load
+ * (usePagePath settles it once): a new `src` would load the page again. A
+ * later files address reaches the page through the frame document instead
+ * (usePassRenewal), and is never put in `src`.
+ */
+function PageWindow({ origin, path, pass, html, title, onLeft }: PageWindowProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const { shown, onLoad } = usePageHandshake({ frameRef, origin, html, onLeft });
+  const onReady = usePassRenewal({ frameRef, origin, pass });
+  const { shown, onLoad } = usePageHandshake({ frameRef, origin, html, onLeft, onReady });
   return (
     <iframe
       ref={frameRef}
@@ -300,12 +339,12 @@ export function PageFrame({ pageKey, html, title, filesKey, className }: PageFra
   const filesGeneration = useGeneration(filesKey ?? "");
   const [attempt, setAttempt] = useState(0);
   const load = `${String(generation)}.${String(filesGeneration)}:${String(attempt)}`;
-  const path = usePagePath(pageKey, filesKey, load);
+  const { path, pass } = usePagePath(pageKey, filesKey, load);
   const [leftLoad, setLeftLoad] = useState<string | null>(null);
   const onLeft = useCallback(() => { setLeftLoad(load); }, [load]);
   const showAgain = useCallback(() => { setAttempt((current) => current + 1); }, []);
   // Where the frame loads from, once both the page's host and its path are known.
-  const place = origin && path !== null ? { origin, path } : null;
+  const place = origin && path !== null ? { origin, path, pass } : null;
   return (
     <div data-slot="page-frame-box" aria-busy={place || failed ? undefined : true} className={cn("min-h-0 overflow-hidden", className)}>
       {failed ? <PageCannotStart /> : null}
@@ -315,7 +354,7 @@ export function PageFrame({ pageKey, html, title, filesKey, className }: PageFra
 }
 
 interface PlacedPageProps {
-  place: { origin: string; path: string };
+  place: { origin: string; path: string; pass: PagePass | null };
   /** This load of the page left its frame, and was closed. */
   left: boolean;
   html: string;
@@ -327,5 +366,5 @@ interface PlacedPageProps {
 /** One load of the page where it runs, or, once it left its frame, the note that it was closed. */
 function PlacedPage({ place, left, html, title, onLeft, onShowAgain }: PlacedPageProps) {
   if (left) return <PageLeft onShowAgain={onShowAgain} />;
-  return <PageWindow origin={place.origin} path={place.path} html={html} title={title} onLeft={onLeft} />;
+  return <PageWindow origin={place.origin} path={place.path} pass={place.pass} html={html} title={title} onLeft={onLeft} />;
 }

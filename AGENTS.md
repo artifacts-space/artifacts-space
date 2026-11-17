@@ -796,10 +796,38 @@ path, as on any website: `<link href="css/site.css">`, a module's
   The page can read its own token (it is in its address). That gives it
   nothing new: the token serves only that page's own files, as that viewer
   gets them, and the page can read those already.
-- Known limit: a file the page asks for after its token ended (a lazy
-  import, a seek in a video, more than 10 to 15 minutes after the frame
-  loaded) gets a 404 until the reader loads the page again. The life is one
-  constant; a longer life is a longer window after access is lost.
+- A page that stays open keeps its files without loading again
+  (`usePassRenewal` in `page-renewal.ts`, rules in `renew-rules.ts`). The
+  site asks for the next address close to the end of the one in hand (two
+  minutes before, `passRenewal`) and posts its frame path to the frame
+  document (`pageMessages.renew`), which moves its own address there with
+  `history.replaceState`. The frame's `src` never changes: a new `src`
+  would load the page again. When to ask is one decision (`renewStep`),
+  taken when an address arrives, when the tab is shown or hidden, and when
+  the timer fires: a shown tab holds one timer set from the known end; a
+  hidden tab holds none and never asks; a tab shown again with an address
+  that ended or is close asks at once. A refusal (the reader lost access,
+  or no address could be made) ends it for that load: the page keeps
+  running without its files. Only an address that ends later counts as new
+  (`renewalOutcome`), so one address never sets two timers. Never add an
+  interval here, and never renew while hidden.
+- The frame document takes `renew` only from the window that frames it,
+  only from the site's origin, and only for a path that is a frame
+  document's own under a files address (`pageFramePathPattern`), and only
+  when it is at such a path already. `frame-document.test.ts` runs the
+  script in a VM and fails if the page itself, another window, or another
+  origin can move it. The page shares the window and could move its own
+  address anyway; that gives it nothing, because a files address serves
+  only that page's own files.
+- Known limit, stated in the guide and the docs: what resolves against the
+  document follows the new address (`fetch`, elements added later,
+  `new URL(path, document.baseURI)`); a module that already loaded keeps
+  the address it loaded from for its own later relative `import()` and
+  `import.meta.url`, and a stylesheet file for its own `url()`. Those get a
+  404 after the first address ended, until the page loads again. A file
+  asked for while the tab was hidden past the end of its address also gets
+  a 404. The life is one constant (`pageTokenLimits`); a longer life is a
+  longer window after access is lost.
 - Which files a viewer gets follows the version they are served, like
   every attachment: a reader of the approved version gets only files
   attached by that version's time, and the copy of a replaced file that was
@@ -813,21 +841,75 @@ path, as on any website: `<link href="css/site.css">`, a module's
   under `/f/<token>/`; a page without them still loads `/`. The name is
   needed: Next redirects a path that ends with `/`. The frame asks for a
   new address when the page's files change (`usePageFilesKey`) and before a
-  load once the one it holds is near its end, never on a timer and not on
-  every keystroke in the editor. When no address can be made, the page runs
-  at `/` without its files.
-- Agents: `files_request_upload` takes `pagePath`, `files_attach` attaches
-  it, `files_replace` and `files_delete` change it, and every artifact
-  result lists each file's `pagePath`. `buildHtmlGuide` tells them the
-  rules from the same constants. The list of attached files on the
-  artifact's page shows a page file by its path (`looseFilesWords`);
-  adding one in the web app is not built yet.
+  load once the one it holds is near its end, not on every keystroke in the
+  editor; while the page runs, the renewal above keeps it supplied. When no
+  address can be made, the page runs at `/` without its files.
+- Agents, one or two files: `files_request_upload` takes `pagePath`,
+  `files_attach` attaches it, `files_replace` and `files_delete` change it,
+  and every artifact result lists each file's `pagePath`.
+- Agents, many files in few calls (`src/lib/mcp/page-file-tools.ts`):
+  `page_files_request_uploads` starts the uploads of a whole set, and
+  `page_files_publish` brings the page's files to a new state in one step:
+  uploads at new paths are added, an upload at a path the page has replaces
+  that file (the old one becomes an old copy, as in a single replace), and
+  the paths in `remove` are deleted. Both check the whole set first
+  (`planPagePublish` in `publish-rules.ts`: every path and size, a path
+  named twice, a case twin of a held path, a removal of nothing, and the
+  page's limits as the set leaves it) and refuse with one error that names
+  every file at fault (`faultsMessage`). The request signs no URL and
+  counts nothing until the set passes; then it counts the pending uploads
+  (`pageBatchLimits.maxPendingUploads`), the hourly limit once per file
+  (`pageFileUpload`, `enforceRateLimitHits`), and the storage quota for
+  the set's total. One request starts at most 50 uploads, because an agent
+  reads every signed address in the answer into its context; one publish
+  names as many as an artifact holds, so a site of any size is still one
+  version (`pageBatchLimits`, with the reasons beside each number).
+- The publish is one statement (`runPagePublish` in
+  `publish-statement.ts`), because neon-http has no transactions. It locks
+  the artifact row and runs only while the artifact is still `html`, at the
+  save the plan read (`updated_at`, to the millisecond), with the
+  visibility and team its approval was decided for. It deletes the removed
+  rows, swaps each replaced file's object after copying the old one to
+  `artifact_file_copy`, attaches the new uploads dated at the save, files
+  one version (`save_kind` `files`), writes the approval outcome
+  (`approvalCtes`, shared with the replace), and stamps the artifact. Its
+  last column divides by zero unless every part found exactly the rows the
+  plan named and the page stays within its limits, so a mismatch fails the
+  whole statement and nothing changes (`allOrNothing`, `isPublishRefusal`).
+  Uploads still pending are finished first (`finalizeUpload`, eight at a
+  time); an upload at fault stops the publish before anything changes.
+  `baseVersion` is optional, as for the other file tools; with it, a save
+  since is an `artifact_changed` refusal, and without it the publish is
+  planned again on the new state (three times at most). An image the
+  artifact or a version shows as its icon or cover is not replaced or
+  removed. Removed files stop loading for every reader at once, as with
+  `files_delete`; added and replaced files follow the version a reader is
+  served. `publish.db.test.ts` and `page-file-tools.db.test.ts` check each
+  rule against a real database.
+- Tripwire: `files_attach` attaches page files in its own statement and
+  stamps the artifact afterwards (`recordArtifactChange`), so a publish and
+  a `files_attach` of page files at the same moment do not see each other.
+  The unique index still refuses two files at one path, and the attach
+  reads the totals again and takes its files back out
+  (`attachPageFilesWithinLimits`). One order is not covered: a publish that
+  started before the attach landed and finished after the attach's second
+  read can leave the artifact over a page file limit by that attach's
+  files. It needs two editors of one artifact in the same few
+  milliseconds, and the account's storage quota still holds. Closing it
+  means moving the page files of `files_attach` onto the publish statement.
+- `buildHtmlGuide` tells agents the rules from the same constants: the
+  batch flow first, what belongs in files, and the limit above. The list
+  of attached files on the artifact's page shows a page file by its path
+  (`looseFilesWords`); adding one in the web app is not built yet.
 - Tests without a database: under `next dev` only, a token for the stand-in
   artifact id `fixture:page-files` is answered from files held in memory
   (`fixture-source.ts`), so `e2e/page-files.spec.ts` on
   `/dev/page-frame?page=files` runs the real proxy, token, route, headers,
   and frame. `serve.test.ts` fails if that source ever answers outside
-  `next dev`.
+  `next dev`. `?pass=short&run=<text>` gives that page a first address that
+  ends within seconds and a usual one after it, and `?pass=refused` none
+  after it (`fixtureShortPassAction`, `mintShorterPageToken`, which can
+  only shorten a token's life), for the renewal tests in the same spec.
 
 ## Testing
 

@@ -6,6 +6,7 @@ import { rateLimits } from "@/lib/abuse/limits";
 import { artifactSizeLimits } from "@/lib/artifact-limits";
 import { AGENT_LOOP_LIMIT, COMMENT_MAX_LENGTH, INBOX_CONTEXT_COMMENTS, MAX_MENTIONS_PER_COMMENT } from "@/lib/comments/config";
 import { docsMetadata } from "@/lib/docs/metadata";
+import { pageFileLimitRows } from "@/lib/docs/page-file-docs";
 import { docsHref } from "@/lib/docs/pages";
 import { rateLimitRows, sampleRefusal, type RateLimitRow, type RefusalShape } from "@/lib/docs/rate-limit-docs";
 import { INVITATION_BUDGET_MESSAGE, NON_SIGN_IN_SHARE, nonSignInDailyLimit, SENDIR_DAILY_RECIPIENTS } from "@/lib/email/budget-rules";
@@ -105,7 +106,7 @@ export default function LimitsPage() {
         head={["Limit", "Value"]}
         rows={[
           ["Content per artifact", size(artifactSizeLimits.maxContentBytes)],
-          ["HTML page, styles and scripts included", size(artifactSizeLimits.maxContentBytes)],
+          ["HTML page: the document, with the styles and scripts written in it", size(artifactSizeLimits.maxContentBytes)],
           ["Metadata per artifact", size(artifactSizeLimits.maxMetadataBytes)],
           ["Mermaid source", `${n(maxMermaidLength)} characters`],
           ["ui spec", size(uiLimits.maxSpecBytes)],
@@ -144,6 +145,12 @@ export default function LimitsPage() {
       <Prose>
         <p>Allowed types are listed on <Link href={docsHref("formats", "file")}>Formats</Link>. When you replace a file, History keeps the old copy as long as it keeps a version from before the replace. Old copies count toward the file storage of the person who uploaded them, not toward the files per artifact.</p>
       </Prose>
+
+      <DocsH page={page} id="page-files" />
+      <Prose>
+        <p>The files an HTML artifact&apos;s page loads by relative path have their own limits, apart from the files per artifact above. See <Link href={docsHref("formats", "page-files")}>Page files</Link>.</p>
+      </Prose>
+      <FactTable head={["Limit", "Value"]} rows={pageFileLimitRows()} mono={[]} />
 
       <DocsH page={page} id="teams" />
       <FactTable

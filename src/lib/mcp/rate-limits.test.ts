@@ -32,6 +32,9 @@ describe("mcpLimitChecks", () => {
     expect(mcpLimitChecks(principal, ["artifacts_update"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
     expect(mcpLimitChecks(principal, ["files_attach"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
     expect(mcpLimitChecks(principal, ["files_replace"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
+    expect(mcpLimitChecks(principal, ["page_files_publish"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
+    // Starting uploads changes no artifact: only the publish counts as an edit.
+    expect(mcpLimitChecks(principal, ["page_files_request_uploads"])).toEqual([]);
     expect(mcpLimitChecks(principal, ["artifacts_restore_version"])).toEqual([{ name: "artifactUpdateByToken", subject: "api:t1" }]);
   });
 

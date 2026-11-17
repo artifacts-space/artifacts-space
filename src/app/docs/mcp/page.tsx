@@ -4,6 +4,7 @@ import { CodeSnippet } from "@/components/code/code-snippet";
 import { AnchorHeading, Code, DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
 import { AccessBadge, McpToolEntry } from "@/components/docs/mcp-tool-entry";
+import { UploadFlowsDocs } from "@/components/docs/page-files-docs";
 import { rateLimitMessage } from "@/lib/abuse/rate-limit";
 import { mcpToolResults } from "@/lib/docs/mcp-results";
 import { agentRefusalCodes, agentRefusalMessage } from "@/lib/edits/edit-conflict-rules";
@@ -170,11 +171,13 @@ export default function McpReferencePage() {
         </section>
       ))}
 
+      <UploadFlowsDocs />
+
       <DocsH page={page} id="concurrent-edits" />
       <Prose>
         <p>A person&apos;s work wins over an agent&apos;s. When someone types in the web editor while an agent updates the same artifact, nothing they type is lost.</p>
         <ul>
-          <li><strong>Pass the version you read.</strong> <code>artifacts_get</code> gives editors <code>versionId</code> and <code>baseVersion</code>. Every save result (<code>artifacts_create</code>, <code>artifacts_update</code>, <code>artifacts_restore_version</code>, <code>files_create_artifact</code>, <code>files_attach</code>, <code>files_replace</code>, and <code>files_delete</code> for a file in an artifact) carries the <code>baseVersion</code> of your own save and shows what that save wrote, even when someone saved right after it. Send it with <code>artifacts_update</code> and <code>artifacts_restore_version</code>.</li>
+          <li><strong>Pass the version you read.</strong> <code>artifacts_get</code> gives editors <code>versionId</code> and <code>baseVersion</code>. Every save result (<code>artifacts_create</code>, <code>artifacts_update</code>, <code>artifacts_restore_version</code>, <code>files_create_artifact</code>, <code>files_attach</code>, <code>files_replace</code>, <code>page_files_publish</code>, and <code>files_delete</code> for a file in an artifact) carries the <code>baseVersion</code> of your own save and shows what that save wrote, even when someone saved right after it. Send it with <code>artifacts_update</code> and <code>artifacts_restore_version</code>, and with <code>page_files_publish</code> when the files you publish go with a document you read.</li>
           <li><strong>A stale save is refused.</strong> If anyone saved after your <code>baseVersion</code>, nothing is saved and the tool returns an error with code <code>artifact_changed</code> that says who changed it. Read the artifact again with <code>artifacts_get</code>, merge your changes into the new content, and save with the new <code>baseVersion</code>. Never resend the same call blindly.</li>
           <li><strong>Without a base version</strong>, a save is refused with code <code>base_version_required</code> whenever a person saved the artifact last, whatever it changes: read the artifact with <code>artifacts_get</code> and pass its <code>baseVersion</code>. A change to the title, content, or format is also refused with code <code>artifact_being_edited</code> while a person is typing in the artifact (their editor holds a lease for about a minute after the last keystroke, or until shortly after they close it). Artifacts that only agents saved last still take saves without one.</li>
           <li><strong>Canvas frame writes always name the board.</strong> <code>canvas_frame_save</code>, <code>canvas_frame_update</code>, and <code>canvas_frame_delete</code> change one frame of the canvas you read, so <code>baseVersion</code> is required: get it from <code>canvas_frames_list</code>, <code>canvas_frame_get</code>, <code>artifacts_get</code>, or your last save. If the canvas changed since, nothing is saved and the error (code <code>artifact_changed</code>) says to call <code>canvas_frames_list</code> again. Two agents changing different frames can never undo each other.</li>

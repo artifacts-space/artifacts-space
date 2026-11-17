@@ -27,7 +27,7 @@ export function toFileDto(row: ArtifactFileRecord): FileDto {
  * offersReplace), as replace.ts refuses them. One read of artifact_version
  * by artifact id (its artifact_id index).
  */
-async function picturedFileIds(artifactIds: readonly string[]): Promise<Map<string, Set<string>>> {
+export async function picturedFileIds(artifactIds: readonly string[]): Promise<Map<string, Set<string>>> {
   const pictured = new Map<string, Set<string>>();
   if (artifactIds.length === 0) return pictured;
   const rows = await getDb()

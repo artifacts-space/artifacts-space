@@ -39,6 +39,8 @@ const artifactInputs: Record<string, "id" | "artifact"> = {
   canvas_frame_update: "id",
   canvas_frame_delete: "id",
   files_attach: "artifact",
+  page_files_request_uploads: "artifact",
+  page_files_publish: "artifact",
   comments_list: "artifact",
   comment_create: "artifact",
 };

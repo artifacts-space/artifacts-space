@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { Fragment } from "react";
 
 import { CodeSnippet } from "@/components/code/code-snippet";
 import { DocsH, FactTable, InlineCodeText, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
+import { HtmlPageFilesDocs } from "@/components/docs/page-files-docs";
 import { formatInfo, formatKinds, type FormatKind } from "@/lib/artifact-formats";
 import { artifactSizeLimits } from "@/lib/artifact-limits";
 import { canvasLimits } from "@/lib/canvas/limits";
@@ -11,6 +13,7 @@ import { docsMetadata } from "@/lib/docs/metadata";
 import { docsHref } from "@/lib/docs/pages";
 import { allowedFileTypes, fileLimits, formatBytes } from "@/lib/files/config";
 import { maxMermaidLength } from "@/lib/mermaid-source";
+import { pageFileLimits } from "@/lib/page-files/rules";
 import { uiLimits } from "@/lib/ui/limits";
 
 export const metadata = docsMetadata("formats");
@@ -87,12 +90,13 @@ export default function FormatsPage() {
       <FactTable
         head={["Limit", "Value", "Applies to"]}
         rows={[
-          ["Content", size(artifactSizeLimits.maxContentBytes), "Every kind, in UTF-8 bytes. An HTML page counts whole, with its styles and scripts. Split larger work into several artifacts."],
+          ["Content", size(artifactSizeLimits.maxContentBytes), "Every kind, in UTF-8 bytes. An HTML page's document counts whole, with the styles and scripts written in it; its page files do not. Split larger work into several artifacts."],
           ["Metadata", size(artifactSizeLimits.maxMetadataBytes), "The metadata object, as JSON text."],
           ["ui spec", size(uiLimits.maxSpecBytes), "ui content and each frame of a canvas, plus element and depth limits."],
           ["Canvas", size(canvasLimits.maxCanvasBytes), `canvas content: up to ${String(canvasLimits.maxFrames)} frames and ${canvasLimits.maxElements.toLocaleString("en-US")} elements across them.`],
           ["Mermaid source", `${maxMermaidLength.toLocaleString("en-US")} characters`, "mermaid content."],
           ["File", size(fileLimits.maxBytes), `Each upload. Up to ${String(fileLimits.maxFilesPerArtifact)} files per artifact.`],
+          ["Page files", size(pageFileLimits.maxTotalBytes), `The files an HTML page loads by relative path: up to ${String(pageFileLimits.maxFiles)} per artifact, on top of its other files.`],
         ]}
         mono={[1]}
       />
@@ -100,7 +104,12 @@ export default function FormatsPage() {
         The full list, with rate limits and storage quotas, is on <Link href={docsHref("limits")} className="underline underline-offset-2">Limits and quotas</Link>. The ui limits are on <Link href={docsHref("json-render/validation", "limits")} className="underline underline-offset-2">Validation</Link>.
       </Note>
 
-      {formatKinds.map((kind) => <FormatSection key={kind} kind={kind} />)}
+      {formatKinds.map((kind) => (
+        <Fragment key={kind}>
+          <FormatSection kind={kind} />
+          {kind === "html" ? <HtmlPageFilesDocs /> : null}
+        </Fragment>
+      ))}
 
       <Prose>
         <p>Allowed file types. Anything else is refused. A vague type such as <code>application/octet-stream</code> is decided by the extension.</p>

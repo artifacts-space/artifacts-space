@@ -22,7 +22,7 @@ interface LimitPlacement {
 export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   readByToken: { per: "token", where: "Every MCP read tool call", refusal: "mcp-429", group: "MCP and artifacts" },
   readByUser: { per: "user", where: "MCP read tool calls and opening artifacts in the workspace", refusal: "mcp-429", group: "MCP and artifacts" },
-  artifactUpdateByToken: { per: "token", where: "artifacts_update, artifacts_restore_version, canvas_frame_save, canvas_frame_update, canvas_frame_delete, files_attach, files_replace", refusal: "mcp-429", group: "MCP and artifacts" },
+  artifactUpdateByToken: { per: "token", where: "artifacts_update, artifacts_restore_version, canvas_frame_save, canvas_frame_update, canvas_frame_delete, files_attach, files_replace, page_files_publish", refusal: "mcp-429", group: "MCP and artifacts" },
   artifactCreate: { per: "user", where: "artifacts_create, files_create_artifact, and the web app", refusal: "tool-error", group: "MCP and artifacts" },
   artifactUpdate: { per: "user", where: "Every artifact edit, from MCP and the web app, except web autosaves that continue an editing session", refusal: "tool-error", group: "MCP and artifacts" },
   artifactAutosave: { per: "user", where: "Web editor autosaves that continue an editing session (the editor sends at most one every 5 seconds)", refusal: "form", group: "MCP and artifacts" },
@@ -33,6 +33,7 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   harnessChoice: { per: "user", where: "Changing an artifact's \"Made with\" agent or a connection's agent in the web app", refusal: "form", group: "MCP and artifacts" },
   sharingRequest: { per: "user", where: "Sharing and comments-setting changes (making private is never limited)", refusal: "tool-error", group: "MCP and artifacts" },
   fileUpload: { per: "user", where: "files_request_upload and web uploads", refusal: "tool-error", group: "Files and pages" },
+  pageFileUpload: { per: "user", where: "page_files_request_uploads, counted once for each file a call names", refusal: "tool-error", group: "Files and pages" },
   frameCaptureNeeded: { per: "user", where: "An open canvas asking which of its frames have no image yet, for people who may edit it", refusal: "not-drawn", group: "Files and pages" },
   frameCaptureStart: { per: "user", where: "Images of canvas frames that your browser draws for agents", refusal: "not-drawn", group: "Files and pages" },
   frameCaptureStartByArtifact: { per: "canvas", where: "Images of one canvas's frames, from everyone who may edit it", refusal: "not-drawn", group: "Files and pages" },

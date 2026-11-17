@@ -105,6 +105,9 @@ export function pageHostPath(pathname: string): PageHostPath {
   return rest === pageDocumentName ? "frame" : "file";
 }
 
+/** The frame document's path under a files address, whole: what a renewal may move the frame document's address to, and nothing else. */
+export const pageFramePathPattern = /^\/f\/[A-Za-z0-9_-]{60,400}\/index\.html$/;
+
 /** The path the frame loads: `/`, or the page's name under its files address when the page has files (`token` from the site). */
 export function pageFramePath(token: string | null): string {
   return token === null ? "/" : `/f/${token}/${pageDocumentName}`;
@@ -250,6 +253,13 @@ export const pageMessages = {
   ping: "artifact-page:ping",
   /** Frame to site: yes. It repeats the question's `id` and carries nothing else. */
   pong: "artifact-page:pong",
+  /**
+   * Site to frame document: the page's files have a new address. Carries
+   * `path`, the frame document's path under it (pageFramePath). The frame
+   * document moves its own address there without loading anything, so what
+   * the page asks for by relative path from then on uses the new address.
+   */
+  renew: "artifact-page:renew",
 } as const;
 
 /**
