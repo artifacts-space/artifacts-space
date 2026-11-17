@@ -265,8 +265,6 @@ test("should insert an empty diagram with its source open when Mermaid diagram i
  * already showing (mermaid-block-view.tsx).
  */
 
-const fenceAsOpened = "```mermaid\nflowchart LR\n  Plan --> Build\n```";
-
 test("should show the diagram alone at once, keeping the edit, when Preview is picked with the cursor in the source", async ({ page }) => {
   await openFixture(page);
   const block = await editorBlock(page);
@@ -306,8 +304,8 @@ test("should keep the diagram alone in Preview when it is clicked and when every
   await page.keyboard.press("ControlOrMeta+a");
   // The selection reached the editor and covers the block: it is outlined, because the next key would replace it.
   await expect(block).toHaveAttribute("data-selection-over", "");
-  const outline = await block.evaluate((element) => getComputedStyle(element).outlineStyle);
-  expect(outline).toBe("solid");
+  const outline = await block.evaluate((element) => { const style = getComputedStyle(element); return `${style.outlineWidth} ${style.outlineStyle}`; });
+  expect(outline).toBe("2px solid");
   await expect(sourceOf(block)).toBeHidden();
   await expect(block).not.toHaveAttribute("data-source-open", "");
 
@@ -322,8 +320,8 @@ test("should pass over a diagram in Preview with the arrow keys and never type i
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.type("X");
-  // The cursor went from the paragraph above the diagram to the one below it.
-  await expect(savedMarkdown(page)).toContainText(`Intro paragraph.\n\n${fenceAsOpened}\n\nEnd paragraph.X`);
+  // The cursor went from the paragraph above the diagram to the one below it (which end of it differs across platforms).
+  await expect(savedMarkdown(page)).toContainText(/Intro paragraph\.\n\n```mermaid\nflowchart LR\n {2}Plan --> Build\n```\n\n(?:XEnd paragraph\.|End paragraph\.X)/u);
   await expect(sourceOf(block)).toBeHidden();
 
   await clickInEditor(editor(page).getByText("End paragraph."));
@@ -331,7 +329,7 @@ test("should pass over a diagram in Preview with the arrow keys and never type i
   await page.keyboard.press("ArrowUp");
   await page.keyboard.type("Y");
   // And from the paragraph below it to the one above.
-  await expect(savedMarkdown(page)).toContainText(`Intro paragraph.Y\n\n${fenceAsOpened}\n\nEnd paragraph.X`);
+  await expect(savedMarkdown(page)).toContainText(/(?:YIntro paragraph\.|Intro paragraph\.Y)\n\n```mermaid\nflowchart LR\n {2}Plan --> Build\n```\n\n/u);
   await expect(sourceOf(block)).toBeHidden();
 });
 
