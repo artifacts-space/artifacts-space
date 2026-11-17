@@ -39,6 +39,21 @@ async function openWorkspace(page: Page, path = "/dev/workspace") {
   await expect(page.getByRole("region", { name: "Content" })).toBeVisible();
 }
 
+/**
+ * Waits until the workspace answers a click, by opening and closing Filters,
+ * which changes nothing. An axe scan marks what it reads, and a mark made
+ * before hydration is reported as a mismatch.
+ */
+async function answersClicks(page: Page) {
+  const projectFilter = page.getByRole("combobox", { name: "Filter by project" });
+  await expect(async () => {
+    if (!(await projectFilter.isVisible())) await page.getByRole("button", { name: /^Filters/ }).click();
+    await expect(projectFilter).toBeVisible({ timeout: 1_000 });
+  }).toPass();
+  await page.keyboard.press("Escape");
+  await expect(projectFilter).toBeHidden();
+}
+
 /** Drags a card onto a sidebar row with real mouse moves, so the drop highlight can be checked midway. */
 async function dragCard(page: Page, item: Locator, target: Locator, check?: () => Promise<void>) {
   await item.hover();
@@ -227,10 +242,7 @@ test("should list the artifacts without a project plainly after the projects, ne
     return tree !== null && Boolean(tree.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING);
   });
   expect(after, "they come after the projects").toBe(true);
-  // Scanned once the page answers a click: a scan marks what it reads, and a mark made before hydration is reported as a mismatch.
-  const first = loose(page).locator("li").first().getByRole("button").first();
-  await first.click();
-  await expect(first).toHaveAttribute("aria-current", "true");
+  await answersClicks(page);
   await expectNoAxeViolations(page.locator("[data-slot=artifact-list]"));
 });
 

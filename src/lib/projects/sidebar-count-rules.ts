@@ -75,18 +75,6 @@ export function groupCount(narrowed: boolean, scopeCount: number, shown: number)
 }
 
 /**
- * How many artifacts in the whole scope are in no project of the tree:
- * every artifact no project entry holds, so it counts the artifacts the
- * sidebar lists loose after the projects, including those whose project
- * has no entry here.
- */
-export function looseCount(total: number, entryCounts: readonly number[]): number {
-  let filed = 0;
-  for (const count of entryCounts) filed += count;
-  return Math.max(0, total - filed);
-}
-
-/**
  * Whether the sidebar shows the artifacts in no project, after the
  * projects. Only when there is something to show or do there: artifacts, a
  * row saying there are more, a card being dragged (it takes the card out of

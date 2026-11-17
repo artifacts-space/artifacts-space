@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countsArePartial, groupCount, listLimit, moreRow, narrowsTree, sidebarViewCounts, looseCount, showsLoose, type SidebarNarrowing } from "./sidebar-count-rules";
+import { countsArePartial, groupCount, listLimit, moreRow, narrowsTree, sidebarViewCounts, showsLoose, type SidebarNarrowing } from "./sidebar-count-rules";
 
 const none: SidebarNarrowing = { query: "", kind: "all", view: "all", tags: [], project: false };
 const viewer = "viewer-1";
@@ -72,17 +72,6 @@ describe("groupCount", () => {
 
   it("should show only the rows listed while the tree is narrowed", () => {
     expect(groupCount(true, 40, 2)).toEqual({ count: 2, shown: 2 });
-  });
-});
-
-describe("looseCount", () => {
-  it("should count every artifact no project entry holds, including ones whose project has no entry", () => {
-    // 340 artifacts, 300 in the tree's projects: 30 with no project, 10 in a project the viewer cannot use here.
-    expect(looseCount(340, [200, 100])).toBe(40);
-  });
-
-  it("should never go below zero when moves shift the counts before fresh totals arrive", () => {
-    expect(looseCount(3, [2, 2])).toBe(0);
   });
 });
 

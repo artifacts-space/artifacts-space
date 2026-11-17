@@ -10,7 +10,7 @@ import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import type { ArtifactListItemDto } from "@/lib/artifact-types";
 import { projectNameKey, type ProjectFilter } from "@/lib/projects/rules";
 import { deleteProjectCopy, projectKeyOf, type SidebarProject, type SidebarProjectRow, type SidebarTeam } from "@/lib/projects/sidebar-rules";
-import { groupCount, looseCount, moreRow, showsLoose, type GroupCount } from "@/lib/projects/sidebar-count-rules";
+import { groupCount, moreRow, showsLoose, type GroupCount } from "@/lib/projects/sidebar-count-rules";
 import type { TreeGroup } from "@/lib/projects/sidebar-view-rules";
 
 import { InlineNameForm } from "./inline-name-form";
@@ -33,8 +33,6 @@ interface SidebarProjectsProps {
   groups: readonly TreeGroup<ArtifactListItemDto>[];
   /** True while a search, the format, a view, or tags narrow the list: only groups with matches show, all open, counting their matches. */
   narrowed: boolean;
-  /** Every artifact in the scope, from the server: what no project holds is listed after the projects. */
-  total: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
   moves: CardMoves;
@@ -173,11 +171,11 @@ function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, 
  * and the row saying there are more. Nothing at all when there is nothing
  * to show or do there (showsLoose).
  */
-function Loose({ controls, filter, onFilter, onDropArtifact, groups, narrowed, total, dragging, selectedId, onSelect, moves }: Pick<SidebarProjectsProps, "controls" | "filter" | "onFilter" | "onDropArtifact" | "groups" | "narrowed" | "total" | "dragging" | "selectedId" | "onSelect" | "moves">) {
+function Loose({ controls, filter, onFilter, onDropArtifact, groups, narrowed, dragging, selectedId, onSelect, moves }: Pick<SidebarProjectsProps, "controls" | "filter" | "onFilter" | "onDropArtifact" | "groups" | "narrowed" | "dragging" | "selectedId" | "onSelect" | "moves">) {
   const items = groups.find((group) => group.key === null)?.items ?? [];
   const filterOn = filter !== null && "none" in filter;
-  // Every artifact no entry holds, so the count and the rows agree.
-  const count = groupCount(narrowed, looseCount(total, controls.entries.map((entry) => entry.count)), items.length);
+  // The server's count of artifacts with no project: exactly what the No project filter lists, so "Show all N" opens N.
+  const count = groupCount(narrowed, controls.none, items.length);
   const more = moreRow(count, { narrowed, filterOn: filter !== null, active: filterOn });
   if (!showsLoose({ shown: items.length, more: more !== null, dragging, filterOn })) return null;
   return (
@@ -241,7 +239,7 @@ function TreeNotice({ state, onClearFilters }: { state: ArtifactListState; onCle
  * An artifact does not need a project: those without one are listed plainly
  * after the projects, never as a project of their own.
  */
-export function SidebarProjects({ dragging, scopeTeam, listState, onClearFilters, total, ...tree }: SidebarProjectsProps) {
+export function SidebarProjects({ dragging, scopeTeam, listState, onClearFilters, ...tree }: SidebarProjectsProps) {
   const [creating, setCreating] = useState(false);
   const known = new Set(tree.controls.entries.map((entry) => entry.key));
   const selected = tree.selectedId === null ? undefined : tree.groups.flatMap((group) => group.items).find((item) => item.id === tree.selectedId);
@@ -263,7 +261,7 @@ export function SidebarProjects({ dragging, scopeTeam, listState, onClearFilters
         <ProjectTree {...tree} closed={closed} onToggle={toggle} />
         {tree.controls.entries.length === 0 && !creating ? <p className="px-2 pt-1 text-xs text-muted-foreground">Create a project, then move artifacts into it.</p> : null}
       </section>
-      <Loose {...tree} total={total} dragging={dragging} />
+      <Loose {...tree} dragging={dragging} />
       <TreeNotice state={listState} onClearFilters={onClearFilters} />
     </>
   );
