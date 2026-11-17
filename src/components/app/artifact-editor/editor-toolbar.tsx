@@ -86,7 +86,7 @@ function MoreMenu({ content, source, onChangeFormat, fullWidth, harness, onReque
 interface EditorToolbarProps {
   /** For Open: the artifact's own page in a new tab. */
   publicId: string;
-  /** The breadcrumb: the artifact's project (null when unfiled) and its title. */
+  /** The breadcrumb: the artifact's project (null when it has none) and its title. */
   project: ArtifactProjectDto | null;
   title: string;
   kind: ArtifactKind;
@@ -116,18 +116,21 @@ interface EditorToolbarProps {
 }
 
 /**
- * Where the artifact sits: its project (or Unfiled), then its title. The
- * title is the page's own heading below, so here it is plain text.
+ * Where the artifact sits: its project, when it has one, then its title. An
+ * artifact with no project shows its title alone. The title is the page's
+ * own heading below, so here it is plain text.
  */
 export function ArtifactBreadcrumb({ project, title }: { project: ArtifactProjectDto | null; title: string }) {
   return (
     <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
       <ol className="flex min-w-0 items-center gap-1.5 text-sm">
-        <li className="flex min-w-0 shrink-0 items-center gap-1.5 text-muted-foreground max-sm:hidden">
-          <ProjectMark name={project?.name ?? null} icon={project?.icon ?? null} />
-          <span className="max-w-48 truncate">{project?.name ?? "Unfiled"}</span>
-          <span aria-hidden>/</span>
-        </li>
+        {project ? (
+          <li className="flex min-w-0 shrink-0 items-center gap-1.5 text-muted-foreground max-sm:hidden">
+            <ProjectMark name={project.name} icon={project.icon} />
+            <span className="max-w-48 truncate">{project.name}</span>
+            <span aria-hidden>/</span>
+          </li>
+        ) : null}
         <li aria-current="page" className="min-w-0 truncate font-medium text-foreground">{title || "Untitled artifact"}</li>
       </ol>
     </nav>

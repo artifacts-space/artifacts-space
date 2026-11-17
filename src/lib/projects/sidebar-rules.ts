@@ -3,10 +3,11 @@ import { projectNameKey, type ProjectFilter } from "./rules";
 
 /**
  * The Projects group in the workspace sidebar, as pure rules. It lists the
- * project rows the viewer may use in the current list (their own and their
- * shared teams' on Mine; the team's on a team tab), merged by name key the
- * same way the project filter merges them, with the list's counts. Moves,
- * renames, and deletes update it optimistically through these functions.
+ * project rows of the current list (the viewer's own in their own list; the
+ * team's on a team tab: the two are never mixed, see sidebar-queries.ts),
+ * merged by name key the same way the project filter merges them, with the
+ * list's counts. Moves, renames, and deletes update it optimistically
+ * through these functions.
  */
 
 /** A team, as the sidebar names it. */

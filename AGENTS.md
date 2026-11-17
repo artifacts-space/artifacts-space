@@ -839,6 +839,30 @@ kept per preset and per default. Restore (owners and admins only) saves the
 old state again as a new revision through the normal checks; never update or
 re-date an old revision, and never file artifact versions from team settings.
 
+### Projects in the sidebar
+
+An artifact's project lives in the artifact's home scope
+(`src/lib/projects/rules.ts`): the shared team it is shared with, else its
+author. The sidebar's rules are in `src/lib/projects/sidebar-rules.ts` and
+`sidebar-queries.ts`.
+
+- **Personal and team are separate** (the owner's decision, 16 Nov 2026:
+  "personal projects show personal projects and team show team - keep them
+  separate"). A person's own list holds only the projects they made, the
+  empty ones too. A team's tab holds only that team's. A team's project
+  never shows in a person's own list, in any state, and is created,
+  renamed, and deleted on the team's tab. Never load a team's project into
+  a person's own list: a person once could delete a team's empty project
+  for everyone from a list that read as theirs.
+- **An artifact does not need a project.** Artifacts without one are listed
+  plainly after the projects, newest first, under the quiet heading
+  "Artifacts" (`sidebar-loose-artifacts.tsx`). Never show them as a row that
+  looks like a project: no dot, no count, no chevron, and nothing at all
+  when there are none (`showsLoose`). A choice says "No project" (the
+  picker, a card's menu, the filter); the product never says "Unfiled".
+  Drop a card on that section to take it out of its project; it shows while
+  a card is dragged even when it lists nothing.
+
 ### Covers
 
 Artifact covers live in `src/lib/covers` (gradients, parsing, reposition

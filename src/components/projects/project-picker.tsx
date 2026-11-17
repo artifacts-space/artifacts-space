@@ -43,7 +43,7 @@ function choiceFor(row: PickerRow): ProjectChoice {
 }
 
 function RowContent({ row, selectedId }: { row: PickerRow; selectedId: string | null }) {
-  if (row.kind === "none") return <><IconX aria-hidden className="size-3.5 text-muted-foreground" /> Unfiled</>;
+  if (row.kind === "none") return <><IconX aria-hidden className="size-3.5 text-muted-foreground" /> No project</>;
   if (row.kind === "create") return <><IconPlus aria-hidden className="size-3.5 text-muted-foreground" /> Create “{row.name}”</>;
   return (
     <>

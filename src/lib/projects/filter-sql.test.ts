@@ -52,7 +52,7 @@ describe("projectFilterCondition", () => {
     expect(params).toEqual(expect.arrayContaining(["team-b", "docs"]));
   });
 
-  it("should match artifacts with no project, or none the viewer can use here, when the filter is Unfiled", async () => {
+  it("should match artifacts with no project, or none the viewer can use here, when the filter is No project", async () => {
     teams.ids = new Set(["team-a"]);
     const { sql, params } = listSql(await projectFilterCondition("viewer-1", { kind: "mine" }, { none: true }));
     expect(sql).toMatch(/"project_id" is null or "artifact"\."project_id" not in \(select "id" from "project" where/);

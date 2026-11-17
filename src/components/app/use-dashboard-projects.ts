@@ -61,5 +61,5 @@ export function useDashboardProjects({ artifacts, setArtifacts, rows, facets, ap
     onDragChange: setDraggingId,
   };
 
-  return { projects, moves, dragging: draggingId !== null, blockedKeys, shared, filterBy, dropped };
+  return { projects, moves, dragging: draggingId !== null, blockedKeys, filterBy, dropped };
 }

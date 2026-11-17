@@ -26,12 +26,12 @@ const dotColors = ["bg-series-1", "bg-series-2", "bg-series-3", "bg-series-4", "
 
 /**
  * A project's mark in the sidebar and the breadcrumb: its icon when it has
- * one, else a small dot in a colour that follows its name. `null` is
- * Unfiled, a neutral dot. Decorative: the name beside it says which project.
+ * one, else a small dot in a colour that follows its name. Only projects
+ * have one. Decorative: the name beside it says which project.
  */
-export function ProjectMark({ name, icon, className }: { name: string | null; icon: string | null; className?: string }) {
+export function ProjectMark({ name, icon, className }: { name: string; icon: string | null; className?: string }) {
   if (icon) return <ProjectIcon icon={icon} className={className} />;
-  const color = name === null ? "bg-muted-foreground/60" : (dotColors[projectDotIndex(projectNameKey(name)) - 1] ?? dotColors[0]);
+  const color = dotColors[projectDotIndex(projectNameKey(name)) - 1] ?? dotColors[0];
   return (
     <span aria-hidden className={cn("inline-flex size-3.5 shrink-0 items-center justify-center", className)}>
       <span className={cn("size-2 rounded-full", color)} />

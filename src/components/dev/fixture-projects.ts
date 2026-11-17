@@ -7,9 +7,10 @@ import type { SidebarProjectRow } from "@/lib/projects/sidebar-rules";
 
 /**
  * Development only: projects for the /dev/workspace fixture, kept in
- * memory, with a stand-in for the project server actions. Every fixture
- * artifact is private, so like the server it refuses team projects.
- * "Locked note" refuses every move, so tests can see a move roll back.
+ * memory, with a stand-in for the project server actions. The rows are the
+ * viewer's own, as the server sends for their own list: a team's project
+ * never shows there. Every fixture artifact is private. "Locked note"
+ * refuses every move, so tests can see a move roll back.
  */
 
 /** The fixture's projects and which project each artifact is in. */
@@ -22,13 +23,12 @@ export const LOCKED_TITLE = "Locked note";
 
 const acme = { slug: "acme", name: "Acme" };
 
-/** Two of the viewer's projects, one team project, and three artifacts filed in them. */
+/** Two of the viewer's projects, and three artifacts in them. */
 export function initialFixtureProjects(): FixtureProjectsState {
   return {
     rows: [
       { id: "project-design", name: "Design", icon: null, team: null },
       { id: "project-research", name: "Research", icon: "🔬", team: null },
-      { id: "project-launch", name: "Launch", icon: null, team: acme },
     ],
     links: { "fixture-ui": "project-design", "fixture-markdown": "project-design", "fixture-csv": "project-research" },
   };

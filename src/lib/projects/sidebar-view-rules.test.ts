@@ -57,7 +57,7 @@ describe("viewCounts", () => {
 describe("groupByProject", () => {
   const keyOf = (entry: { key: string | null }) => entry.key;
 
-  it("should group artifacts under their projects in the entries' order with Unfiled last", () => {
+  it("should group artifacts under their projects in the entries' order with those in no project last", () => {
     const groups = groupByProject([{ id: "a", key: "beta" }, { id: "b", key: null }, { id: "c", key: "alpha" }], ["alpha", "beta"], keyOf);
     expect(groups.map((group) => [group.key, group.items.map((entry) => entry.id)])).toEqual([["alpha", ["c"]], ["beta", ["a"]], [null, ["b"]]]);
   });
@@ -67,7 +67,7 @@ describe("groupByProject", () => {
     expect(groups).toEqual([{ key: "alpha", items: [] }, { key: null, items: [] }]);
   });
 
-  it("should list an artifact whose project has no entry under Unfiled instead of losing it", () => {
+  it("should list an artifact whose project has no entry with those in no project instead of losing it", () => {
     const groups = groupByProject([{ id: "a", key: "elsewhere" }], ["alpha"], keyOf);
     expect(groups.at(-1)?.items.map((entry) => entry.id)).toEqual(["a"]);
   });

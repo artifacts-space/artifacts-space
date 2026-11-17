@@ -69,7 +69,7 @@ function MoveMenu({ artifact, moves, titleId }: { artifact: ArtifactListItemDto;
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled={currentKey === null} onClick={() => { moves.onMove(artifact, null); }}>
-          <IconX aria-hidden /> Unfiled
+          <IconX aria-hidden /> No project
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

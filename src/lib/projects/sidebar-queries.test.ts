@@ -9,8 +9,8 @@ import type * as ScopeModule from "./scope";
 
 /*
  * The sidebar's project rows. Projects are team-internal, so these tests
- * read the SQL itself: a list may only load the viewer's own projects and
- * those of shared teams they belong to.
+ * read the SQL itself: the viewer's own list loads only their own projects,
+ * and a team's tab only that team's, for a member.
  */
 
 const db = drizzle({ client: neon(fakeDatabaseUrl()) });
@@ -54,10 +54,11 @@ describe("sidebarProjectCondition", () => {
     expect(query?.params).toEqual(["viewer-1"]);
   });
 
-  it("should add only the viewer's shared teams when they belong to some", async () => {
+  it("should load only the viewer's own projects into their own list, however many shared teams they are in", async () => {
     teams.ids = new Set(["acme", "globex"]);
     const query = await whereSql("viewer-1", { kind: "mine" });
-    expect(query?.sql).toBe('select "id" from "project" where ("project"."user_id" = $1 or "project"."team_id" in ($2, $3))');
-    expect(query?.params).toEqual(["viewer-1", "acme", "globex"]);
+    // On main this was `user_id = $1 or team_id in ($2, $3)`: every project of every team they are in.
+    expect(query?.sql).toBe('select "id" from "project" where "project"."user_id" = $1');
+    expect(query?.params).toEqual(["viewer-1"]);
   });
 });

@@ -4,8 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /*
  * The sidebar's counts against a real Postgres: the facets count every
- * artifact in a scope, Unfiled holds exactly what no usable project holds
- * (so its count and the Unfiled filter's rows agree), and Shared with me
+ * artifact in a scope, "no project" holds exactly what no usable project
+ * holds (so its count and the No project filter's rows agree), and Shared with me
  * and Public are counted in the database, not over the newest 100. Runs only
  * when TEST_DATABASE_URL names a throwaway local database with the
  * migrations applied; never point it at a shared one.
@@ -27,7 +27,7 @@ describe.runIf(Boolean(databaseUrl))("project facets with a database", async () 
   // The viewer is not in `outside`, so its project is not theirs to use; they are in `crew`.
   const outside = id("outside");
   const crew = id("crew");
-  const artifactIds = ["filed", "loose-1", "loose-2", "elsewhere", "crew-note"].map(id);
+  const artifactIds = ["filed", "loose-1", "loose-2", "elsewhere", "crew-note", "crew-filed"].map(id);
 
   const row = (key: string, values: { userId: string; projectId?: string; teamId?: string; visibility?: "private" | "team" | "public" }) => ({
     id: id(key),
@@ -57,32 +57,44 @@ describe.runIf(Boolean(databaseUrl))("project facets with a database", async () 
     await db.insert(project).values([
       { id: id("own"), userId: viewer, name: "Own", nameKey: "own" },
       { id: id("theirs"), teamId: outside, name: "Theirs", nameKey: "theirs" },
+      { id: id("crew-plans"), teamId: crew, name: "Crew plans", nameKey: "crew plans" },
     ]);
     await db.insert(artifact).values([
       row("filed", { userId: viewer, projectId: id("own"), visibility: "public" }),
       row("loose-1", { userId: viewer }),
       row("loose-2", { userId: viewer }),
-      // A project the viewer cannot use in their own list: it counts as Unfiled there.
+      // A project the viewer cannot use in their own list: it counts as no project there.
       row("elsewhere", { userId: viewer, projectId: id("theirs") }),
       row("crew-note", { userId: other, teamId: crew, visibility: "team" }),
+      // The viewer's own, shared with their team and filed in the team's project: it has a project.
+      row("crew-filed", { userId: viewer, teamId: crew, visibility: "team", projectId: id("crew-plans") }),
     ]);
   });
 
   afterAll(async () => {
     const db = getDb();
     await db.delete(artifact).where(inArray(artifact.id, artifactIds));
-    await db.delete(project).where(inArray(project.id, [id("own"), id("theirs")]));
+    await db.delete(project).where(inArray(project.id, [id("own"), id("theirs"), id("crew-plans")]));
     await db.delete(team).where(inArray(team.id, [outside, crew]));
     await db.delete(user).where(inArray(user.id, [viewer, other]));
   });
 
-  it("should count Unfiled as every artifact no usable project holds, matching the Unfiled filter's rows", async () => {
+  it("should count as no project every artifact no usable project holds, matching the No project filter's rows", async () => {
     const facets = await listProjectFacets(viewer, { kind: "mine" });
-    expect(facets.total).toBe(4);
-    expect(facets.projects).toEqual([expect.objectContaining({ key: "own", count: 1 })]);
+    expect(facets.total).toBe(5);
+    expect(facets.projects).toEqual([expect.objectContaining({ key: "crew plans", count: 1 }), expect.objectContaining({ key: "own", count: 1 })]);
     expect(facets.none).toBe(3);
-    const unfiled = await listArtifacts(viewer, { project: { none: true } });
-    expect(unfiled.map((item) => item.id).sort()).toEqual([id("elsewhere"), id("loose-1"), id("loose-2")].sort());
+    const loose = await listArtifacts(viewer, { project: { none: true } });
+    expect(loose.map((item) => item.id).sort()).toEqual([id("elsewhere"), id("loose-1"), id("loose-2")].sort());
+  });
+
+  it("should give the sidebar a no-project count equal to the No project filter's rows when a team's project holds the viewer's artifact", async () => {
+    // The sidebar's "Show all N artifacts without a project" reads this count and opens this filter:
+    // the artifact in the team's project is in neither, though the viewer's own list has no entry for that project.
+    const facets = await listProjectFacets(viewer, { kind: "mine" });
+    const loose = await listArtifacts(viewer, { project: { none: true } });
+    expect(loose).toHaveLength(facets.none);
+    expect(loose.map((item) => item.id)).not.toContain(id("crew-filed"));
   });
 
   it("should count Public in the database, and nothing as shared on the viewer's own list", async () => {
@@ -93,7 +105,7 @@ describe.runIf(Boolean(databaseUrl))("project facets with a database", async () 
 
   it("should count an artifact someone else shared with the team as Shared with me", async () => {
     const facets = await listProjectFacets(viewer, { kind: "team", teamId: crew });
-    expect(facets.total).toBe(1);
+    expect(facets.total).toBe(2);
     expect(facets.shared).toBe(1);
   });
 });

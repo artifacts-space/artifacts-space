@@ -1,7 +1,6 @@
 "use client";
 
 import { IconChevronRight, IconDots, IconPencil, IconTrash } from "@tabler/icons-react";
-import { useState } from "react";
 
 import {
   DropdownMenu,
@@ -15,38 +14,8 @@ import {
 import { scopeLabel, type SidebarProject, type SidebarProjectRow } from "@/lib/projects/sidebar-rules";
 import { cn } from "@/lib/utils";
 
-import { carriesArtifact, droppedArtifactId } from "./artifact-drag";
 import { ProjectMark } from "./project-label";
-
-/** Drop handling for one sidebar row: highlight while an artifact card is over it, then hand over its id. */
-function useDropTarget(onDropArtifact: (artifactId: string) => void) {
-  const [over, setOver] = useState(false);
-  // Enter and over both accept the drag: browsers repeat dragover only while the pointer moves.
-  const accept = (event: React.DragEvent) => {
-    if (!carriesArtifact(event)) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    setOver(true);
-  };
-  return {
-    over,
-    handlers: {
-      onDragEnter: accept,
-      onDragOver: accept,
-      onDragLeave: (event: React.DragEvent) => {
-        if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
-        setOver(false);
-      },
-      onDrop: (event: React.DragEvent) => {
-        setOver(false);
-        const id = droppedArtifactId(event);
-        if (!id) return;
-        event.preventDefault();
-        onDropArtifact(id);
-      },
-    },
-  };
-}
+import { useDropTarget } from "./use-drop-target";
 
 /** The row's drop state for styling and tests: "" when a drop would land, "blocked" when it is refused. */
 function dropState(over: boolean, blocked: boolean) {
@@ -109,7 +78,7 @@ function dropRowClass(over: boolean, blocked: boolean): string {
  * filters the list to the group when clicked, and its count. It takes
  * dropped artifacts.
  */
-export function DropRow({ blocked = false, label, icon, count, active, disclosure, onFilter, onDropArtifact, children }: DropRowProps) {
+function DropRow({ blocked = false, label, icon, count, active, disclosure, onFilter, onDropArtifact, children }: DropRowProps) {
   const { over, handlers } = useDropTarget(onDropArtifact);
   return (
     <div
@@ -141,22 +110,15 @@ export function DropRow({ blocked = false, label, icon, count, active, disclosur
   );
 }
 
-/** The Unfiled row: shows artifacts without a project, and takes artifacts out of theirs. */
-export function NoProjectRow(props: Omit<DropRowProps, "label" | "icon" | "children">) {
-  return <DropRow {...props} label="Unfiled" icon={<ProjectMark name={null} icon={null} />} />;
-}
-
 interface EntryMenuProps {
   project: SidebarProject;
-  /** True on Mine: team projects then say which team they belong to. */
-  namesTeams: boolean;
   onRename: (row: SidebarProjectRow) => void;
   onDelete: (row: SidebarProjectRow) => void;
 }
 
-/** Rename and Delete for each row behind an entry. A name shared by several scopes lists each one. */
-function EntryMenu({ project, namesTeams, onRename, onDelete }: EntryMenuProps) {
-  const labelled = project.rows.length > 1 || (namesTeams && project.rows.some((row) => row.team !== null));
+/** Rename and Delete for each row behind an entry. Should one name ever stand for several rows, each says whose it is. */
+function EntryMenu({ project, onRename, onDelete }: EntryMenuProps) {
+  const labelled = project.rows.length > 1;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger

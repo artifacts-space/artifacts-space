@@ -108,10 +108,10 @@ export type { ProjectFilter } from "./rules";
 export async function projectFilterCondition(viewerId: string, scope: ListScope, filter: ProjectFilter): Promise<SQL> {
   const usable = await projectCondition(viewerId, scope);
   if ("none" in filter) {
-    // Unfiled: no project, or one the viewer cannot use in this list, so it holds what the facets count as unfiled.
-    const unfiled = or(isNull(artifact.projectId), notInArray(artifact.projectId, getDb().select({ id: project.id }).from(project).where(usable)));
-    if (!unfiled) throw new Error("The unfiled condition could not be built.");
-    return unfiled;
+    // No project, or one the viewer cannot use in this list, so it holds what the facets count as `none`.
+    const loose = or(isNull(artifact.projectId), notInArray(artifact.projectId, getDb().select({ id: project.id }).from(project).where(usable)));
+    if (!loose) throw new Error("The no-project condition could not be built.");
+    return loose;
   }
   const ids = getDb().select({ id: project.id }).from(project).where(and(usable, eq(project.nameKey, filter.key)));
   return inArray(artifact.projectId, ids);
@@ -127,7 +127,7 @@ export async function projectSearchCondition(viewerId: string, scope: ListScope,
 export interface ProjectFacets {
   /** One entry per project name, with how many artifacts in the list it holds. */
   projects: ProjectFacet[];
-  /** Artifacts in the list with no project the viewer can use here: Unfiled. */
+  /** Artifacts in the list with no project the viewer can use here. */
   none: number;
   /** Every artifact in the list. */
   total: number;
@@ -182,7 +182,7 @@ export async function loadProjectFacets(viewerId: string, scope: ListScope, list
   ]);
   const projects = mergeProjectFacets(perProject.map((row) => ({ ...row, own: row.userId === viewerId })));
   const total = totals[0]?.total ?? 0;
-  // Every artifact is in at most one project, so what no usable project holds is Unfiled.
+  // Every artifact is in at most one project, so what no usable project holds has none.
   const filed = perProject.reduce((sum, row) => sum + row.count, 0);
   return { projects, none: Math.max(0, total - filed), total, shared: totals[0]?.shared ?? 0, public: totals[0]?.public ?? 0 };
 }
