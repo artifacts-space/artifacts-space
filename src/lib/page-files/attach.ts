@@ -52,11 +52,11 @@ async function assertHtmlArtifact(artifactId: string): Promise<void> {
  * Attaches the editor's page file uploads to an HTML artifact.
  * Refuses, with the reason, an artifact of another format, a path the page
  * already has (or one that differs from it only by letter case), and files
- * that would take the artifact over the page file limits. Returns how many
- * were attached.
+ * that would take the artifact over the page file limits. Returns the ids
+ * it attached: all of them, or it throws and attaches none.
  */
-export async function attachPageUploads(editorId: string, artifactId: string, uploads: readonly PageUpload[]): Promise<number> {
-  if (uploads.length === 0) return 0;
+export async function attachPageUploads(editorId: string, artifactId: string, uploads: readonly PageUpload[]): Promise<string[]> {
+  if (uploads.length === 0) return [];
   await assertHtmlArtifact(artifactId);
   const [existing, totals] = await Promise.all([pageFilePaths(artifactId), pageFileTotals(artifactId)]);
   const shared = sharedPagePath(existing, uploads);
@@ -65,5 +65,5 @@ export async function attachPageUploads(editorId: string, artifactId: string, up
   if (problem) throw new UserFacingError(problem);
   const attached = await attachPageFilesWithinLimits(editorId, artifactId, uploads.map((upload) => upload.id));
   if (attached.length === 0) throw new UserFacingError("The page files could not be attached: the uploads or the artifact changed meanwhile. Read the artifact and try again.");
-  return attached.length;
+  return attached;
 }

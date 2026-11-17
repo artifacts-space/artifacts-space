@@ -104,7 +104,12 @@ export async function attachPageFilesWithinLimits(editorId: string, artifactId: 
  * was made for gets it, or null. `asOf` is set for a reader of an approved
  * version and for a version in History: then only a file attached by that
  * time counts, and a file replaced since is the copy that was current then
- * (fileServedAt), never a newer one. The path is matched exactly.
+ * (fileServedAt), never a newer one. The path is matched exactly, letter case included, as a
+ * static web host matches it: a link written `Css/Site.css` does not find
+ * `css/site.css`, here or anywhere the page is hosted later. (Two files
+ * whose paths differ only by case are refused on attach so a page never
+ * depends on which of the two a host picks; that rule does not make the
+ * lookup loose.) The guide and the upload tool tell agents so.
  */
 export async function findPageFile(artifactId: string, path: string, asOf: Date | null): Promise<ArtifactFileRecord | null> {
   const [row] = await getDb()

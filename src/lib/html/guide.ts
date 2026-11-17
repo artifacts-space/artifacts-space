@@ -31,6 +31,7 @@ export function buildHtmlGuide(): string {
     "Page files",
     '- A page can have its own files and load them by relative path, as on any website: <link rel="stylesheet" href="css/site.css">, <script type="module" src="js/app.js"> (and its own import "./chart.js"), <img src="img/logo.png">, url(../img/bg.png) in a stylesheet, fetch("data.json").',
     '- Paths are relative to the page, which is index.html. Do not start a path with / and do not use "..": write css/site.css, never /css/site.css.',
+    "- A path is matched exactly, letter case included: a link to Css/Site.css does not find css/site.css, and the page gets a 404 for it. Use lowercase paths, and write each link exactly as the file's pagePath.",
     `- To add one: files_request_upload with pagePath (for example "css/site.css") and the exact size, PUT the bytes, files_finalize, then files_attach to the artifact. The page loads it at once; the document does not need to be saved again.`,
     "- To change one: upload again with the same pagePath, then files_replace with the file's id. To remove one: files_delete.",
     `- A page file may be ${pageFileTypesHint}. Its type comes from its extension. A second HTML document is refused: one artifact is one page.`,

@@ -711,8 +711,15 @@ path, as on any website: `<link href="css/site.css">`, a module's
   ready uploads with a path, an `html` artifact, the count, the bytes).
   Two attaches at one moment can each pass that check, so the attach reads
   the totals again afterwards and takes its files back out when the
-  artifact is over (`attachPageFilesWithinLimits`). Attach, replace, and
-  delete file a version through `recordArtifactChange`, like any file.
+  artifact is over (`attachPageFilesWithinLimits`). One `files_attach` call
+  with page files and plain files attaches both or neither: the plain
+  files are checked first, and the page files are taken back out if the
+  plain attach fails (`attachPlainOrUndo`). Attach, replace, and delete
+  file a version through `recordArtifactChange`, like any file.
+- The lookup matches a path exactly, letter case included, as a static web
+  host does (`findPageFile`). Only the attach treats case twins as one, so
+  a page never depends on which of two files a host would pick. The guide
+  and the upload tool tell agents to use lowercase paths.
 - Serving (`serve.ts`, headers in `serve-rules.ts`): the route streams the
   object from R2 (`openObject`); it never redirects, so a signed storage
   URL never reaches a page, and never reads a body into memory (the host

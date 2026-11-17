@@ -78,19 +78,30 @@ const ADDRESS_MARGIN_MS = 60_000;
 /** A page files address the frame holds: which page and files it is for, and its token (null when none could be made). */
 interface HeldAddress {
   key: string;
+  /** The load of the page this address was last found good for. */
+  load: string;
   token: string | null;
-  /** When the token ends, in milliseconds; 0 for no token, so the next load asks again. */
+  /** When the token ends, in milliseconds; 0 for no token. */
   endsAt: number;
 }
 
 /**
  * The path the frame loads: `/`, or, for a page with files, its name under
  * the files address the server makes for this viewer (pageFramePath), so
- * the page's relative URLs reach its files. Null while that address is on
- * its way. The address is asked for when the page or its files change
- * (`filesKey`), and again before a later load (`load`) once it is near its
- * end, so typing in the editor does not ask for one per change. When no
- * address can be made, the page runs at `/` without its files.
+ * the page's relative URLs reach its files. Null until an address is
+ * settled for this load of the page. The address is asked for when the
+ * page or its files change (`filesKey`), and again for a later load
+ * (`load`) once it is near its end or when none could be made, so typing in
+ * the editor does not ask for one per change and a load never starts on an
+ * address that is about to end. When no address can be made, the page runs
+ * at `/` without its files.
+ *
+ * A page that stays open is not given a new address while it runs, on
+ * purpose: the token is part of the frame's address, so a new one would
+ * load the page again and drop what the reader did in it. A file the page
+ * first asks for after its address ended (10 to 15 minutes, pageTokenLimits)
+ * gets a 404 until the next load; the guide tells agents to load what the
+ * page needs when it starts.
  */
 function usePagePath(pageKey: string, filesKey: string | undefined, load: string): string | null {
   const { address } = useContext(PageHostContext);
@@ -99,18 +110,20 @@ function usePagePath(pageKey: string, filesKey: string | undefined, load: string
   const key = `${pageKey}\n${versionId ?? ""}\n${filesKey ?? ""}`;
   const wanted = filesKey !== undefined && address !== null;
   const mine = held?.key === key ? held : null;
-  const endsAt = mine?.endsAt ?? null;
+  const settled = mine?.load === load;
   useEffect(() => {
-    if (!wanted || (endsAt !== null && endsAt - ADDRESS_MARGIN_MS > Date.now())) return undefined;
+    if (!wanted || settled) return undefined;
     let alive = true;
-    address({ pageKey, ...(versionId === null ? {} : { versionId }) })
-      .then((made) => { if (alive) setHeld({ key, token: made?.token ?? null, endsAt: made ? Date.parse(made.expiresAt) : 0 }); })
-      .catch(() => { if (alive) setHeld({ key, token: null, endsAt: 0 }); });
+    // The address in hand still has time: this load uses it too. Otherwise the server makes a new one.
+    const inHand = mine && mine.endsAt - ADDRESS_MARGIN_MS > Date.now() ? Promise.resolve({ token: mine.token, endsAt: mine.endsAt }) : null;
+    const next = inHand ?? address({ pageKey, ...(versionId === null ? {} : { versionId }) }).then((made) => ({ token: made?.token ?? null, endsAt: made ? Date.parse(made.expiresAt) : 0 }));
+    next
+      .then((found) => { if (alive) setHeld({ key, load, ...found }); })
+      .catch(() => { if (alive) setHeld({ key, load, token: null, endsAt: 0 }); });
     return () => { alive = false; };
-    // `load` is here so each new load of the page checks that the address still works.
-  }, [wanted, address, pageKey, versionId, key, endsAt, load]);
+  }, [wanted, settled, mine, address, pageKey, versionId, key, load]);
   if (!wanted) return pageFramePath(null);
-  return mine ? pageFramePath(mine.token) : null;
+  return mine && settled ? pageFramePath(mine.token) : null;
 }
 
 /** Counts up each time the HTML changes, so a new version loads in a fresh frame document. */

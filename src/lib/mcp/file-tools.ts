@@ -87,7 +87,7 @@ function registerUploadTools(server: ToolServer, userId: string) {
         filename: z.string().min(1).max(255).optional().describe("File name with its extension, such as report.pdf. Not needed with pagePath, whose last part is the name."),
         contentType: z.string().max(255).optional().describe("MIME type, such as application/pdf. Omit to use the extension. Not read with pagePath: a page file's type comes from its path."),
         size: z.number().int().positive().describe("Exact size in bytes. The PUT must send exactly this many bytes."),
-        pagePath: z.string().min(1).max(pageFileLimits.maxPathLength).optional().describe('For a page file of an HTML artifact: the relative path the page loads it by, such as "css/site.css" or "js/app.js". Folders and a file name of letters, digits, dots, dashes, and underscores, joined by /. The path is fixed for this upload; attach it with files_attach.'),
+        pagePath: z.string().min(1).max(pageFileLimits.maxPathLength).optional().describe('For a page file of an HTML artifact: the relative path the page loads it by, such as "css/site.css" or "js/app.js". Folders and a file name of letters, digits, dots, dashes, and underscores, joined by /. The page must name it exactly, letter case included, so prefer lowercase. The path is fixed for this upload; attach it with files_attach.'),
       },
     },
     (input) => respond(async () => {
