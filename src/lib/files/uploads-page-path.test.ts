@@ -80,6 +80,22 @@ describe("finalizeUpload for a page file", () => {
     expect(file.pagePath).toBe("js/app.js");
   });
 
+  it.each([-1, Number.NaN])("should keep the upload and ask for another try when storage reports no size (%s)", async (size) => {
+    pending();
+    r2.headObject.mockResolvedValue({ size, contentType: "text/javascript" });
+    await expect(finalizeUpload("author", "7c9e6679-7425-40de-944b-e07fc1f90ae7")).rejects.toThrow("It was not removed. Try again.");
+    expect(store.removeFiles).not.toHaveBeenCalled();
+    expect(r2.readObjectStart).not.toHaveBeenCalled();
+    expect(db.updated).toHaveLength(0);
+  });
+
+  it("should still delete an upload whose stored size is a real size that does not match", async () => {
+    pending();
+    r2.headObject.mockResolvedValue({ size: 19, contentType: "text/javascript" });
+    await expect(finalizeUpload("author", "7c9e6679-7425-40de-944b-e07fc1f90ae7")).rejects.toThrow("The stored file is 19 bytes");
+    expect(store.removeFiles).toHaveBeenCalled();
+  });
+
   it("should delete a page file whose bytes are another kind of file", async () => {
     pending({ contentType: "font/woff2", pagePath: "fonts/a.woff2" });
     r2.headObject.mockResolvedValue({ size: 20, contentType: "font/woff2" });
