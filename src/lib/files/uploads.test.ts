@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { storedObjectProblem, uploadRequestSchema } from "./uploads";
+import { storedObjectProblem, storedSizeUnread, uploadRequestSchema } from "./uploads";
 
 describe("storedObjectProblem", () => {
   const row = { size: 100, contentType: "image/png" };
@@ -14,6 +14,16 @@ describe("storedObjectProblem", () => {
     expect(storedObjectProblem(row, { size: 99, contentType: "image/png" })).toContain("99 bytes");
     expect(storedObjectProblem(row, { size: 100, contentType: "text/html" })).toContain("text/html");
     expect(storedObjectProblem(row, { size: 100, contentType: "" })).toContain("untyped");
+  });
+});
+
+describe("storedSizeUnread", () => {
+  it.each([-1, Number.NaN, 1.5, Number.POSITIVE_INFINITY])("should say storage reported no size for %s", (size) => {
+    expect(storedSizeUnread({ size })).toBe(true);
+  });
+
+  it.each([0, 1, 222])("should take %s as a size storage reported", (size) => {
+    expect(storedSizeUnread({ size })).toBe(false);
   });
 });
 
