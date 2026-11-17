@@ -82,3 +82,61 @@ test("should fail when the only rule the scan is told to run is skipped outright
   await page.setContent(`<main>${unnamedButton}</main>`);
   await expect(expectNoAxeViolations(page, { only: ["button-name"], skip: { "button-name": "this test checks a scan left with nothing to run" } })).rejects.toThrow(/runs no rule/);
 });
+
+test("should scan every element a locator matches, and nothing outside them", async ({ page }) => {
+  await page.setContent(`<main><section class="part"><p>Fine</p></section><section class="part">${unnamedButton}</section><section class="outside">${unnamedButton}</section></main>`);
+  await expect(expectNoAxeViolations(page.locator(".part"))).rejects.toThrow(/button-name/);
+  await expectNoAxeViolations(page.locator("section.part").first());
+  await expectNoAxeViolations(page.locator("p"));
+});
+
+test("should scan an element inside a shadow root when a locator matches it", async ({ page }) => {
+  await page.setContent(`<main><div id="host"></div></main><script>document.getElementById("host").attachShadow({ mode: "open" }).innerHTML = '<div class="inner">${unnamedButton}</div>';</script>`);
+  await expect(expectNoAxeViolations(page.locator(".inner"))).rejects.toThrow(/button-name/);
+});
+
+/*
+ * A scan of a part of a page must not change that page. On a server-rendered
+ * page React has not taken over yet, an attribute the server did not send
+ * makes React log a hydration mismatch (issue #225: `data-a11y-scan` on the
+ * docs menu). The page's scripts are held back here, the scan runs on the
+ * server's HTML, and the scripts are let go as soon as anything in the menu
+ * changes (or the scan is over, if nothing does), so a scan that marks the
+ * menu hits React with the mark still on it.
+ */
+test("should leave a server-rendered element as the server sent it when a scan of it runs before React hydrates the page", async ({ page, isMobile }) => {
+  test.skip(isMobile, "the docs menu is closed on a phone; the helper is the same");
+  let release: () => void = () => undefined;
+  const scriptsMayRun = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/_next/static/**/*.js", async (route) => {
+    await scriptsMayRun;
+    await route.continue().catch(() => undefined);
+  });
+  const changes: string[] = [];
+  await page.exposeFunction("menuChanged", (change: string) => {
+    changes.push(change);
+    release();
+  });
+  await page.addInitScript(() => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const menu = document.querySelector('nav[aria-label="Docs"]');
+      if (!menu) return;
+      const report: unknown = Reflect.get(window, "menuChanged");
+      if (typeof report !== "function") return;
+      const observer = new MutationObserver((records) => {
+        for (const record of records) Reflect.apply(report, window, [`${record.type} ${record.attributeName ?? ""}`.trim()]);
+      });
+      observer.observe(menu, { attributes: true, childList: true, characterData: true, subtree: true });
+    });
+  });
+
+  await page.goto("/docs", { waitUntil: "domcontentloaded" });
+  const menu = page.getByRole("navigation", { name: "Docs" });
+  await expect(menu).toBeVisible();
+  const hydrated = () => menu.evaluate((element) => Object.keys(element).some((key) => key.startsWith("__reactFiber")));
+  expect(await hydrated(), "the page is still waiting for its scripts").toBe(false);
+
+  await expectNoAxeViolations(menu).finally(release);
+  expect(changes, "what the scan changed in the menu before React hydrated it").toEqual([]);
+  await expect.poll(hydrated, { message: "React takes the page over" }).toBe(true);
+});
