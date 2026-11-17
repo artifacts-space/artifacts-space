@@ -163,15 +163,24 @@ export type ContentRoute = "first" | "upload" | "ignore";
 
 /**
  * Routes a paste or drop on the New artifact pane. Only an empty Markdown
- * body takes first content, which may pick the format. Any other file
- * dropped there uploads and is attached to the artifact (uploadStep), in
- * every format, created first when it is not stored yet; it is never read
- * into the body, so writing is never replaced. Other text is an ordinary
- * paste for the editor.
+ * body takes first content, which may pick the format; a file that is not
+ * read as text then goes into the document, as a block. A document with
+ * writing takes its files itself, in its text, where they were dropped
+ * (the rich editor), so the page leaves them alone. In every other format
+ * a dropped file uploads and is attached to the artifact (uploadStep),
+ * created first when it is not stored yet; it is never read into the body,
+ * so content is never replaced. Other text is an ordinary paste for the
+ * editor.
  */
 export function contentRoute(isText: boolean, page: PageForContent): ContentRoute {
   if (takesFirstContent(page)) return "first";
-  return !isText && page.active ? "upload" : "ignore";
+  if (isText || !page.active) return "ignore";
+  return page.kind === "markdown" ? "ignore" : "upload";
+}
+
+/** True while the page itself takes dropped and pasted files: every route but "ignore". A document with writing takes its own. */
+export function pageTakesFiles(page: PageForContent): boolean {
+  return contentRoute(false, page) !== "ignore";
 }
 
 /** The files a blank page's create carries: those handed to it that are still on the page (not removed), in the order they came. */

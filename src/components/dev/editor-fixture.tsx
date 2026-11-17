@@ -13,6 +13,8 @@ import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { SheetFill } from "@/components/artifact-view/sheet-fill";
 import { SheetFormatProvider, type SheetFormatSaver } from "@/components/artifact-view/sheet-format";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
+import { dropZoneProps } from "@/components/editor/rich/media-bridge";
+import { EditorMediaProvider } from "@/components/editor/rich/media-context";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { appFlowCanvas } from "@/lib/canvas/fixtures";
 import { bodyFillsColumnClass, pageColumnClass, usesFullWidth } from "@/lib/page-width/rules";
@@ -21,6 +23,7 @@ import { sheetAtLimit } from "@/lib/ui/fixtures/formats";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
 import { CanvasCatchUp, type FixtureCatchUp } from "./catch-up-fixture";
+import { fixtureMediaUpload, fixtureMediaUrl } from "./fixture-media";
 import { counterPage, dataUi, fixtureArtifact, longJson, longMarkdown, longUi, shortUi, styledUi, type EditorFixtureKind } from "./fixture-content";
 
 const samples: Record<EditorFixtureKind, { kind: ArtifactKind; content: () => string }> = {
@@ -87,6 +90,9 @@ export function EditorFixture({ kind, failingSaves = false, agentSaves = false, 
         <main className={`mx-auto w-full py-12 sm:py-16 ${pageColumnClass(usesFullWidth(artifact.kind, false))}`}>
           <ConfirmationsProvider initial={[]}>
             <CanvasCatchUp artifact={artifact} mode={catchUp}>
+            {/* As on the artifact page: the column is the document's drop zone, and here its uploads stay in the tab. */}
+            <EditorMediaProvider upload={fixtureMediaUpload} urlFor={fixtureMediaUrl}>
+            <div {...dropZoneProps()}>
             <PageInlineEditor artifact={artifact} reviewed={false} onSaved={onSaved} save={save} signalEditing={keepSignalInTab}>
               <InlineTitle>{artifact.title}</InlineTitle>
               <InlineSummary><p className="mt-4 text-md leading-7 text-muted-foreground">{artifact.summary}</p></InlineSummary>
@@ -101,6 +107,8 @@ export function EditorFixture({ kind, failingSaves = false, agentSaves = false, 
                 </SheetFill>
               </article>
             </PageInlineEditor>
+            </div>
+            </EditorMediaProvider>
             </CanvasCatchUp>
           </ConfirmationsProvider>
           <p className="mt-10 text-sm leading-6 text-muted-foreground">Shared from artifacts.space, a shared artifact hub for coding agents.</p>

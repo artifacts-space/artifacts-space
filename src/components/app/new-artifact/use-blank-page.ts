@@ -5,7 +5,7 @@ import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave
 import type { ArtifactDraft } from "@/components/app/artifact-editor/use-artifact-draft";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { detectFileText, detectTextKind, filePlan, type Detection } from "@/lib/create/detect-kind-rules";
-import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, isUntouched, persistOnce, takesFirstContent, type PageForContent } from "@/lib/create/new-artifact-rules";
+import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, isUntouched, pageTakesFiles, persistOnce, takesFirstContent, type PageForContent } from "@/lib/create/new-artifact-rules";
 
 import type { NewArtifactApi } from "./new-artifact-api";
 import { useBlankUploads, type CreateTracker } from "./use-blank-uploads";
@@ -31,6 +31,8 @@ interface EditorHandles {
   draft: ArtifactDraft;
   replace: (draft: ArtifactDraft, remount: boolean) => void;
   onUpdated: (artifact: ArtifactDto) => void;
+  /** Puts files in the document as blocks: at the point they were dropped, or where the cursor is. */
+  intoDocument: (content: Extract<FirstContent, { files: File[] }>) => void;
 }
 
 /** Largest file read into the body as text; bigger ones upload as files. */
@@ -42,7 +44,7 @@ function withDetection(draft: ArtifactDraft, detection: Detection): ArtifactDraf
   return { ...draft, kind: detection.kind, language: detection.language || draft.language, content: detection.content, title };
 }
 
-/** Reads one dropped file as text when its extension says it is code, SVG, or Mermaid; null when it should upload. */
+/** Reads one dropped file as text when its extension says it is code, SVG, or Mermaid; null when it stays a file. */
 async function readAsText(files: readonly File[]): Promise<Detection | null> {
   const [file] = files;
   if (files.length !== 1 || !file || file.size > maxReadBytes) return null;
@@ -115,10 +117,11 @@ function useCreateOnceSave(api: NewArtifactApi | undefined, project: string | nu
  * is set: nothing is stored until the person puts something in it, then it
  * is created once (persistOnce) and every later change is an ordinary save.
  * The first text pasted or dropped into the empty body picks the format
- * (detectTextKind); dropped files upload and make a Files artifact.
+ * (detectTextKind), and so does a dropped code, SVG, or diagram file; any
+ * other file dropped on the empty page goes into the document as a block.
  */
 export function useBlankPage(options: BlankPageOptions | undefined, editor: EditorHandles) {
-  const { artifact, draft, replace, onUpdated } = editor;
+  const { artifact, draft, replace, onUpdated, intoDocument } = editor;
   const blank = options !== undefined && artifact.id === BLANK_ARTIFACT_ID;
   const draftRef = useRef(draft);
   const [detected, setDetected] = useState<DetectedFormat | null>(null);
@@ -144,7 +147,7 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
     setDetected(detection.kind === "markdown" ? null : { kind: detection.kind, language: detection.language, content: detection.content });
   }, [replace]);
 
-  // First content only while the body is empty; any other file dropped on this page uploads and is attached (contentRoute, uploadStep).
+  // First content only while the body is empty. After that a document takes files in its text, and any other format gets them attached (contentRoute, uploadStep).
   const uploadCount = uploads.items.length;
   const eligible = takesFirstContent({ active, kind: draft.kind, content: draft.content, uploadCount });
   const routeRef = useRef<PageForContent>({ active, kind: draft.kind, content: draft.content, uploadCount });
@@ -161,12 +164,13 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
       uploads.addFiles(content.files);
       return;
     }
+    const asBlocks = () => { intoDocument(content); };
     readAsText(content.files)
-      // Typed into while the file was read: the writing stays, and the file uploads instead.
-      .then((detection) => { if (detection && takesFirstContent(routeRef.current)) apply(detection); else uploads.addFiles(content.files); })
-      // Not readable as text: it still uploads, as any other file would.
-      .catch(() => { uploads.addFiles(content.files); });
-  }, [apply, uploads]);
+      // Not a file to read, or typed into while it was read: the writing stays, and the file goes into the document.
+      .then((detection) => { if (detection && takesFirstContent(routeRef.current)) apply(detection); else asBlocks(); })
+      // Not readable as text: it goes into the document, as any other file would.
+      .catch(asBlocks);
+  }, [apply, uploads, intoDocument]);
 
   const dismissDetected = useCallback(() => { setDetected(null); }, []);
   return {
@@ -177,7 +181,7 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
     idle,
     onContent,
     eligible,
-    takesFiles: active,
+    takesFiles: pageTakesFiles({ active, kind: draft.kind, content: draft.content, uploadCount }),
     uploads,
     removeUpload,
     filesProblem: uploadProblem,

@@ -1086,6 +1086,20 @@
 }
 
 /*
+ * Where files held over a document will land: one line between two blocks,
+ * drawn on the page's body so no scroll box clips it (media-landing.ts).
+ */
+.media-landing-line {
+  position: fixed;
+  z-index: 60;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 9999px;
+  background: var(--ring);
+  pointer-events: none;
+}
+
+/*
  * A block opened from a link (/artifact/<id>#block=…): a tint laid over it
  * that fades out, so the eye finds it. With reduced motion it stays still
  * and is removed after the same time (block-link-target.tsx).

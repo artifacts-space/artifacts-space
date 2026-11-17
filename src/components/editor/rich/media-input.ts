@@ -4,6 +4,10 @@ import { Plugin, PluginKey, type Transaction } from "@tiptap/pm/state";
 import { ReplaceAroundStep, ReplaceStep } from "@tiptap/pm/transform";
 import type { EditorView } from "@tiptap/pm/view";
 
+import { mediaKindForType } from "@/lib/files/media-rules";
+
+import { addMediaEvent, dropZoneAttribute, readMediaRequest, showsMedia, takenByPage, takesFilesAttribute, type AttachedFile, type MediaRequest } from "./media-bridge";
+import { endLanding, fileLanding, LandingMark, type Point } from "./media-landing";
 import { emptyMediaAttrs, MEDIA_NODE } from "./media-markdown";
 import { defaultMediaLabel, insertableFiles, pasteIsFiles, uploadMediaKind } from "./media-upload-rules";
 import { forgetUpload, queueUpload } from "./media-uploads";
@@ -37,8 +41,133 @@ function pastedFiles(event: ClipboardEvent): File[] {
   return pasteIsFiles(paste) ? files : [];
 }
 
-function dropPosition(view: EditorView, event: DragEvent): number | undefined {
-  return view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
+/** A media block for a file the artifact already has: nothing uploads, the block points at it. */
+function attachedMediaNode(file: AttachedFile): JSONContent {
+  const kind = mediaKindForType(file.contentType);
+  return { type: MEDIA_NODE, attrs: { ...emptyMediaAttrs(kind), src: `/api/files/${file.id}`, alt: defaultMediaLabel(kind, file.filename) } };
+}
+
+/** Puts a file the artifact already has at the end of the document, in view. */
+function insertAttached(editor: Editor, file: AttachedFile): boolean {
+  const inserted = editor.chain().focus().insertContentAt(endLanding(editor.state.doc), attachedMediaNode(file)).scrollIntoView().run();
+  if (inserted) ensureTrailingParagraph(editor);
+  return inserted;
+}
+
+/** True when a drag holds files, from the desktop or from another page. */
+function carriesFiles(event: DragEvent): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes("Files");
+}
+
+function pointOf(event: DragEvent): Point {
+  return { x: event.clientX, y: event.clientY };
+}
+
+/**
+ * The part of the page whose file drags this document takes: the nearest
+ * ancestor marked as a drop zone (the artifact's page column, with its
+ * title block and the space under the text), or the document alone. Null
+ * while the page takes files itself: a new, empty page reads a dropped
+ * file as its first content, until the document holds a media block (one
+ * that is still uploading is not in the saved content yet, and the page
+ * asks the same question, showsMedia). Read at each event: the document's
+ * element is put on the page after this plugin starts.
+ */
+function dropZone(view: EditorView): HTMLElement | null {
+  const marked = view.dom.closest<HTMLElement>(`[${dropZoneAttribute}]`);
+  if (marked && takenByPage(marked) && !showsMedia(view.dom)) return null;
+  return marked ?? view.dom;
+}
+
+/**
+ * True for a drag event this document takes: files from outside, held
+ * inside its zone, outside any box that takes files itself. A drag that
+ * started in the document (a block moved by its grip, a picture dragged by
+ * itself, which browsers also offer as a file) is the editor's own move.
+ */
+function takesDrag(view: EditorView, event: DragEvent): boolean {
+  if (!view.editable || view.dragging || !carriesFiles(event) || !(event.target instanceof Element)) return false;
+  if (event.target.closest("[data-slot=file-drop]")) return false;
+  return dropZone(view)?.contains(event.target) === true;
+}
+
+/**
+ * Keeps the event from the handlers under the window: the document's own
+ * drop cursor and text drop, and the browser, which would open the file.
+ * Other documents on the page still hear it at the window, and take their
+ * own line away.
+ */
+function claim(event: DragEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+/** True when a drag left the window, not only one element for the next. */
+function leftWindow(event: DragEvent): boolean {
+  if (event.relatedTarget instanceof Node) return false;
+  return event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight;
+}
+
+/**
+ * Files held over the document's page, and files sent to it from outside
+ * the text. The listeners sit on the window, in the capture phase, so they
+ * run before the editor's own: a held file shows one line, between two
+ * blocks, where it will land (media-landing.ts), and a drop puts each file
+ * there as a block of its own, in order. The line goes on any drop (also
+ * one that another part of the page took), when the files leave the
+ * window or the document's page, and when the drag is not heard from for a
+ * moment, so it can never stay behind.
+ */
+function fileDragPlugin(editor: Editor): Plugin {
+  return new Plugin({
+    key: new PluginKey("mediaFileDrag"),
+    // The page finds the document that takes files by this mark (documentIn).
+    props: { attributes: { [takesFilesAttribute]: "" } },
+    view: (view) => {
+      const mark = new LandingMark();
+      const hide = () => { mark.hide(); };
+      const over = (event: DragEvent) => {
+        if (!takesDrag(view, event)) { hide(); return; }
+        claim(event);
+        if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+        mark.show(fileLanding(view, pointOf(event)).line);
+      };
+      const drop = (event: DragEvent) => {
+        hide();
+        if (!takesDrag(view, event)) return;
+        claim(event);
+        insertFiles(editor, [...(event.dataTransfer?.files ?? [])], fileLanding(view, pointOf(event)).pos);
+      };
+      const leave = (event: DragEvent) => {
+        if (leftWindow(event)) hide();
+      };
+      const sent = (event: Event) => {
+        const request = readMediaRequest(event);
+        if (request && view.editable && takeRequest(editor, view, request)) event.preventDefault();
+      };
+      window.addEventListener("dragover", over, true);
+      window.addEventListener("drop", drop, true);
+      window.addEventListener("dragleave", leave, true);
+      window.addEventListener("dragend", hide, true);
+      view.dom.addEventListener(addMediaEvent, sent);
+      return {
+        destroy: () => {
+          hide();
+          window.removeEventListener("dragover", over, true);
+          window.removeEventListener("drop", drop, true);
+          window.removeEventListener("dragleave", leave, true);
+          window.removeEventListener("dragend", hide, true);
+          view.dom.removeEventListener(addMediaEvent, sent);
+        },
+      };
+    },
+  });
+}
+
+/** Does what the page asked of the document (media-bridge.ts): files at a point or at the cursor, or a file the artifact already has. */
+function takeRequest(editor: Editor, view: EditorView, request: MediaRequest): boolean {
+  if ("attached" in request) return insertAttached(editor, request.attached);
+  return insertFiles(editor, request.files, request.point ? fileLanding(view, request.point).pos : undefined);
 }
 
 function uploadIdsIn(content: Fragment, into: Set<string>) {
@@ -92,9 +221,11 @@ export function uploadCleanupPlugin(): Plugin<Set<string>> {
 /**
  * Pasting or dropping files into a document makes a media block for each:
  * images, video, audio, PDFs, and other files the store takes. Each block
- * uploads its file and shows progress (media-view.tsx). Text pastes, drags
- * inside the editor, and anything in a code block are left alone. Uploads
- * are forgotten when the editor closes (uploadCleanupPlugin).
+ * uploads its file and shows progress (media-view.tsx). A drop lands
+ * between two blocks, anywhere on the document's page (fileDragPlugin).
+ * Text pastes, drags inside the editor, and a paste in a code block are
+ * left alone. Uploads are forgotten when the editor closes
+ * (uploadCleanupPlugin).
  */
 export const MediaInput = Extension.create({
   name: "mediaInput",
@@ -103,6 +234,7 @@ export const MediaInput = Extension.create({
     const editor = this.editor;
     return [
       uploadCleanupPlugin(),
+      fileDragPlugin(editor),
       new Plugin({
         key: new PluginKey("mediaInput"),
         props: {
@@ -112,12 +244,6 @@ export const MediaInput = Extension.create({
             if (files.length === 0) return false;
             event.preventDefault();
             return insertFiles(editor, files);
-          },
-          handleDrop: (view, event, _slice, moved) => {
-            const files = [...(event.dataTransfer?.files ?? [])];
-            if (moved || files.length === 0) return false;
-            event.preventDefault();
-            return insertFiles(editor, files, dropPosition(view, event));
           },
         },
       }),

@@ -1,7 +1,8 @@
 "use client";
 
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
-import { useState } from "react";
+import { useState, type RefObject } from "react";
+import { toast } from "sonner";
 
 import { CommentsControl } from "@/components/app/comments-picker";
 import { ShareControl } from "@/components/app/share-control";
@@ -11,9 +12,10 @@ import { useLeaveGuard } from "@/components/artifact-page/use-leave-guard";
 import { EditorFrameCaptures } from "@/components/artifact-view/canvas/capture/capture-api-context";
 import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
 import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
-import { AttachedFiles } from "@/components/files/attached-files";
+import { AttachedFiles, type AttachFilesApi } from "@/components/files/attached-files";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { BlockMenuFor } from "@/components/editor/rich/block-menu/block-menu-context";
+import { askDocument, dropZoneProps } from "@/components/editor/rich/media-bridge";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { VersionHistory } from "@/components/history/version-history";
 import { ViewsDialog } from "@/components/views/views-dialog";
@@ -22,6 +24,8 @@ import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
 import { useArtifactHarness, type HarnessControl } from "@/components/harness/use-artifact-harness";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { sheetFormatTarget } from "@/lib/create/new-artifact-rules";
+import { addsToDocument, filesPanel, looseFiles } from "@/lib/files/loose-rules";
+import type { FileDto } from "@/lib/files/types";
 import { previewColumnClass, usesFullWidth } from "@/lib/page-width/rules";
 import { cn } from "@/lib/utils";
 import { BlankPageFilesSlot } from "@/components/app/new-artifact/blank-page-parts";
@@ -81,9 +85,34 @@ function SharingSlot({ artifact, shareUrl, canShare, manager, team, onUpdated }:
   return null;
 }
 
-/** Files show under formats that use them, and under any artifact that has some. */
-function showsFiles(kind: ArtifactDto["kind"], fileCount: number) {
-  return kind === "file" || kind === "ui" || kind === "canvas" || fileCount > 0;
+interface FilesSlotProps {
+  artifact: ArtifactDto;
+  /** The format and content as the editor has them now, saved or not. */
+  kind: ArtifactDto["kind"];
+  content: string;
+  /** The content region, which holds the document a listed file is added to. */
+  body: RefObject<HTMLElement | null>;
+  /** True while the document can take a file: the rich editor shows, not the source. */
+  hasDocument: boolean;
+  api: AttachFilesApi | undefined;
+  onUpdated: (artifact: ArtifactDto) => void;
+  column: string;
+}
+
+/**
+ * What the page shows for files under the content (filesPanel): the Files
+ * section where files are the content or are named by id, and otherwise a
+ * quiet list of the files that are attached and shown nowhere on the page,
+ * drawn only while there is one. A document's files go into its text.
+ */
+function FilesSlot({ artifact, kind, content, body, hasDocument, api, onUpdated, column }: FilesSlotProps) {
+  if (filesPanel(kind) === "section") return <AttachedFiles artifact={artifact} onUpdated={onUpdated} api={api} column={column} className={gutterRoom} />;
+  const loose = looseFiles(artifact.files, { kind, content, icon: artifact.icon, cover: artifact.cover });
+  if (loose.length === 0) return null;
+  const add = (file: FileDto) => {
+    if (!askDocument(body.current, { attached: file })) toast.error("The file could not be added to the document. Try again.");
+  };
+  return <AttachedFiles artifact={artifact} onUpdated={onUpdated} api={api} column={column} className={gutterRoom} quiet={{ files: loose, onAddToDocument: addsToDocument(kind) && hasDocument ? add : undefined }} />;
 }
 
 interface ArtifactToolbarProps {
@@ -201,7 +230,8 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           notice={notice}
         />
       )}
-      <div ref={outerRef} data-slot="detail-outer" className={detailOuterClass(draft.kind === "ui")}>
+      {/* The page is the document's drop zone: a file dropped on the title block or under the text lands in the text. A new, empty page takes files itself. */}
+      <div ref={outerRef} data-slot="detail-outer" className={detailOuterClass(draft.kind === "ui")} {...dropZoneProps(page.takesFiles)}>
         {shared ? <ShareBanner shareUrl={shareUrl} isPublic={artifact.visibility === "public"} column={column} /> : null}
         {/* The title block is part of the page: it scrolls away with the body and sits on the body's surface, in the artifact's theme. */}
         <PaneHead theme={theme}>
@@ -261,7 +291,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
             </ArtifactSheetFormat>
           </SheetKeyContext>
           <BlankPageFilesSlot page={page} dragging={dragging} column={column} />
-          {!page.blank && showsFiles(draft.kind, artifact.files.length) ? <AttachedFiles artifact={artifact} onUpdated={onUpdated} api={filesApi} column={column} className={gutterRoom} /> : null}
+          {page.blank ? null : <FilesSlot artifact={artifact} kind={draft.kind} content={draft.content} body={bodyRef} hasDocument={!sourceOpen} api={filesApi} onUpdated={onUpdated} column={column} />}
         </div>
       </div>
       <FormatDialog

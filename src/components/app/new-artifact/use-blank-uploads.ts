@@ -32,29 +32,27 @@ interface BlankUploadsOptions {
   onUpdated: (artifact: ArtifactDto) => void;
 }
 
-/** The title for dropped files when the page has none. */
-function filesTitle(draft: ArtifactDraft, names: readonly string[]): string {
-  if (draft.title.trim() !== "") return draft.title;
+/**
+ * A Files page without a title is named after its files. Only a page whose
+ * format is Files: a document takes files in its text and keeps its format,
+ * and every other format gets them attached and keeps its title.
+ */
+function namedAfterFiles(draft: ArtifactDraft, names: readonly string[]): ArtifactDraft | null {
+  if (draft.kind !== "file" || draft.title.trim() !== "") return null;
   const [first] = names;
-  return names.length === 1 && first ? fileTitle(first) : `${String(names.length)} files`;
-}
-
-/** An empty Markdown page becomes a Files artifact named after its files; a page with writing keeps its format and gets the files attached. */
-function asFiles(draft: ArtifactDraft, names: readonly string[]): ArtifactDraft | null {
-  if (draft.kind !== "markdown" || draft.content.trim() !== "") return null;
-  return { ...draft, kind: "file", title: filesTitle(draft, names) };
+  return { ...draft, title: names.length === 1 && first ? fileTitle(first) : `${String(names.length)} files` };
 }
 
 const attachFailed = "The files could not be added. Drop them again to try once more.";
 /**
  * The answers were lost and the artifact, loaded again, has only some of them:
- * its Files section shows which. Defensive: attachFiles is all-or-nothing
+ * its list of attached files shows which. Defensive: attachFiles is all-or-nothing
  * today, so this needs a future attach that is not, or a batch with ids the
  * artifact already held (which uploadStep rules out).
  */
-const attachPartial = "Some files could not be added. The Files section shows the ones that were; drop the others again.";
-/** The answers were lost and the artifact could not be loaded either, so the Files section may be out of date. */
-const attachUnknownStale = "We could not confirm the files were added. Reload the page and check Files before adding them again.";
+const attachPartial = "Some files could not be added. The attached files list shows the ones that were; drop the others again.";
+/** The answers were lost and the artifact could not be loaded either, so its list of attached files may be out of date. */
+const attachUnknownStale = "We could not confirm the files were added. Reload the page and check its attached files before adding them again.";
 
 type Uploads = ReturnType<typeof useFileUploads>;
 type Api = BlankPageOptions["api"];
@@ -93,7 +91,7 @@ interface Settled {
   message: string | null;
 }
 
-/** After every attach answer was lost: loads the artifact as it is now, so its Files section can show the truth. */
+/** After every attach answer was lost: loads the artifact as it is now, so its list of attached files can show the truth. */
 async function settleUnknownAttach(api: Api, publicId: string, ids: readonly string[]): Promise<Settled> {
   const result = await api.load(publicId).catch(() => null);
   if (!result?.success) return { loaded: null, landed: [], missing: [], message: attachUnknownStale };
@@ -102,12 +100,6 @@ async function settleUnknownAttach(api: Api, publicId: string, ids: readonly str
   const missing = ids.filter((id) => !have.has(id));
   if (missing.length === 0) return { loaded: result.data, landed, missing, message: null };
   return { loaded: result.data, landed, missing, message: landed.length > 0 ? attachPartial : attachFailed };
-}
-
-/** Where an attach's outcome goes: files that landed (the page may become a Files page), or the artifact as it is, with no file of the batch. */
-interface AttachOutcomes {
-  attached: (artifact: ArtifactDto) => void;
-  refreshed: (artifact: ArtifactDto) => void;
 }
 
 /**
@@ -122,11 +114,10 @@ interface AttachOutcomes {
  * `round` changes after each attach, so files that finished meanwhile are
  * taken next.
  */
-function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, holdRef: React.RefObject<Set<string>>, outcomes: AttachOutcomes) {
+function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, holdRef: React.RefObject<Set<string>>, onUpdated: (artifact: ArtifactDto) => void) {
   const [problem, setProblem] = useState<string | null>(null);
   const [round, setRound] = useState(0);
   const attachingRef = useRef(false);
-  const { attached, refreshed } = outcomes;
   const attach = useCallback((stored: { id: string; publicId: string }, ids: readonly string[]) => {
     if (!api || attachingRef.current) return;
     attachingRef.current = true;
@@ -139,7 +130,7 @@ function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, h
       // Known either way once loaded: files it holds are done, files it lacks go. Unloaded, they stay held.
       for (const id of [...settled.landed, ...settled.missing]) holdRef.current.delete(id);
       discardAll(api, settled.missing);
-      if (settled.loaded) (settled.landed.length > 0 ? attached : refreshed)(settled.loaded);
+      if (settled.loaded) onUpdated(settled.loaded);
       setProblem(settled.message);
     };
     void attachWithRecheck(api, stored.id, ids, () => { uploadsRef.current.markChecking(ids); })
@@ -151,7 +142,7 @@ function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, h
         for (const id of ids) holdRef.current.delete(id);
         if (result.success) {
           setProblem(null);
-          attached(result.data);
+          onUpdated(result.data);
           return;
         }
         // Refused: the files are in no artifact, so they go.
@@ -164,20 +155,22 @@ function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, h
         attachingRef.current = false;
         setRound((count) => count + 1);
       });
-  }, [api, holdRef, attached, refreshed, uploadsRef]);
+  }, [api, holdRef, onUpdated, uploadsRef]);
   return { attach, problem, round };
 }
 
 /**
- * Files dropped on the blank page, from upload to artifact (uploadStep): the
- * create carries them while the page is blank; a page already stored gets
- * them attached, including any that finished while the create was on its
- * way. Once the artifact has them all, the list clears, so later files go
- * through the artifact's own Files section. Removing a file takes it out of
- * the create too (filesForCreate); a Files page that loses all its files
- * goes back to a blank page. Leaving while files upload asks first. Uploads
- * that never reached an artifact are deleted when the page goes
- * (uploadsToDiscard); the cleanup job is the backstop.
+ * Files dropped on a new page that is not a document, from upload to
+ * artifact (uploadStep): the create carries them while the page is blank; a
+ * page already stored gets them attached, including any that finished
+ * while the create was on its way. Once the artifact has them all, the list
+ * clears, and the artifact's own list of attached files shows them. (A
+ * document never comes here: it takes files in its text.) Removing a file
+ * takes it out of the create too (filesForCreate); a Files page that loses
+ * all its files loses the title they gave it, so it is a blank page again.
+ * Leaving while files upload asks first. Uploads that never reached an
+ * artifact are deleted when the page goes (uploadsToDiscard); the cleanup
+ * job is the backstop.
  */
 export function useBlankUploads({ options, artifact, draftRef, replace, onUpdated }: BlankUploadsOptions) {
   const api = options?.api;
@@ -197,17 +190,11 @@ export function useBlankUploads({ options, artifact, draftRef, replace, onUpdate
   const handedRef = useRef<{ ids: string[] }>({ ids: [] });
   /** Files whose attach is on its way or whose answer was lost. */
   const holdRef = useRef(new Set<string>());
-  /** The draft the drop turned into a Files page, so removing every file can turn it back. */
-  const filesDraftRef = useRef<ArtifactDraft | null>(null);
+  /** The title the files gave a Files page, so removing every file can take it back. */
+  const filesTitleRef = useRef<string | null>(null);
   const uploadsRef = useRef(uploads);
   useEffect(() => { uploadsRef.current = uploads; }, [uploads]);
-  const attached = useCallback((result: ArtifactDto) => {
-    onUpdated(result);
-    const next = asFiles(draftRef.current, result.files.map((file) => file.filename));
-    if (next) replace(next, false);
-  }, [draftRef, onUpdated, replace]);
-  const outcomes = useMemo(() => ({ attached, refreshed: onUpdated }), [attached, onUpdated]);
-  const { attach, problem, round } = useAttach(api, uploadsRef, holdRef, outcomes);
+  const { attach, problem, round } = useAttach(api, uploadsRef, holdRef, onUpdated);
 
   const readyKey = useMemo(() => uploads.readyFiles.map((file) => file.id).join(","), [uploads.readyFiles]);
   const attachedKey = useMemo(() => artifact.files.map((file) => file.id).join(","), [artifact.files]);
@@ -228,22 +215,21 @@ export function useBlankUploads({ options, artifact, draftRef, replace, onUpdate
     }
     if (step.step !== "create") return;
     handedRef.current.ids = [...new Set([...handedRef.current.ids, ...step.ids])];
-    // No remount: the empty body has no content editor to reload, and the title keeps its caret.
-    const next = asFiles(draftRef.current, files.map((file) => file.filename));
+    // No remount: the title keeps its caret.
+    const next = namedAfterFiles(draftRef.current, files.map((file) => file.filename));
     if (!next) return;
-    filesDraftRef.current = next;
+    filesTitleRef.current = next.title;
     replace(next, false);
   }, [api, stored, artifact.id, artifact.publicId, uploads.busy, readyKey, attachedKey, round, attach, draftRef, replace]);
 
-  // Every file removed before the create: the page is blank again, not an empty Files artifact.
+  // Every file removed before the create: the title they gave the page goes too, so nothing is stored for an empty page.
   // Not while a create is on its way: it may still store the Files page, and the draft must match what comes back.
   useEffect(() => {
-    const auto = filesDraftRef.current;
-    if (stored || itemCount > 0 || !auto || standingRef.current.state === "inFlight") return;
-    filesDraftRef.current = null;
+    const auto = filesTitleRef.current;
+    if (stored || itemCount > 0 || auto === null || standingRef.current.state === "inFlight") return;
+    filesTitleRef.current = null;
     const draft = draftRef.current;
-    if (draft.kind !== "file" || draft.content !== "") return;
-    replace({ ...draft, kind: "markdown", title: draft.title === auto.title ? "" : draft.title }, true);
+    if (draft.title === auto) replace({ ...draft, title: "" }, false);
   }, [stored, itemCount, settled, draftRef, replace]);
 
   /** Removes a file from the page and from the create; its upload goes unless a create on its way may carry it. */

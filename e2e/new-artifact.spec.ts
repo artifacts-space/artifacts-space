@@ -1,11 +1,15 @@
 import type { Page } from "@playwright/test";
+import { expectNoAxeViolations } from "./support/a11y";
+import { attachedList, switchBlankPageTo } from "./support/new-page";
 import { allowPageError, expect, test } from "./support/test";
 
 /**
  * New artifact opens a blank page in the pane, like a new document: no form
  * first. Nothing is stored until something is put in it; then it is created
  * once. The first paste or drop picks the format, and a wrong guess costs one
- * click. Checked on /dev/workspace, whose stand-in stores new artifacts in
+ * click. A file dropped on a document goes into its text
+ * (document-files.spec.ts); on any other format it is attached. Checked on
+ * /dev/workspace, whose stand-in stores new artifacts in
  * the tab's sessionStorage, so a reload shows exactly what was stored.
  */
 
@@ -170,8 +174,27 @@ test("should keep pasted writing as Markdown and take a heading as the title", a
   expect((await storedNew(page))[0]?.kind).toBe("markdown");
 });
 
-test("should make a Files artifact when a file is dropped on the blank page", async ({ page }) => {
+test("should put a file dropped on the blank page into the document, and keep the page a document", async ({ page }) => {
   await openNewArtifact(page);
+  await body(page).evaluate((element) => {
+    const data = new DataTransfer();
+    data.items.add(new File(["%PDF-1.4"], "Quarterly report.pdf", { type: "application/pdf" }));
+    element.dispatchEvent(new DragEvent("drop", { dataTransfer: data, bubbles: true, cancelable: true }));
+  });
+  await expect(body(page).locator('[data-media-block="pdf"]')).toBeVisible();
+  await expect.poll(async () => (await storedNew(page))[0]?.content ?? "", { timeout: 15_000 }).toContain("/api/files/");
+  const [stored] = await storedNew(page);
+  expect(stored?.kind).toBe("markdown");
+  expect(stored?.files).toHaveLength(1);
+  expect(await creates(page)).toBe(1);
+  await expect(page.getByRole("region", { name: "Files", exact: true })).toHaveCount(0);
+  await expect(attachedList(page)).toHaveCount(0);
+  await expect(page.getByText("Drop files here, or")).toHaveCount(0);
+});
+
+test("should make a Files artifact named after its file when a file is dropped on a page switched to Files", async ({ page }) => {
+  await openNewArtifact(page);
+  await switchBlankPageTo(page, "Files");
   await body(page).evaluate((element) => {
     const data = new DataTransfer();
     data.items.add(new File(["%PDF-1.4"], "Quarterly report.pdf", { type: "application/pdf" }));
@@ -201,8 +224,9 @@ async function dropFiles(target: ReturnType<Page["locator"]>, names: readonly st
   }, [...names]);
 }
 
-test("should add later files through the artifact's Files section once a drop made it", async ({ page }) => {
+test("should add later files through a Files artifact's own section once a drop made it", async ({ page }) => {
   await openNewArtifact(page);
+  await switchBlankPageTo(page, "Files");
   await dropFiles(body(page), ["First.pdf"]);
   const files = page.getByRole("region", { name: "Files" });
   await expect(files).toContainText("1 attached");
@@ -226,8 +250,9 @@ test("should add later files through the artifact's Files section once a drop ma
   expect(await creates(page)).toBe(1);
 });
 
-test("should take a drop on the blank page's own drop box while files upload", async ({ page }) => {
+test("should take a drop on a blank Files page's own drop box while files upload", async ({ page }) => {
   await openNewArtifact(page);
+  await switchBlankPageTo(page, "Files");
   await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-uploads", "1"); });
   await dropFiles(body(page), ["First.pdf"]);
   const box = blankPage(page).getByText("Drop files here, or");
@@ -245,71 +270,57 @@ test("should take a drop on the blank page's own drop box while files upload", a
   expect(await creates(page)).toBe(1);
 });
 
-test("should attach a file dropped after a title was already stored", async ({ page }) => {
+test("should put a file dropped after a title was already stored into the document, and keep the title", async ({ page }) => {
   await openNewArtifact(page);
   await page.keyboard.type("Title first");
   await expect(cards(page, "Title first")).toHaveCount(1);
   await dropFiles(body(page), ["Later.pdf"]);
-  await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
-  await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("file");
+  await expect(body(page).locator('[data-media-block="pdf"]')).toBeVisible();
+  await expect.poll(async () => (await storedNew(page))[0]?.content ?? "", { timeout: 15_000 }).toContain("/api/files/");
   const [stored] = await storedNew(page);
+  expect(stored?.kind, "the page stays a document").toBe("markdown");
   expect(stored?.title, "the typed title stays").toBe("Title first");
   expect(stored?.files).toHaveLength(1);
   expect(await creates(page)).toBe(1);
 });
 
-test("should upload a code file dropped while files are on their way, and keep what was typed", async ({ page }) => {
+test("should keep a file that is still uploading when a code file is dropped next, and put both in the text", async ({ page }) => {
   await openNewArtifact(page);
-  await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-uploads", "1"); });
+  // Held while it uploads: the page's content is still empty, but the page is not, so the next file is not read as its content.
+  await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-media", "1"); });
   await dropFiles(body(page), ["First.pdf"]);
-  await expect(page.getByText("First.pdf")).toBeVisible();
-  const field = body(page).locator('[contenteditable="true"]');
-  await field.click();
-  await page.keyboard.type("Typed while it uploads");
+  await expect(body(page).getByRole("group", { name: "Uploading First.pdf" })).toBeVisible();
   await body(page).evaluate((element) => {
     const data = new DataTransfer();
     data.items.add(new File(["const a = 1;"], "notes.ts", { type: "text/plain" }));
     element.dispatchEvent(new DragEvent("drop", { dataTransfer: data, bubbles: true, cancelable: true }));
   });
-  await expect(page.getByText("notes.ts")).toBeVisible();
-  await expect(field).toContainText("Typed while it uploads");
-  await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-uploads"); window.dispatchEvent(new Event("fixture:release-uploads")); });
+  await expect(body(page).locator("[data-media-block]")).toHaveCount(2);
+  await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-media"); window.dispatchEvent(new Event("fixture:release-media")); });
 
-  await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(2);
+  await expect.poll(async () => ((await storedNew(page))[0]?.content.match(/\/api\/files\//g) ?? []).length, { timeout: 15_000 }).toBe(2);
   const [stored] = await storedNew(page);
-  expect(stored?.kind, "typed writing keeps the page a document").toBe("markdown");
-  expect(stored?.content).toContain("Typed while it uploads");
+  expect(stored?.kind, "the page stays a document").toBe("markdown");
+  expect(stored?.files).toHaveLength(2);
   expect(await creates(page)).toBe(1);
 });
 
-test("should attach a file dropped on a page that already has writing, and keep the writing", async ({ page }) => {
-  await openNewArtifact(page);
-  await page.keyboard.type("Notes");
-  await page.keyboard.press("Enter");
-  await page.keyboard.type("Written first");
-  await expect(cards(page, "Notes")).toHaveCount(1);
-  // Held while it uploads: its progress shows, with no second drop box beside the Files section.
-  await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-uploads", "1"); });
-  await dropFiles(body(page), ["Screenshot.pdf"]);
-  await expect(page.getByRole("list", { name: "Uploads" }).getByText("Screenshot.pdf")).toBeVisible();
-  await expect(page.getByText("Drop files here, or")).toHaveCount(0);
-  await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-uploads"); window.dispatchEvent(new Event("fixture:release-uploads")); });
-  await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
-  await expect(body(page)).toContainText("Written first");
-  await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(1);
-  await expect.poll(async () => (await storedNew(page))[0]?.content, { timeout: 15_000 }).toContain("Written first");
-  const [stored] = await storedNew(page);
-  expect(stored?.kind).toBe("markdown");
-  expect(await creates(page)).toBe(1);
-});
-
-test("should attach a file dropped on a page whose format is not Markdown, and keep its content", async ({ page }) => {
+test("should attach a file dropped on a page whose format is not Markdown, keep its content, and list the file with no upload box", async ({ page }) => {
   await openNewArtifact(page);
   await pasteIntoBody(page, "name,value\nAda,1\nBo,2");
   await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("csv");
   await dropFiles(body(page), ["Source.pdf"]);
   await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(1);
-  await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
+  const list = attachedList(page);
+  await expect(list.getByRole("listitem")).toHaveCount(1);
+  await expect(list).toContainText("Source.pdf");
+  await expect(list.getByLabel("Open Source.pdf")).toBeVisible();
+  await expect(list.getByRole("button", { name: "Remove Source.pdf" })).toBeVisible();
+  // A table has no text to put a file in, and the page has no box for adding files.
+  await expect(list.getByRole("button", { name: /Add to document/ })).toHaveCount(0);
+  await expect(page.getByText("Drop files here, or")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Files", exact: true })).toHaveCount(0);
+  await expectNoAxeViolations(list);
   const [stored] = await storedNew(page);
   expect(stored?.kind).toBe("csv");
   expect(stored?.content).toBe("name,value\nAda,1\nBo,2");

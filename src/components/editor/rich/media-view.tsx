@@ -1,6 +1,6 @@
 "use client";
 
-import { IconTrash } from "@tabler/icons-react";
+import { IconDownload, IconExternalLink, IconTrash } from "@tabler/icons-react";
 import type { Editor } from "@tiptap/core";
 import { NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
 import { useCallback, useRef, useState } from "react";
@@ -12,15 +12,15 @@ import { cn } from "@/lib/utils";
 
 import { useEditorMedia } from "./media-context";
 import { MEDIA_NODE, mediaFileId, readMediaAttrs, type MediaAttrs } from "./media-markdown";
-import { MediaPicker, UploadingMedia } from "./media-picker";
+import { kindCopy, MediaPicker, UploadingMedia } from "./media-picker";
 import { forgetUpload, queueUpload, type UploadedMedia } from "./media-uploads";
 
 /**
  * A media block in the editor. Empty, it offers an upload or a link;
  * uploading, it shows progress; with a file, it draws the same MediaBlock
  * as the read view, with a caption field under it, a handle to resize
- * images and video, and a small toolbar (width, alt text, remove) while it
- * is selected. Every change is a node attribute, so it saves as Markdown.
+ * images and video, and a small toolbar (width, alt text, replace, open,
+ * download, remove) while it is selected. Every change is a node attribute, so it saves as Markdown.
  */
 
 type Patch = Partial<MediaAttrs>;
@@ -45,7 +45,18 @@ const widthChoices: readonly { label: string; width: number | null }[] = [
   { label: "Original", width: null },
 ];
 
-function Toolbar({ attrs, onChange, onRemove, onEditAlt }: { attrs: MediaAttrs; onChange: (patch: Patch) => void; onRemove: () => void; onEditAlt: () => void }) {
+interface ToolbarProps {
+  attrs: MediaAttrs;
+  /** Where the file opens and downloads from. */
+  links: { open: string; download: string };
+  onChange: (patch: Patch) => void;
+  onRemove: () => void;
+  onEditAlt: () => void;
+  /** Picks a new file for this block. */
+  onReplace: () => void;
+}
+
+function Toolbar({ attrs, links, onChange, onRemove, onEditAlt, onReplace }: ToolbarProps) {
   return (
     <div role="toolbar" aria-label="Media options" className="flex flex-wrap items-center gap-1 rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10">
       {hasAdjustableWidth(attrs.kind)
@@ -56,6 +67,9 @@ function Toolbar({ attrs, onChange, onRemove, onEditAlt }: { attrs: MediaAttrs; 
           ))
         : null}
       <Button type="button" variant="ghost" size="xs" onClick={onEditAlt}>{attrs.kind === "image" ? "Alt text" : "Name"}</Button>
+      <Button type="button" variant="ghost" size="xs" onClick={onReplace}>Replace</Button>
+      <Button variant="ghost" size="icon-xs" nativeButton={false} render={<a href={links.open} target="_blank" rel="noopener noreferrer" aria-label="Open in a new tab" />}><IconExternalLink aria-hidden /></Button>
+      <Button variant="ghost" size="icon-xs" nativeButton={false} render={<a href={links.download} aria-label="Download" />}><IconDownload aria-hidden /></Button>
       <Button type="button" variant="ghost" size="icon-xs" aria-label="Remove" onClick={onRemove}><IconTrash aria-hidden /></Button>
     </div>
   );
@@ -125,14 +139,19 @@ function EditableMedia({ editor, attrs, selected, onChange, onRemove }: { editor
   const media = useEditorMedia();
   const [preview, setPreview] = useState<number | null>(null);
   const [altOpen, setAltOpen] = useState(false);
+  const replaceRef = useRef<HTMLInputElement>(null);
   const fileId = mediaFileId(attrs) ?? "";
+  const links = { open: media.urlFor(fileId, false), download: media.urlFor(fileId, true) };
+  // The block keeps its place, caption, alt text, and width; the new file uploads in it. One step, so Undo brings the old file back.
+  const replaceWith = (file: File | undefined) => { if (file) onChange({ src: "", uploadId: queueUpload(file) }); };
   const caption = <TextField value={attrs.caption} label="Caption" placeholder="Add a caption" onChange={(next) => { onChange({ caption: next }); }} />;
   const overlay = hasAdjustableWidth(attrs.kind) ? <ResizeHandle editor={editor} onPreview={setPreview} onCommit={(width) => { onChange({ width }); }} /> : null;
   return (
     <div className="flex flex-col gap-2">
-      {selected || altOpen ? <Toolbar attrs={attrs} onChange={onChange} onRemove={onRemove} onEditAlt={() => { setAltOpen((open) => !open); }} /> : null}
+      {selected || altOpen ? <Toolbar attrs={attrs} links={links} onChange={onChange} onRemove={onRemove} onEditAlt={() => { setAltOpen((open) => !open); }} onReplace={() => { replaceRef.current?.click(); }} /> : null}
+      <input ref={replaceRef} type="file" accept={kindCopy[attrs.kind].accept} hidden aria-label="Replace: choose a file" onChange={(event) => { replaceWith(event.target.files?.[0]); event.target.value = ""; }} />
       {altOpen ? <AltField attrs={attrs} onChange={onChange} /> : null}
-      <MediaBlock kind={attrs.kind} url={media.urlFor(fileId, false)} downloadUrl={media.urlFor(fileId, true)} alt={attrs.alt} caption={caption} width={preview ?? attrs.width} file={null} overlay={overlay} />
+      <MediaBlock kind={attrs.kind} url={links.open} downloadUrl={links.download} alt={attrs.alt} caption={caption} width={preview ?? attrs.width} file={null} overlay={overlay} />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { expectNoAxeViolations } from "./support/a11y";
 import { allowPageError, expect, test } from "./support/test";
 
 import { largePhoto } from "./support/photos";
@@ -140,6 +141,27 @@ test("should resize an image from its toolbar and write the width into the Markd
   await toolbar.getByRole("button", { name: "Alt text" }).click();
   await editor(page).getByRole("textbox", { name: "Alt text" }).fill("Hills at dusk");
   await expect(savedMarkdown(page)).toContainText(`![Hills at dusk](/api/files/`);
+});
+
+test("should put a new file in an image's place from its toolbar, keep its caption and width, and offer Open and Download", async ({ page }) => {
+  await openFixture(page);
+  await editor(page).getByRole("img", { name: "Dusk over the hills" }).click();
+  const toolbar = editor(page).getByRole("toolbar", { name: "Media options" });
+  await expect(toolbar.getByLabel("Open in a new tab")).toHaveAttribute("href", "/hero-dusk.webp");
+  await expect(toolbar.getByLabel("Download")).toHaveAttribute("href", "/hero-dusk.webp");
+  await expectNoAxeViolations(toolbar);
+
+  const chooser = page.waitForEvent("filechooser");
+  await toolbar.getByRole("button", { name: "Replace" }).click();
+  await (await chooser).setFiles({ name: "Newer.png", mimeType: "image/png", buffer: Buffer.from(await screenshotPng(page)) });
+  // The block keeps its place and what was written on it; only the file changes.
+  await expect(savedMarkdown(page)).toContainText(`Intro paragraph.\n\n![Dusk over the hills](/api/files/${firstUpload}#width=50 "A preset caption")`);
+  await expect(editor(page).locator(`[data-media-block="image"] img[src^="blob:"]`)).toBeVisible();
+
+  // Undo brings the old file back.
+  await editor(page).getByText("End paragraph.").click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(savedMarkdown(page)).toContainText("![Dusk over the hills](/api/files/00000000-0000-4000-8000-0000000000a1#width=50");
 });
 
 test("should refuse a file type the store does not take and say why", async ({ page }) => {

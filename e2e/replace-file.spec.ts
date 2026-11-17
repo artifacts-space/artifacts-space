@@ -1,9 +1,11 @@
 import type { Page } from "@playwright/test";
+import { switchBlankPageTo } from "./support/new-page";
 import { allowPageError, expect, test } from "./support/test";
 
 /**
- * Replace in the Files section: a new upload takes a file's place under the
- * same entry, so its name, place, and id stay, and a refused replace leaves
+ * Replace on a file's row (a Files artifact's section here; the quiet list
+ * of attached files has the same rows): a new upload takes a file's place
+ * under the same entry, so its name, place, and id stay, and a refused replace leaves
  * the file as it was and discards the upload. Checked on /dev/workspace,
  * whose stand-in stores new artifacts in the tab's sessionStorage and acts
  * as the server does (fixture-new-artifacts.ts).
@@ -30,8 +32,9 @@ async function openNewArtifact(page: Page) {
   await expect(body(page).locator('[contenteditable="true"]')).toBeVisible();
 }
 
-/** Drops PDFs on the blank page, which makes a Files artifact with them. */
+/** Makes the blank page a Files page and drops PDFs on it, which stores a Files artifact with them. */
 async function dropFiles(page: Page, names: readonly string[]) {
+  await switchBlankPageTo(page, "Files");
   await body(page).evaluate((element, files) => {
     const data = new DataTransfer();
     for (const name of files) data.items.add(new File(["%PDF-1.4"], name, { type: "application/pdf" }));

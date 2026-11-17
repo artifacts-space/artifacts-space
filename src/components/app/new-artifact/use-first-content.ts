@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
+import { showsMedia } from "@/components/editor/rich/media-bridge";
+import type { Point } from "@/components/editor/rich/media-landing";
 import { leavesPasteToEditor } from "@/lib/create/new-artifact-rules";
 
-/** What came onto an empty page: text, or files. */
-export type FirstContent = { text: string } | { files: File[] };
+/** What came onto the page: text, or files, with the point of the window they were dropped at (none for a paste or a picked file). */
+export type FirstContent = { text: string } | { files: File[]; point?: Point | undefined };
 
 interface FirstContentOptions {
   /** The whole editor: files dropped anywhere on it count. */
@@ -12,7 +14,7 @@ interface FirstContentOptions {
   body: RefObject<HTMLElement | null>;
   /** Take pasted or dropped text: only while the page is a new artifact with an empty body. */
   text: boolean;
-  /** Take dropped or pasted files: anywhere on the new artifact's page except a drop box, which takes its own. */
+  /** Take dropped or pasted files: anywhere on the new artifact's page except a drop box, which takes its own. Off for a document with writing, which takes files in its text. */
   files: boolean;
   onContent: (content: FirstContent) => void;
 }
@@ -33,7 +35,7 @@ function contentOf(data: DataTransfer | null, takes: Takes): FirstContent | null
   return leavesPasteToEditor(text, data.types.includes("text/html")) ? null : { text };
 }
 
-/** True when the target is a file drop box (FileUploader): the Files section's or the blank page's own. It takes its drops itself; anywhere else stays the page's. */
+/** True when the target is a file drop box (FileUploader): the blank page's own, or a Files artifact's. It takes its drops itself; anywhere else stays the page's. */
 function inDropBox(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("[data-slot=file-drop]") !== null;
 }
@@ -61,8 +63,12 @@ export function useFirstContent({ page, body, text, files, onContent }: FirstCon
   useEffect(() => {
     const root = page.current;
     if (!enabled || !root) return;
-    // A drop box keeps its drops: the Files section's attaches them itself, and the blank page's hands them to onContent.
-    const takes = (target: EventTarget | null): Takes => ({ text: text && target instanceof Node && body.current?.contains(target) === true, files: files && !inDropBox(target) });
+    // A drop box keeps its drops: a Files artifact's attaches them itself, and the blank page's hands them to onContent.
+    // A document that shows a file (one still uploading is not in its content yet) is no longer empty: it takes pastes and drops itself.
+    const takes = (target: EventTarget | null): Takes => {
+      if (showsMedia(body.current)) return { text: false, files: false };
+      return { text: text && target instanceof Node && body.current?.contains(target) === true, files: files && !inDropBox(target) };
+    };
     const take = (event: ClipboardEvent | DragEvent, content: FirstContent | null) => {
       if (!content) return;
       event.preventDefault();
@@ -72,7 +78,11 @@ export function useFirstContent({ page, body, text, files, onContent }: FirstCon
     };
     const paste = (event: ClipboardEvent) => { take(event, contentOf(event.clipboardData, takes(event.target))); };
     // Any drop ends the drag, also one a drop box takes, so the page's hint never stays behind.
-    const drop = (event: DragEvent) => { setDragging(false); take(event, contentOf(event.dataTransfer, takes(event.target))); };
+    const drop = (event: DragEvent) => {
+      setDragging(false);
+      const content = contentOf(event.dataTransfer, takes(event.target));
+      take(event, content && "files" in content ? { ...content, point: { x: event.clientX, y: event.clientY } } : content);
+    };
     const over = (event: DragEvent) => {
       // Over a drop box, or carrying nothing the page takes: the box shows its own highlight, not the page's hint.
       if (!carriesContent(event, takes(event.target))) { setDragging(false); return; }

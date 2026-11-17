@@ -42,6 +42,7 @@ import { canSeeComments } from "@/lib/comments/setting-rules";
 import { filesForViewer } from "@/lib/files/download";
 import { csvFileName, mayExportCsv } from "@/lib/csv-export/rules";
 import { canChangeCsvDownloadFor } from "@/lib/csv-export/store";
+import { dropZoneProps } from "@/components/editor/rich/media-bridge";
 import type { FileDto } from "@/lib/files/types";
 import { accountCreatedAt } from "@/lib/account-age";
 import { loadActor } from "@/lib/agents/queries";
@@ -385,6 +386,15 @@ function mainTopClass(view: ViewableArtifact["view"]) {
   return view.icon ? "pt-0 sm:pt-0" : "pt-8 sm:pt-10";
 }
 
+/**
+ * For someone who may edit, the page's column is the drop zone of the
+ * document in it: a file dropped on the title or under the text lands in
+ * the text (media-bridge.ts). Readers get no zone.
+ */
+function editorDropZone(canEdit: boolean): Partial<ReturnType<typeof dropZoneProps>> {
+  return canEdit ? dropZoneProps() : {};
+}
+
 export default async function ArtifactPage({ params }: PageProps<"/artifact/[publicId]">) {
   const viewable = await load(params);
   if (!viewable) notFound();
@@ -438,7 +448,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
             {/* A Markdown artifact takes comments on its words: highlights in the text, threads in cards at them, and the list below. */}
             <InlineCommentsProvider publicId={record.publicId} kind={view.kind} canComment={canComment}>
             {/* The artifact and its in-place editor fill the page's column, as the title above them does; the comments under them keep their own measure. */}
-            <div className={bodyFillsColumnClass}>
+            {/* For someone who may edit a document, this column is its drop zone: a file dropped on the title or under the text lands in the text. */}
+            <div className={bodyFillsColumnClass} {...editorDropZone(viewable.canEdit)}>
               <EditorIsland viewable={viewable} viewerId={session?.user.id ?? ""} files={files}>
                 <ThemeScope theme={theme} className="text-foreground" data-artifact-theme={themeIdForReader(presetId, viewable.canEdit)} data-theme-source={source}>
                   <ArtifactHeading viewable={viewable} editor={editor} organizers={organizers} themeChoices={themeChoices} />

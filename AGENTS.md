@@ -897,7 +897,8 @@ path, as on any website: `<link href="css/site.css">`, a module's
 
 An artifact has one column, and everything in it starts and ends at the
 same place: the title, the summary, the chips and meta line, the notices,
-the body, and the Files section. The column is the reading width: 1024px
+the body, and the files under it (a Files artifact's section, or the list of
+attached files; see Files in a document). The column is the reading width: 1024px
 with 24px side padding when contained, the whole window with Full width
 (`src/lib/page-width/rules.ts`; change the width there, once). Never give a
 part of the page its own narrower cap or its own side padding: a body that
@@ -922,7 +923,7 @@ there. Every row that holds the content's column, above the body and
 inside it, leaves the block gutter on both sides (`gutterRoom`): one
 variable, set by `detailOuterClass` from the artifact's kind alone, so the
 title never moves when View source opens. A band that spans the pane (a
-notice, the Files section) takes the `column` class for its content.
+notice, the files under the body) takes the `column` class for its content.
 Under View source the field's side padding is the column's. A new row
 must keep to this. `e2e/title-body-column.spec.ts` (fixtures: the editor
 in the pane and on the page, for Markdown, text, and interface artifacts),
@@ -1035,11 +1036,72 @@ attached (`artifact_file.attached_by_content`, set in the save's own
 statement by `writeAndAttach`), follows these rules: hidden from readers of a version
 that does not show it, not counted toward the file limit while only older
 versions name it, and deleted once none does (`icon-cleanup.ts`). Files
-attached any other way (`files_attach`, the Files panel, and all files from
-before the column) are plain attachments that pruning never removes, even
-after content links them. A ui artifact's Markdown block is text only
+attached any other way (`files_attach`, a Files artifact's section, the
+Files panel documents had before, and all files from before the column) are
+plain attachments that pruning never removes, even after content links
+them. A ui artifact's Markdown block is text only
 (`media={false}`). Images from other sites never load. Add each new block
 to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
+
+### Files in a document
+
+Decided by the owner on 17 Nov 2026: "the base panel file upload UI needs
+removed", files go "inline only". A document has no section for adding
+files. A file goes into its text, as a block, where it was put.
+
+- **A drop lands in the text, anywhere on the page.** The page marks its
+  column as the document's drop zone (`dropZoneProps` in
+  `src/components/editor/rich/media-bridge.ts`: the /app pane's
+  `detail-outer`, and the artifact page's column for someone who may edit).
+  The editor listens at the window, in the capture phase
+  (`fileDragPlugin` in `media-input.ts`), and takes every drag that carries
+  files inside its zone: the title block, the text, the space under it. So
+  nothing under the window draws for it (the editor's own drop cursor is
+  for text, and once stayed on the page as a stray line), and the browser
+  never opens the file. A new drop target inside a document's page marks
+  itself `data-slot="file-drop"`, which the editor leaves alone.
+- **One line shows where the files land** (`media-landing.ts`): between
+  two top-level blocks, above the block under the pointer in its upper half
+  and below it otherwise, at the nearest block when the pointer is outside
+  the text, and in place of an empty line. Each file is a block of its own,
+  in order. The line is one element on `body`, fixed in the window (the
+  pane's body is a size container, which would hold a fixed box inside
+  it), and it goes on any drop, when the files leave the window, and by
+  itself 1.5 seconds after the last drag event. Never draw a second line.
+- **The New artifact page** takes a file itself only while it is empty
+  (`pageTakesFiles` in `src/lib/create/new-artifact-rules.ts`): a code,
+  SVG, or diagram file is read as the page's content, and any other file
+  goes into the document (`askDocumentWhenReady`). The zone is then marked
+  `"page"`, and the editor leaves the drop alone. A block whose file is
+  still uploading is not in the saved content yet, so both sides ask
+  `showsMedia` before they call the page empty. A page of another format
+  (a table, code) gets a dropped file attached, as before
+  (`use-blank-uploads.ts`); the web makes a Files artifact only from a page
+  switched to Files.
+- **Files that are attached and shown nowhere stay reachable.**
+  `looseFiles` (`src/lib/files/loose-rules.ts`) lists the plain attachments
+  the content does not link and that are no icon or cover; the page shows
+  them under the body as "Attached files" (`AttachedFiles` with `quiet`),
+  with Open, Replace, Remove, and in a document "Add to document", which
+  puts a block that points at the file at the end of the text
+  (`askDocument`): the file is linked, never copied, and stays a plain
+  attachment. The list has no upload box and is drawn only while it lists a
+  file. Never migrate such files into anyone's content. A Files artifact,
+  an interface, and a canvas keep the Files section with its upload box
+  (`filesPanel`): a Files artifact's files are its content, and an Image or
+  File element names a file by the id copied from its row.
+- A file leaves a document by deleting its block. An upload in progress can
+  be cancelled, a failed one retried or removed, and the tab asks before it
+  closes while one is on its way (`UploadingMedia`). A selected block's
+  toolbar has Replace (a new upload in the same block, one undo step), Open
+  in a new tab, and Download (`media-view.tsx`).
+- A drag that started in the document (a block moved by its grip, a
+  picture dragged by itself, which browsers also offer as a file) is the
+  editor's own move, never a file drop (`view.dragging` in `takesDrag`).
+- `e2e/document-files.spec.ts` drops, pastes, and picks files on
+  `/dev/workspace` and on the page fixture (`/dev/editor?kind=markdown`),
+  where uploads stay in the tab (`fixture-media.ts`), and reads where each
+  block landed; `e2e/editor-media.spec.ts` covers the blocks themselves.
 
 ### Block menu and block links
 
@@ -1188,7 +1250,8 @@ Fixtures supply people to mention through `MentionablesLoader`;
 
 ### Replaced files
 
-Replace (the Files section, MCP `files_replace`, `src/lib/files/replace.ts`)
+Replace (a file's row in the Files section or in the list of attached files,
+MCP `files_replace`, `src/lib/files/replace.ts`)
 puts an editor's finished upload in place of a plain attachment. The
 `artifact_file` row keeps its id, place, and name, so links and embeds open
 the new file; what it held moves to `artifact_file_copy`. The swap is one SQL
@@ -1205,7 +1268,7 @@ readers see no difference. The page discards a refused upload with
 swap a row's object at any time, so code that deletes file rows reads the key
 in the delete itself (`deleteFileRows`, `DELETE … RETURNING`).
 Content media and icon or cover images (of the artifact or any version) are
-never replaced; the Files section learns the version ones from
+never replaced; a file's row learns the version ones from
 `FileDto.pictured`, which only full artifact DTOs load. Readers get the
 current file, except readers of an approved version, who get the copy that
 was current when it was saved (`download.ts`, never a newer one). Old copies

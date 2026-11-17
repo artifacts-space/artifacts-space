@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
 
-import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, createInputFor, filesForCreate, isUntouched, leavesPasteToEditor, persistOnce, sheetFormatTarget, UNTITLED, uploadStep, uploadsToDiscard, type BlankDraft } from "./new-artifact-rules";
+import { BLANK_ARTIFACT_ID, blankDraftProblem, contentRoute, createInputFor, filesForCreate, isUntouched, leavesPasteToEditor, pageTakesFiles, persistOnce, sheetFormatTarget, UNTITLED, uploadStep, uploadsToDiscard, type BlankDraft } from "./new-artifact-rules";
 
 const blank: BlankDraft = { title: "", icon: null, summary: "", content: "", language: "", kind: "markdown" };
 const requestId = "0b6f6d43-8a8f-4b52-9f44-2f8c1a6d3e10";
@@ -180,21 +180,31 @@ describe("contentRoute", () => {
     expect(contentRoute(false, empty)).toBe("first");
   });
 
-  it("should upload and attach a file, never read it into the body, when someone typed first", () => {
+  it("should leave a file to the document, which takes it in its text, when someone typed first", () => {
     const typed = { ...empty, content: "Written first" };
-    expect(contentRoute(false, typed)).toBe("upload");
+    expect(contentRoute(false, typed)).toBe("ignore");
     expect(contentRoute(true, typed), "a paste is the editor's").toBe("ignore");
+    expect(pageTakesFiles(typed)).toBe(false);
   });
 
   it("should upload and attach a file when the page's format is not Markdown", () => {
     expect(contentRoute(false, { ...empty, kind: "csv", content: "a,b\n1,2" })).toBe("upload");
     expect(contentRoute(false, { ...empty, kind: "code", content: "" })).toBe("upload");
+    expect(contentRoute(false, { ...empty, kind: "file", content: "" })).toBe("upload");
+    expect(pageTakesFiles({ ...empty, kind: "csv", content: "a,b\n1,2" })).toBe(true);
   });
 
-  it("should add files dropped during an upload to the uploads, not read them, when the body is still empty", () => {
+  it("should never attach a file to a document, whatever is on its way", () => {
     const uploading = { ...empty, uploadCount: 1 };
-    expect(contentRoute(false, uploading)).toBe("upload");
+    expect(contentRoute(false, uploading)).toBe("ignore");
     expect(contentRoute(true, uploading)).toBe("ignore");
+  });
+
+  it("should take files on the page itself only while the document is empty", () => {
+    expect(pageTakesFiles(empty)).toBe(true);
+    expect(pageTakesFiles({ ...empty, content: "  \n" }), "white space is still empty").toBe(true);
+    expect(pageTakesFiles({ ...empty, content: "A line." })).toBe(false);
+    expect(pageTakesFiles({ ...empty, active: false })).toBe(false);
   });
 
   it("should leave everything to the editor when the page is not a new artifact", () => {
