@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { earlierFormatNote, formatInfo, newVisualWork } from "@/lib/artifact-formats";
 import { artifactKinds } from "@/lib/artifact-types";
 import { exampleCanvas } from "@/lib/canvas/fixtures";
+import { fileLimits } from "@/lib/files/config";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
 
 import { formatGuide, validationReport } from "./format-tools";
@@ -47,6 +48,16 @@ describe("formatGuide", () => {
     expect(guide).toContain("- Metric:");
     expect(guide).toContain('"root": "page"');
     expect(guide).not.toContain("JSONL patches");
+  });
+});
+
+describe("formatGuide on how many files a document shows", () => {
+  it("should state both limits from the one constant the server checks", () => {
+    const guide = formatGuide("markdown");
+    expect(guide).toContain(`A document shows at most ${String(fileLimits.maxInlineFilesPerArtifact)} files in its text`);
+    expect(guide).toContain(`counted apart, at most ${String(fileLimits.maxFilesPerArtifact)}`);
+    expect(fileLimits.maxInlineFilesPerArtifact).toBe(100);
+    expect(fileLimits.maxFilesPerArtifact).toBe(20);
   });
 });
 

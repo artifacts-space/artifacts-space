@@ -20,6 +20,7 @@ import type { AttachFilesApi } from "@/components/files/attached-files";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { appFlowCanvas } from "@/lib/canvas/fixtures";
 import { bodyFillsColumnClass, pageColumnClass, usesFullWidth } from "@/lib/page-width/rules";
+import { fullMessage } from "@/lib/files/limit-rules";
 import type { FileDto } from "@/lib/files/types";
 import { plainSheetFormat } from "@/lib/sheet-format/rules";
 import { sheetAtLimit } from "@/lib/ui/fixtures/formats";
@@ -86,7 +87,7 @@ function useMemoryAttach(artifact: ArtifactDto): AttachFilesApi {
     },
     attach: (_artifactId, fileIds) => {
       const files = fileIds.flatMap((fileId) => uploaded.current.get(fileId) ?? []);
-      if (files.some((file) => file.filename.startsWith("refused"))) return Promise.resolve({ success: false, error: "An artifact holds at most 20 files. Remove some first." });
+      if (files.some((file) => file.filename.startsWith("refused"))) return Promise.resolve({ success: false, error: fullMessage("plain") });
       attached.current = [...attached.current, ...files];
       return Promise.resolve({ success: true, data: { ...artifact, files: attached.current } });
     },
