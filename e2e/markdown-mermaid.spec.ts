@@ -1,4 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
+import { expectNoAxeViolations } from "./support/a11y";
 import { expect, test } from "./support/test";
 
 /*
@@ -256,4 +257,126 @@ test("should insert an empty diagram with its source open when Mermaid diagram i
   await expect(sourceOf(added)).toBeVisible();
   await page.keyboard.type("flowchart TD\n  New --> Diagram");
   await expect(savedMarkdown(page)).toContainText("End paragraph.\n\n```mermaid\nflowchart TD\n  New --> Diagram\n```");
+});
+
+/*
+ * Preview is the diagram alone. The source shows in Preview only while the
+ * diagram is empty or broken, or while the cursor is in a source that was
+ * already showing (mermaid-block-view.tsx).
+ */
+
+const fenceAsOpened = "```mermaid\nflowchart LR\n  Plan --> Build\n```";
+
+test("should show the diagram alone at once, keeping the edit, when Preview is picked with the cursor in the source", async ({ page }) => {
+  await openFixture(page);
+  const block = await editorBlock(page);
+  await pickView(page, block, "Split");
+  await clickSourceEnd(block);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("  Build --> Ship");
+
+  await pickView(page, block, "Preview");
+  await expect(block).toHaveAttribute("data-diagram-view", "preview");
+  await expect(sourceOf(block)).toBeHidden();
+  await expect(block).not.toHaveAttribute("data-source-open", "");
+  await expect(block.getByRole("img", { name: "Diagram" })).toBeVisible();
+  // The edit made in Split is kept, and the block itself is selected: the cursor is no longer in hidden text.
+  await expect(savedMarkdown(page)).toContainText("```mermaid\nflowchart LR\n  Plan --> Build\n  Build --> Ship\n```");
+  await expect(editor(page).locator(".ProseMirror-selectednode [data-mermaid-block]")).toHaveCount(1);
+  // The picker keeps the keyboard, so the view can be changed again at once.
+  const picker = block.getByRole("combobox", { name: "Diagram view" });
+  await expect(picker).toBeFocused();
+  await expect(picker).toHaveText(/Preview/u);
+  await expectNoAxeViolations(block);
+
+  await pickView(page, block, "Split");
+  await expect(sourceOf(block)).toBeVisible();
+  await expect(sourceOf(block)).toContainText("Build --> Ship");
+});
+
+test("should keep the diagram alone in Preview when it is clicked and when everything is selected", async ({ page }) => {
+  await openFixture(page);
+  const block = await editorBlock(page);
+  await clickInEditor(block.getByRole("img", { name: "Diagram" }));
+  // A click on the diagram never opens the source.
+  await expect(sourceOf(block)).toBeHidden();
+  await expect(block).not.toHaveAttribute("data-source-open", "");
+
+  await clickInEditor(editor(page).getByText("End paragraph."));
+  await page.keyboard.press("ControlOrMeta+a");
+  // Let the editor take the selection before the source is checked.
+  await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 100); }));
+  await expect(sourceOf(block)).toBeHidden();
+  await expect(block).not.toHaveAttribute("data-source-open", "");
+});
+
+test("should pass over a diagram in Preview with the arrow keys and never type into its hidden source", async ({ page }) => {
+  await openFixture(page);
+  const block = await editorBlock(page);
+  await clickInEditor(editor(page).getByText("Intro paragraph."));
+  await page.keyboard.press("End");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.type("X");
+  await expect(savedMarkdown(page)).toContainText("X");
+  await expect(savedMarkdown(page)).toContainText(fenceAsOpened);
+  await expect(sourceOf(block)).toBeHidden();
+
+  await clickInEditor(editor(page).getByText("End paragraph."));
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.type("Y");
+  await expect(savedMarkdown(page)).toContainText("Y");
+  await expect(savedMarkdown(page)).toContainText(fenceAsOpened);
+  await expect(sourceOf(block)).toBeHidden();
+});
+
+test("should keep a new diagram's source in sight while it is typed, and hide it when Preview is picked again", async ({ page }) => {
+  await openFixture(page);
+  await editorBlock(page);
+  await clickInEditor(editor(page).getByText("End paragraph."));
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/mermaid");
+  await page.getByRole("option", { name: /Mermaid diagram/u }).click();
+  await page.keyboard.type("flowchart TD\n  New --> Diagram");
+  const added = editorDiagram(page).nth(1);
+  await expect(added).toHaveAttribute("data-diagram-state", "drawn", { timeout: 60_000 });
+  // The cursor is still in the source that was open while the diagram was empty, so what is typed stays in sight.
+  await expect(added).toHaveAttribute("data-diagram-view", "preview");
+  await expect(sourceOf(added)).toBeVisible();
+  await page.keyboard.type("\n  Diagram --> Done");
+  await expect(savedMarkdown(page)).toContainText("```mermaid\nflowchart TD\n  New --> Diagram\n  Diagram --> Done\n```");
+
+  // Preview already shows in the picker; picking it again is still a clear choice.
+  await pickView(page, added, "Preview");
+  await expect(sourceOf(added)).toBeHidden();
+  await expect(added.getByRole("img", { name: "Diagram" })).toBeVisible();
+  await expect(savedMarkdown(page)).toContainText("  Diagram --> Done\n```");
+});
+
+test("should show the source again in Preview when an undo puts the cursor back in it", async ({ page }) => {
+  await openFixture(page);
+  await editorBlock(page);
+  await clickInEditor(editor(page).getByText("End paragraph."));
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/mermaid");
+  await page.getByRole("option", { name: /Mermaid diagram/u }).click();
+  await page.keyboard.type("flowchart TD\n  New --> Diagram");
+  const added = editorDiagram(page).nth(1);
+  await expect(added).toHaveAttribute("data-diagram-state", "drawn", { timeout: 60_000 });
+  // A pause, so the next line is its own step to undo (the editor groups typing that follows within half a second).
+  await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 700); }));
+  await page.keyboard.type("\n  Diagram --> Done");
+  await expect(savedMarkdown(page)).toContainText("  Diagram --> Done\n```");
+  // The cursor leaves: the diagram shows alone.
+  await clickInEditor(editor(page).getByText("Intro paragraph."));
+  await expect(sourceOf(added)).toBeHidden();
+
+  await page.keyboard.press("ControlOrMeta+z");
+  // The undo took the line out of the source and left the cursor there, so the source is in sight for what is typed next.
+  await expect(savedMarkdown(page)).not.toContainText("Diagram --> Done");
+  await expect(sourceOf(added)).toBeVisible();
+  await page.keyboard.type(" %% Q");
+  await expect(sourceOf(added)).toContainText("%% Q");
 });

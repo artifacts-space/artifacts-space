@@ -29,10 +29,21 @@ function useSettledValue(value: string, delay: number): string {
 }
 
 /**
- * True while the cursor or a text selection touches the source of the block
- * at `getPos()`, including a selection that starts inside and runs past it,
- * so the source never hides under the text being selected. Selecting the
- * block itself does not count.
+ * True when a selection from `anchor` to `head` rests in the source of the
+ * block that starts at `pos` and is `size` long: the cursor is in it, or a
+ * selection starts or ends in it. A selection that only covers the block,
+ * with both ends outside (Select all), does not rest in it.
+ */
+export function restsInSource(anchor: number, head: number, pos: number, size: number): boolean {
+  const within = (at: number) => at >= pos + 1 && at <= pos + size - 1;
+  return within(anchor) || within(head);
+}
+
+/**
+ * True while the cursor, or one end of a text selection, rests in the source
+ * of the block at `getPos()`, so text being typed or selected there is never
+ * hidden. Selecting the block itself, or covering it from outside, does not
+ * count.
  */
 function useCursorInside(editor: Editor, getPos: () => number | undefined): boolean {
   return useEditorState({
@@ -43,18 +54,33 @@ function useCursorInside(editor: Editor, getPos: () => number | undefined): bool
       if (typeof pos !== "number" || selection instanceof NodeSelection) return false;
       const node = doc.nodeAt(pos);
       if (!node) return false;
-      return selection.from <= pos + node.nodeSize - 1 && selection.to >= pos + 1;
+      return restsInSource(selection.anchor, selection.head, pos, node.nodeSize);
     },
   });
+}
+
+/**
+ * Takes the selection out of the source of the block at `getPos()` by
+ * selecting the block itself, when the selection rests in the source. The
+ * source can then hide without the cursor in it.
+ */
+function leaveSource(editor: Editor, getPos: () => number | undefined) {
+  const pos = getPos();
+  const { selection, doc } = editor.state;
+  if (typeof pos !== "number" || selection instanceof NodeSelection) return;
+  const node = doc.nodeAt(pos);
+  if (!node || !restsInSource(selection.anchor, selection.head, pos, node.nodeSize)) return;
+  editor.commands.setNodeSelection(pos);
 }
 
 /** What the block shows: the source, the diagram, or both. */
 type Layout = "code" | "diagram" | "both";
 
 /**
- * The layout for a view. Preview shows the source too while an editor's
- * cursor is in it, or while the diagram is empty or broken, so it can be
- * fixed; a person who is only reading sees the diagram alone.
+ * The layout for a view. Preview is the diagram alone. It shows the source
+ * too only while an editor needs it: the diagram is empty or broken, so
+ * there is nothing to draw until it is fixed, or the cursor is in the source
+ * (see MermaidBlockView for how it gets there).
  */
 export function blockLayout(view: DiagramView, sourceNeeded: boolean): Layout {
   if (view === "code") return "code";
@@ -87,6 +113,14 @@ function DiagramPane({ code, state, editable, sourceShown }: { code: string; sta
  * with the read view's renderer, redraws once typing pauses, and opens
  * larger with a click. The source and its cursor stay in one place in the
  * document whatever the view, so switching never loses an edit.
+ *
+ * Preview and the cursor: picking Preview takes the cursor out of the
+ * source (the block is selected instead), so the diagram shows alone at
+ * once. The cursor cannot enter a hidden source: arrow keys and clicks pass
+ * over it. It is in the source in Preview only where the source was already
+ * showing: a new or broken diagram someone is typing, or an undo that puts
+ * the cursor back. The source then stays until the cursor leaves, so typed
+ * text is never hidden.
  */
 export function MermaidBlockView({ node, updateAttributes, editor, getPos }: ReactNodeViewProps) {
   const attrs = useCodeBlockAttrs(node.attrs.language, updateAttributes);
@@ -96,9 +130,15 @@ export function MermaidBlockView({ node, updateAttributes, editor, getPos }: Rea
   const inside = useCursorInside(editor, getPos);
   const { scopeRef, state } = useMermaidDiagram(preview, { keepPrevious: true, deferUntilNear: true, skip: view === "code" });
   const editable = editor.isEditable;
-  const sourceNeeded = editable && (inside || code.trim() === "" || state.status === "failed");
+  const unfinished = code.trim() === "" || state.status === "failed";
+  const sourceNeeded = editable && (inside || unfinished);
   const layout = blockLayout(view, sourceNeeded);
   const sides = sideClasses[layout];
+  const setView = (next: DiagramView) => {
+    attrs.setView(next);
+    // An unfinished diagram keeps its source in Preview, so the cursor may stay in it.
+    if (next === "preview" && !unfinished) leaveSource(editor, getPos);
+  };
 
   return (
     <NodeViewWrapper
@@ -117,7 +157,7 @@ export function MermaidBlockView({ node, updateAttributes, editor, getPos }: Rea
           wrap={attrs.fence.wrap}
           captionShown={attrs.captionShown}
           onLanguage={attrs.setLanguage}
-          onView={attrs.setView}
+          onView={setView}
           onWrap={attrs.setWrap}
           onCaption={attrs.openCaption}
         />

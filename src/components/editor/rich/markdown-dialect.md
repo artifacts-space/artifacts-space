@@ -228,9 +228,13 @@ flowchart TD
   a toolbar: the language picker and the view picker (Code, Preview, Split)
   on the left; Copy, Wrap code, and Caption on the right, shown on hover and
   focus and always on touch screens. Picking a view saves it in the fence.
-  Split's diagram redraws once typing pauses. In Preview, the source shows
-  beside the diagram while the cursor is in it, and while the diagram is
-  empty or broken, so it can be fixed. The slash menu's "Mermaid diagram"
+  Split's diagram redraws once typing pauses. Preview is the diagram alone:
+  picking it takes the cursor out of the source and selects the block, and
+  arrow keys, clicks, and Select all never open a hidden source. The source
+  shows in Preview only while the diagram is empty or broken, so it can be
+  fixed, or while the cursor is still in a source that was already showing
+  (a new diagram being typed, or an undo that puts the cursor back), so
+  typed text is never hidden. The slash menu's "Mermaid diagram"
   inserts an empty one, and "Mermaid diagram" in the language picker turns
   any code block into one, or back.
 - **The Markdown version** keeps the fenced source. **Link previews** skip
