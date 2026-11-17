@@ -8,7 +8,7 @@ import type { UploadItem } from "@/components/files/use-file-uploads";
 
 import { dropZoneAttribute, takenByPage } from "./rich/media-bridge";
 import { useEditorMedia } from "./rich/media-context";
-import { pasteIsFiles } from "./rich/media-upload-rules";
+import { mediaUploadProblem, pasteIsFiles } from "./rich/media-upload-rules";
 import type { UploadState } from "./rich/media-uploads";
 import { mediaLineFor, offsetOfLine, ownParagraphInsert } from "./source-media-rules";
 
@@ -106,7 +106,8 @@ export function useSourceFileDrop(field: RefObject<HTMLTextAreaElement | null>, 
     void import("./rich/media-uploads").then((uploads) => {
       for (const file of files) {
         nextKey.current += 1;
-        const uploadId = uploads.queueUpload(file);
+        // A file that cannot be added says why at once, in its row, and never uploads.
+        const uploadId = uploads.queueUpload(file, mediaUploadProblem(file));
         const entry: Waiting = { key: `source-upload-${String(nextKey.current)}`, file, state: uploads.uploadState(uploadId), stop: () => undefined };
         const unsubscribe = uploads.subscribeUpload(uploadId, () => {
           entry.state = uploads.uploadState(uploadId);
