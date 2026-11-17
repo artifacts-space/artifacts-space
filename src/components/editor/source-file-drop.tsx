@@ -8,9 +8,10 @@ import type { UploadItem } from "@/components/files/use-file-uploads";
 
 import { dropZoneAttribute, takenByPage } from "./rich/media-bridge";
 import { useEditorMedia } from "./rich/media-context";
-import { mediaUploadProblem, pasteIsFiles } from "./rich/media-upload-rules";
-import type { UploadState } from "./rich/media-uploads";
-import { mediaLineFor, offsetOfLine, ownParagraphInsert } from "./source-media-rules";
+import { pasteIsFiles } from "./rich/media-upload-rules";
+// Loaded with this file, never on demand: a load that failed would drop a file with no word. It brings no editor with it (the rich editor loads apart).
+import { forgetUpload, queueUpload, startUpload, subscribeUpload, uploadState, type UploadState } from "./rich/media-uploads";
+import { mediaLineFor, offsetOfLine, ownParagraphInsert, sourceInsertProblems } from "./source-media-rules";
 
 /**
  * Files dropped or pasted on a document's source (View source). Each file
@@ -103,23 +104,23 @@ export function useSourceFileDrop(field: RefObject<HTMLTextAreaElement | null>, 
   }, [field, show]);
 
   const add = useCallback((files: readonly File[]) => {
-    void import("./rich/media-uploads").then((uploads) => {
-      for (const file of files) {
-        nextKey.current += 1;
-        // A file that cannot be added says why at once, in its row, and never uploads.
-        const uploadId = uploads.queueUpload(file, mediaUploadProblem(file));
-        const entry: Waiting = { key: `source-upload-${String(nextKey.current)}`, file, state: uploads.uploadState(uploadId), stop: () => undefined };
-        const unsubscribe = uploads.subscribeUpload(uploadId, () => {
-          entry.state = uploads.uploadState(uploadId);
-          settle();
-        });
-        entry.stop = () => { unsubscribe(); uploads.forgetUpload(uploadId); };
-        waiting.current.push(entry);
-        uploads.startUpload(uploadId, media.upload);
-      }
-      settle();
-    }).catch(() => undefined);
-  }, [media.upload, settle]);
+    // Every file gets a row and an answer. One that cannot be added (its size or type, or a document that would show more files than it may) says why at once and never uploads.
+    const onTheirWay = waiting.current.filter((entry) => entry.state.status !== "failed").length;
+    const problems = sourceInsertProblems(files, field.current?.value ?? "", onTheirWay);
+    for (const [index, file] of files.entries()) {
+      nextKey.current += 1;
+      const uploadId = queueUpload(file, problems[index] ?? null);
+      const entry: Waiting = { key: `source-upload-${String(nextKey.current)}`, file, state: uploadState(uploadId), stop: () => undefined };
+      const unsubscribe = subscribeUpload(uploadId, () => {
+        entry.state = uploadState(uploadId);
+        settle();
+      });
+      entry.stop = () => { unsubscribe(); forgetUpload(uploadId); };
+      waiting.current.push(entry);
+      startUpload(uploadId, media.upload);
+    }
+    settle();
+  }, [field, media.upload, settle]);
 
   const remove = useCallback((key: string) => {
     const index = waiting.current.findIndex((entry) => entry.key === key);

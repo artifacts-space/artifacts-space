@@ -140,6 +140,25 @@ test("should say why under the source when a pasted file cannot upload, and leav
   await expect(field).toHaveValue(before);
 });
 
+test("should refuse a file pasted on the source past the 100 a document shows, in the editor's words, and take the one that still fits", async ({ page }) => {
+  await writeDocument(page, "Source at the limit", ["Only line."]);
+  await openSource(page);
+  const field = sourceField(page);
+  // The source names 99 files already: there is room for one more.
+  const named = Array.from({ length: 99 }, (_, index) => `![](/api/files/00000000-0000-4000-8000-${String(index).padStart(12, "0")})`).join("\n\n");
+  await field.fill(`Only line.\n\n${named}\n`);
+  await field.focus();
+  await pasteFiles(field, [pdf("Fits.pdf"), pdf("Over.pdf")]);
+  const problem = sourceUploads(page).getByRole("alert");
+  await expect(problem).toHaveCount(1);
+  await expect(problem).toHaveText("A document shows at most 100 files. Remove some, then add this one again.");
+  await expect(sourceUploads(page).getByRole("listitem")).toContainText("Over.pdf");
+  await expectNoAxeViolations(sourceUploads(page));
+  await expect(field).toHaveValue(/!\[Fits\.pdf\]\(\/api\/files\/[0-9a-f-]+#pdf\)\n$/, { timeout: 15_000 });
+  expect(await field.inputValue()).not.toContain("Over.pdf");
+  expect(((await field.inputValue()).match(/\/api\/files\//g) ?? []).length).toBe(100);
+});
+
 /** The file the fixture shows a real image for (fixtureAttachedImageId), and one it only knows by name. */
 const attachedImageId = "00000000-0000-4000-8000-0000000000a1";
 const attachedZipId = "00000000-0000-4000-8000-0000000000b2";

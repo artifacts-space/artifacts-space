@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { fileLimits } from "@/lib/files/config";
 
 import { maxUploadsAtOnce } from "./media-upload-rules";
-import { canRetryUpload, forgetUpload, queueUpload, retryUpload, startUpload, subscribeUpload, uploadedFacts, uploadState, type MediaUploader, type UploadedMedia } from "./media-uploads";
+import { canRetryUpload, fetchFromLink, forgetUpload, queueUpload, retryUpload, startUpload, subscribeUpload, uploadedFacts, uploadState, type MediaUploader, type UploadedMedia } from "./media-uploads";
 
 const pdf = () => new File([new Uint8Array([37, 80, 68, 70])], "q3.pdf", { type: "application/pdf" });
 const ready = { id: "0f8fad5b-d9cb-469f-a165-70867728950e", filename: "q3.pdf", contentType: "application/pdf" };
@@ -143,5 +145,64 @@ describe("media uploads", () => {
 
   it("should read as failed when a block names an upload this tab never started", () => {
     expect(uploadState("upload-from-another-tab")).toMatchObject({ status: "failed" });
+  });
+});
+
+describe("fetchFromLink", () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const megabyte = new Uint8Array(1024 * 1024);
+  const limitInMegabytes = fileLimits.maxBytes / megabyte.byteLength;
+
+  /** A site's answer whose body gives `chunks` megabytes, one per read, and counts the reads and whether the request was let go. */
+  function answerOf(chunks: number, headers: Record<string, string> = {}) {
+    const seen = { reads: 0, cancelled: false };
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (seen.reads >= chunks) { controller.close(); return; }
+        seen.reads += 1;
+        controller.enqueue(megabyte);
+      },
+      cancel() { seen.cancelled = true; },
+    }, { highWaterMark: 0 });
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(body, { headers }))));
+    return seen;
+  }
+
+  it("should refuse a file over the limit that states no length, without reading it all", async () => {
+    const seen = answerOf(400, { "content-type": "image/png" });
+    await expect(fetchFromLink("https://example.com/huge.png")).rejects.toThrow(/^That file is too large\. The limit is 25 MB\.$/);
+    // It stopped at the first read past the limit, and let the request go.
+    expect(seen.reads).toBe(limitInMegabytes + 1);
+    expect(seen.cancelled).toBe(true);
+  });
+
+  it("should refuse a file whose stated length is wrong as soon as the read passes the limit", async () => {
+    const seen = answerOf(400, { "content-type": "image/png", "content-length": "1024" });
+    await expect(fetchFromLink("https://example.com/liar.png")).rejects.toThrow("The limit is 25 MB.");
+    expect(seen.reads).toBe(limitInMegabytes + 1);
+    expect(seen.cancelled).toBe(true);
+  });
+
+  it("should refuse a file whose stated length is over the limit before reading any of it", async () => {
+    const seen = answerOf(400, { "content-length": String(fileLimits.maxBytes + 1) });
+    await expect(fetchFromLink("https://example.com/stated.png")).rejects.toThrow("The limit is 25 MB.");
+    expect(seen.reads).toBe(0);
+  });
+
+  it("should take a file under the limit that states no length, with its bytes, name, and type", async () => {
+    const seen = answerOf(3, { "content-type": "image/png; charset=binary" });
+    const file = await fetchFromLink("https://example.com/pictures/chart.png?size=large");
+    expect(file.size).toBe(3 * megabyte.byteLength);
+    expect(file.name).toBe("chart.png");
+    expect(file.type).toBe("image/png");
+    expect(seen.reads).toBe(3);
+    expect(seen.cancelled).toBe(false);
+  });
+
+  it("should take a file of exactly the limit", async () => {
+    answerOf(limitInMegabytes, { "content-type": "application/pdf" });
+    const file = await fetchFromLink("https://example.com/report.pdf");
+    expect(file.size).toBe(fileLimits.maxBytes);
   });
 });

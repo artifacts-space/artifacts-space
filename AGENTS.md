@@ -1295,7 +1295,17 @@ files. A file goes into its text, as a block, where it was put.
   drop on the field, at the cursor otherwise. It is typed in with
   `execCommand("insertText")`, the one way a script's edit joins the
   field's Undo history, so Undo removes the line. Progress and refusals
-  show under the field, by file name.
+  show under the field, by file name. A file past the 100 a document
+  shows is refused before it uploads, in the editor's words
+  (`sourceInsertProblems`): the files the source names and the files still
+  uploading count against the room. `media-uploads.ts` is imported there
+  statically, never on demand, so a failed load cannot drop a file with no
+  word; it brings no editor with it.
+- **A pasted link never downloads more than a file may be.**
+  `fetchFromLink` refuses a stated length over the limit at once, and
+  reads any other body through `boundedBody`, which stops and cancels the
+  request one byte past `fileLimits.maxBytes`. Never read a linked body
+  with `response.blob()`.
 - **Files that are attached and shown nowhere stay reachable.**
   `looseFiles` (`src/lib/files/loose-rules.ts`) lists the plain attachments
   the content does not link and that are no icon or cover; the page shows

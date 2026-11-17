@@ -1,7 +1,7 @@
-import { mediaKindForType } from "@/lib/files/media-rules";
+import { markdownFileRefs, mediaKindForType } from "@/lib/files/media-rules";
 
 import { emptyMediaAttrs, renderMediaMarkdown } from "./rich/media-markdown";
-import { defaultMediaLabel } from "./rich/media-upload-rules";
+import { defaultMediaLabel, insertProblems } from "./rich/media-upload-rules";
 
 /**
  * A file dropped on a document's source (View source) becomes the line of
@@ -14,6 +14,21 @@ import { defaultMediaLabel } from "./rich/media-upload-rules";
 export function mediaLineFor(file: { id: string; filename: string; contentType: string }): string {
   const kind = mediaKindForType(file.contentType);
   return renderMediaMarkdown({ ...emptyMediaAttrs(kind), src: `/api/files/${file.id}`, alt: defaultMediaLabel(kind, file.filename) });
+}
+
+/**
+ * Why each file dropped or pasted on the source cannot be added, or null
+ * when it can: its own problem (size, type), or that the document would
+ * show more files than it may. The room that is left is what the limit
+ * allows less the files the source already names and the files still
+ * `onTheirWay` (uploading, their lines not typed in yet), so several files
+ * in one drop count against it together. The same answers, in the same
+ * words, as the document's editor gives (insertProblems). The server decides
+ * for real on save; a link to a plain attachment is counted here and not
+ * there, so this can refuse slightly early, never late.
+ */
+export function sourceInsertProblems(files: readonly { name: string; type: string; size: number }[], source: string, onTheirWay: number): (string | null)[] {
+  return insertProblems(files, markdownFileRefs(source).length + onTheirWay);
 }
 
 /** Where the source text of line `line` (from 0) starts; the end of the text for a line past the last. */

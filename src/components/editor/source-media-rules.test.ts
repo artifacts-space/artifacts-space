@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { mediaLineFor, offsetOfLine, ownParagraphInsert } from "./source-media-rules";
+import { fileLimits } from "@/lib/files/config";
+
+import { documentFullProblem } from "./rich/media-upload-rules";
+import { mediaLineFor, offsetOfLine, ownParagraphInsert, sourceInsertProblems } from "./source-media-rules";
 
 const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const line = `![](/api/files/${id})`;
@@ -68,5 +71,36 @@ describe("ownParagraphInsert", () => {
 
   it("should start the text when the cursor is on a blank first line", () => {
     expect(applied("\nFirst", 0)).toBe(`${line}\n\nFirst`);
+  });
+});
+
+describe("sourceInsertProblems", () => {
+  const limit = fileLimits.maxInlineFilesPerArtifact;
+  const pdf = (name: string) => ({ name, type: "application/pdf", size: 2048 });
+  /** A source that names `count` different files, one line each. */
+  const sourceWith = (count: number) => Array.from({ length: count }, (_, index) => `![](/api/files/00000000-0000-4000-8000-${String(index).padStart(12, "0")})`).join("\n\n");
+
+  it("should take a file while the source names fewer files than a document shows", () => {
+    expect(sourceInsertProblems([pdf("a.pdf")], sourceWith(limit - 1), 0)).toEqual([null]);
+    expect(sourceInsertProblems([pdf("a.pdf")], "No files yet.", 0)).toEqual([null]);
+  });
+
+  it("should refuse the file past the limit in the words the document's editor uses", () => {
+    expect(sourceInsertProblems([pdf("a.pdf")], sourceWith(limit), 0)).toEqual([documentFullProblem]);
+  });
+
+  it("should count the files of one drop against the room that is left", () => {
+    expect(sourceInsertProblems([pdf("a.pdf"), pdf("b.pdf"), pdf("c.pdf")], sourceWith(limit - 2), 0)).toEqual([null, null, documentFullProblem]);
+  });
+
+  it("should count files that are still uploading, whose lines are not in the source yet", () => {
+    expect(sourceInsertProblems([pdf("a.pdf"), pdf("b.pdf")], sourceWith(limit - 3), 2)).toEqual([null, documentFullProblem]);
+  });
+
+  it("should count a file named twice once, and give a file its own problem without using up room", () => {
+    const twice = `${sourceWith(limit - 1)}\n\n${sourceWith(1)}`;
+    const answers = sourceInsertProblems([{ name: "huge.pdf", type: "application/pdf", size: fileLimits.maxBytes + 1 }, pdf("a.pdf")], twice, 0);
+    expect(answers[0]).toContain("The limit is");
+    expect(answers[1]).toBeNull();
   });
 });

@@ -187,11 +187,40 @@ export function forgetUpload(uploadId: string): void {
   entry.stop.abort();
 }
 
+/** What a linked file is told when it is larger than a file may be and its size is only known by reading it. */
+const linkedFileTooLarge = `That file is too large. The limit is ${formatBytes(fileLimits.maxBytes)}.`;
+
+/**
+ * Reads a response's body up to `limit` bytes. One byte more and the read
+ * stops and the request is cancelled, so a site that states no length, or
+ * a wrong one, cannot make the tab hold a file of any size.
+ */
+async function boundedBody(response: Response, limit: number): Promise<Blob> {
+  const type = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
+  const reader = response.body?.getReader();
+  if (!reader) return new Blob([], { type });
+  const parts: BlobPart[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel().catch(() => undefined);
+      throw new Error(linkedFileTooLarge);
+    }
+    parts.push(value);
+  }
+  return new Blob(parts, { type });
+}
+
 /**
  * Fetches a file from a link in the browser, so it can be uploaded here:
  * images then load from this site's file store, never from the other site.
  * The fetch sends no cookies and no referrer. Many sites refuse it (CORS);
- * the error says what to do instead.
+ * the error says what to do instead. A file over the size limit is refused:
+ * at once when the site states its length, and otherwise as soon as the
+ * read passes the limit (boundedBody), never after the whole download.
  */
 export async function fetchFromLink(url: string): Promise<File> {
   let response: Response;
@@ -202,7 +231,11 @@ export async function fetchFromLink(url: string): Promise<File> {
   }
   if (!response.ok) throw new Error(`That link answered with an error (${String(response.status)}). Check the link and try again.`);
   const declared = Number(response.headers.get("content-length"));
-  if (declared > fileLimits.maxBytes) throw new Error(`That file is ${formatBytes(declared)}. The limit is ${formatBytes(fileLimits.maxBytes)}.`);
-  const blob = await response.blob();
+  if (declared > fileLimits.maxBytes) {
+    // The answer is known without the body: let the request go.
+    void response.body?.cancel().catch(() => undefined);
+    throw new Error(`That file is ${formatBytes(declared)}. The limit is ${formatBytes(fileLimits.maxBytes)}.`);
+  }
+  const blob = await boundedBody(response, fileLimits.maxBytes);
   return new File([blob], filenameFromUrl(url), { type: blob.type });
 }
