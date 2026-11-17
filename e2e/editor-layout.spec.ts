@@ -113,7 +113,9 @@ test("should hold Full width, History, and View source in the header's More menu
   await expect(menu.getByRole("menuitem", { name: "History" })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "View source" })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Try saving again" })).toHaveCount(0);
-  await expect(menu.getByRole("menuitemcheckbox", { name: "Full width" }), "the first item takes focus").toBeFocused();
+  await expect(menu.getByRole("menuitem", { name: "Copy link" }), "the first item takes focus").toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.getByRole("menuitemcheckbox", { name: "Full width" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(menu.getByRole("menuitem", { name: "History" })).toBeFocused();
   await page.keyboard.press("Escape");
@@ -124,6 +126,19 @@ test("should hold Full width, History, and View source in the header's More menu
   await page.getByRole("textbox", { name: "Title" }).fill("Renamed in place");
   await expect(saveStatus(page)).toHaveText("Saved", savedWithin);
   await expect(saveStatus(page)).toBeInViewport();
+});
+
+test("should copy the page's own address, without its query or fragment, from Copy link in the header's More menu", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await openFixture(page, "markdown");
+  await page.evaluate(() => { window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#block-at=2`); });
+  await page.evaluate(() => navigator.clipboard.writeText("before the copy"));
+  await moreActions(page).click();
+  await page.getByRole("menuitem", { name: "Copy link" }).click();
+  await expect(page.getByText("Copied the link.")).toBeVisible();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toBe(await page.evaluate(() => `${window.location.origin}${window.location.pathname}`));
+  expect(copied).not.toMatch(/[?#]/);
 });
 
 test("should open the History dialog from the header's More menu, with a click or the keyboard", async ({ page }) => {
@@ -138,6 +153,8 @@ test("should open the History dialog from the header's More menu, with a click o
 
   await moreActions(page).focus();
   await page.keyboard.press("Enter");
+  await expect(page.getByRole("menuitem", { name: "Copy link" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("menuitemcheckbox", { name: "Full width" })).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("menuitem", { name: "History" })).toBeFocused();

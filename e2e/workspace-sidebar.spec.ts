@@ -31,6 +31,31 @@ test.describe("desktop", () => {
     await expect(search, "a / typed in the search stays in it").toHaveValue("/");
   });
 
+  test("should show the start of the artifact's id in the meta line and copy the artifact's link, never its internal id", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await openWorkspace(page);
+    const link = slot(page, "artifact-link");
+    // The fixture's artifact: internal id "fixture-ui", id in its link "fixtureworkspace0000ui".
+    await expect(link).toHaveText("fixturew");
+    await page.evaluate(() => navigator.clipboard.writeText("before the copy"));
+    await link.getByRole("button", { name: "Copy link" }).click();
+    await expect(link.getByRole("button", { name: "Copied the link" })).toBeVisible();
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    // The fixture gives the editor the origin "http://localhost"; the app gives it the site's own.
+    expect(copied).toBe("http://localhost/artifact/fixtureworkspace0000ui");
+    expect(copied, "the internal id opens nothing, so it is never handed out").not.toContain("fixture-ui");
+  });
+
+  test("should copy the same link from Copy link in the More menu", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await openWorkspace(page);
+    await page.evaluate(() => navigator.clipboard.writeText("before the copy"));
+    await page.getByRole("button", { name: "More actions" }).click();
+    await page.getByRole("menuitem", { name: "Copy link" }).click();
+    await expect(page.getByText("Copied the link.")).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("http://localhost/artifact/fixtureworkspace0000ui");
+  });
+
   test("should leave / to an open dialog or menu instead of pulling focus to the search", async ({ page }) => {
     await openWorkspace(page);
     // By its label, not its role: an open modal hides the rest of the page from the accessibility tree.
@@ -104,7 +129,7 @@ test.describe("desktop", () => {
     await expect(page.getByRole("button", { name: "Project: Design. Change project" })).toBeVisible();
     await expect(page.getByRole("combobox", { name: "Add a tag" })).toBeVisible();
     await expect(slot(page, "save-status")).toContainText(/chars/);
-    await expect(page.getByRole("button", { name: "Copy the artifact id" })).toBeVisible();
+    await expect(slot(page, "save-status").getByRole("button", { name: "Copy link" })).toBeVisible();
     // The title lines up with the content's column, inside its 24px padding.
     const title = await page.getByRole("textbox", { name: "Artifact title" }).boundingBox();
     const column = await slot(page, "detail-body").locator("[data-slot=page-column]").first().boundingBox();
@@ -205,7 +230,7 @@ test.describe("phone", () => {
       tree.getByRole("button", { name: "Move to project" }).first(),
       tree.getByRole("button", { name: "New project" }),
       tree.getByRole("button", { name: "Close every project" }),
-      page.getByRole("button", { name: "Copy the artifact id" }),
+      slot(page, "save-status").getByRole("button", { name: "Copy link" }),
     ];
     for (const target of targets) {
       const box = await target.boundingBox();

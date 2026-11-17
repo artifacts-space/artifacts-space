@@ -2,8 +2,8 @@
  * The words an agent reads before it picks a tool: the MCP server's
  * instructions and the titles and descriptions of the artifact tools. A
  * tool's `_meta` lives here too when it changes how a client finds the tool:
- * `artifacts_create` carries Claude Code's load-up-front hint, which is why
- * it is always visible.
+ * `artifacts_create`, `artifacts_get`, and `artifacts_list` carry Claude
+ * Code's load-up-front hint, which is why they are always visible.
  *
  * Kept in one module, with no imports, so the words are easy to find and
  * test. The server reads them in `src/app/api/mcp/route.ts` and
@@ -16,6 +16,16 @@
 /** The instructions every connection gets. Read-only connections get `READ_ONLY_INSTRUCTIONS` after them. */
 export const SERVER_INSTRUCTIONS =
   "artifacts.space is a workspace for artifacts: docs, documents, plans, specs, reports, notes, runbooks, pages, and dashboards that people and agents keep and work on together. Save one with artifacts_create when someone asks you to write something up, save or keep it for later, share it with the team, or publish a page, and when you make something a person or a later session will read again. Saved artifacts persist across sessions, can be shared with a team or by link, can be edited by both people and agents, and keep every version (artifacts_versions). Answer quick questions in chat, and keep files that belong in the repository, such as code or a README, in the repository. Search with artifacts_list before you create, and change an earlier artifact with artifacts_update instead of making a duplicate. Include project and session identifiers when available: set `project` to a project name (projects_list shows the ones that exist; a new name creates one), and `tags` to reuse the tags tags_list shows. Give each artifact a fitting page icon with `icon` (one emoji or tabler:<name>), and optionally a `theme` preset and a `cover` gradient from themes_list. Artifacts are private by default; teams_list shows the teams you can share with. Sharing one with a team moves it to that team's workspace. You can edit artifacts shared through your team. Sharing and edits to shared artifacts may need a team owner's or admin's approval, and agents never approve.";
+
+/**
+ * What an artifact's link looks like on this deployment, and which tools
+ * read it. The server adds it to the instructions with its own origin
+ * (src/app/api/mcp/route.ts), so an agent that is handed a link, or a bare
+ * id, knows at the start of a session that these tools read it.
+ */
+export function artifactLinkNote(origin: string): string {
+  return `An artifact's link looks like ${origin}/artifact/<22 characters>, and its id is those 22 characters. When someone gives you such a link or id, read it with artifacts_get; every tool here that takes an artifact takes its link as well as its id.`;
+}
 
 /** A tool's title and description, as `tools/list` returns them, and any `_meta` it carries. */
 export interface ToolCopy {
@@ -36,13 +46,17 @@ export const ALWAYS_LOAD_META = { "anthropic/alwaysLoad": true } as const;
 export const artifactToolCopy = {
   artifacts_list: {
     title: "List artifacts",
+    // Loaded up front with artifacts_get: finding earlier work is the step before reading or changing it.
+    _meta: ALWAYS_LOAD_META,
     description:
-      "Find saved artifacts (docs, plans, specs, reports, notes, pages, dashboards) before you create one. List and search them by title, summary, content, project name, or tag, or only those in one `project` or with every one of `tags`. scope \"mine\" (default) lists yours, and those of agents you added; a team slug lists what is shared with that team. \"mine\" includes yours that live in a team's workspace. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Call artifacts_get with an id to read the full content.",
+      "Find saved artifacts (docs, plans, specs, reports, notes, pages, dashboards) before you create one. List and search them by title, summary, content, project name, or tag, or only those in one `project` or with every one of `tags`. A `query` that is an artifact's id or link returns that artifact first, when you can read it. scope \"mine\" (default) lists yours, and those of agents you added; a team slug lists what is shared with that team. \"mine\" includes yours that live in a team's workspace. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Call artifacts_get with an id to read the full content.",
   },
   artifacts_get: {
     title: "Get artifact",
+    // Loaded up front: a person who hands an agent an artifact's link expects it to be read in one call, without a tool search first.
+    _meta: ALWAYS_LOAD_META,
     description:
-      "Read a saved artifact (a doc, plan, spec, report, page, or dashboard) in full, by its id. `version` says whether you got the latest version or the approved version that readers outside the team see; `editPending` says whether newer changes wait for approval. When you can edit it you also get `versionId` (the version you read) and `baseVersion`: pass `baseVersion` to artifacts_update so your save never overwrites newer work. A CSV whose owner turned off downloads (`allowCsvDownload` false) comes without its content unless you can edit it; `contentWithheld` says so.",
+      "Read a saved artifact (a doc, plan, spec, report, page, or dashboard) in full, by its id or its link. The link ends in /artifact/ and the 22-character id; the id alone works too. `version` says whether you got the latest version or the approved version that readers outside the team see; `editPending` says whether newer changes wait for approval. When you can edit it you also get `versionId` (the version you read) and `baseVersion`: pass `baseVersion` to artifacts_update so your save never overwrites newer work. A CSV whose owner turned off downloads (`allowCsvDownload` false) comes without its content unless you can edit it; `contentWithheld` says so.",
   },
   teams_list: {
     title: "List teams",
@@ -50,7 +64,7 @@ export const artifactToolCopy = {
   },
   artifacts_create: {
     title: "Create artifact",
-    // The one tool loaded up front: saving is the step an agent must find without searching.
+    // Loaded up front: saving is the step an agent must find without searching.
     _meta: ALWAYS_LOAD_META,
     description:
       "Save a doc, plan, spec, report, notes, runbook, page, or dashboard as an artifact on artifacts.space. Use it when someone asks you to write something up, save or keep it, share it with the team, or publish it, and for work a person or a later session will read again. The artifact persists across sessions, people and agents can both read and edit it, it can be shared with a team or by link, and every save is kept in its version history. For anything visual or interactive (a mockup of a website or of app screens, a prototype, a dashboard, a report with charts), set kind \"html\", a full web page that runs as you wrote it, and read artifacts_formats_guide with kind \"html\" first. Search with artifacts_list first and update a match with artifacts_update instead of duplicating it. It is private unless you set visibility, and `comments` sets who can comment. Creation is limited per hour; a limit error says when to try again.",

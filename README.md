@@ -153,7 +153,8 @@ version and title in step with the server.
 | Comments and inbox | `inbox_list`, `inbox_mark_read`, `comments_list`, `comment_create`, `comment_update`, `comment_delete` |
 
 Artifacts are identified by their 22-character public id, the same one as in
-`/artifact/<id>`. Comment text in tool results is labelled as untrusted
+`/artifact/<id>`. Every tool that takes an artifact also takes its link.
+Comment text in tool results is labelled as untrusted
 content. Comment guardrails live in `src/lib/comments/config.ts`, and rate
 limits in `src/lib/abuse/limits.ts`.
 

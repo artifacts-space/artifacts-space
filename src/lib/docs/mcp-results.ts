@@ -49,7 +49,7 @@ const mentionsShape = `"mentions": { "notified": [{ "handle", "kind" }], "refuse
 
 export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   artifacts_list: {
-    summary: "An array of artifacts you can read, newest first. Items have no `content`: text formats carry a `preview` of the first 280 characters, others an empty preview.",
+    summary: "An array of artifacts you can read, newest first. Items have no `content`: text formats carry a `preview` of the first 280 characters, others an empty preview. When `query` is an artifact's id or link, that artifact is first, if you can read it.",
     shape: "[ { …artifact without content, \"preview\": \"First 280 characters…\" } ]",
   },
   artifacts_get: {

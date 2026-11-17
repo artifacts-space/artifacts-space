@@ -96,6 +96,7 @@ test("should give editors a header ⋯ with Full width, History, and View source
 
   await moreActions(page).click();
   const menu = page.getByRole("menu");
+  await expect(menu.getByRole("menuitem", { name: "Copy link" }), "the page's link, which a person hands to an agent").toBeVisible();
   await expect(menu.getByRole("menuitemcheckbox", { name: "Full width" })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "History" })).toBeVisible();
   await menu.getByRole("menuitem", { name: "View source" }).click();

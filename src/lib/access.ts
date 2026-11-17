@@ -167,6 +167,26 @@ const ownerMember = alias(teamMember, "owner_member");
  * is its key), and owner_member only when the viewer is still in its team.
  */
 export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publicId: string, viewerId: string | null) {
+  return subjectSelect(db, viewerId).where(eq(artifact.publicId, publicId)).limit(1);
+}
+
+/** An older value that names an artifact's row: its internal id, or the id of a legacy /share/<id> link. */
+export type OlderArtifactKey = { kind: "internalId"; id: string } | { kind: "shareId"; shareId: string };
+
+/**
+ * The same query, keyed by an older value a person may still hold: the
+ * artifact's internal id, which the workspace copied before it copied the
+ * link, or a legacy share id (src/lib/artifact-ref). One query whether the
+ * row exists or not, so the answer to a caller who may not read it costs
+ * what the answer for an unknown value costs.
+ */
+export function subjectQueryByOlderKey(db: Pick<ReturnType<typeof getDb>, "select">, key: OlderArtifactKey, viewerId: string | null) {
+  const names = key.kind === "internalId" ? eq(artifact.id, key.id) : eq(artifact.shareId, key.shareId);
+  return subjectSelect(db, viewerId).where(names).limit(1);
+}
+
+/** The select and joins both subject queries share; the caller names the row. */
+function subjectSelect(db: Pick<ReturnType<typeof getDb>, "select">, viewerId: string | null) {
   const memberOn = viewerId ? and(eq(teamMember.teamId, artifact.teamId), eq(teamMember.userId, viewerId)) : sql`false`;
   const ownedAgentOn = viewerId ? and(eq(agent.userId, artifact.userId), eq(agent.ownerId, viewerId)) : sql`false`;
   const ownerMemberOn = viewerId ? and(eq(ownerMember.teamId, agent.teamId), eq(ownerMember.userId, viewerId)) : sql`false`;
@@ -189,9 +209,7 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
     .leftJoin(teamMember, memberOn)
     .leftJoin(agent, ownedAgentOn)
     .leftJoin(ownerMember, ownerMemberOn)
-    .leftJoin(artifactVersion, eq(artifactVersion.id, artifact.approvedVersionId))
-    .where(eq(artifact.publicId, publicId))
-    .limit(1);
+    .leftJoin(artifactVersion, eq(artifactVersion.id, artifact.approvedVersionId));
 }
 
 /**
@@ -203,12 +221,18 @@ export function subjectQuery(db: Pick<ReturnType<typeof getDb>, "select">, publi
  */
 const loadSubject = cache(async (publicId: string, viewerId: string | null) => {
   const [row] = await subjectQuery(getDb(), publicId, viewerId);
-  if (!row) return null;
-  const { memberId, ownerMemberId, ...rest } = row;
-  return { ...rest, member: memberId !== null, actsForAuthor: viewerId !== null && viewerId !== rest.record.userId && ownerMemberId !== null };
+  return row ? toSubject(row, viewerId) : null;
 });
 
-type Subject = NonNullable<Awaited<ReturnType<typeof loadSubject>>>;
+type SubjectRow = Awaited<ReturnType<typeof subjectQuery>>[number];
+
+/** A subject row as the read decision takes it: the joins' ids turned into what they mean for this viewer. */
+function toSubject(row: SubjectRow, viewerId: string | null) {
+  const { memberId, ownerMemberId, ...rest } = row;
+  return { ...rest, member: memberId !== null, actsForAuthor: viewerId !== null && viewerId !== rest.record.userId && ownerMemberId !== null };
+}
+
+type Subject = ReturnType<typeof toSubject>;
 
 /** The approved version a reader outside the team gets, or null for the latest. */
 function approvedVersionFor(subject: Subject, versionId: string) {
@@ -249,6 +273,18 @@ export const getArtifactAccess = cache(async (publicId: string, viewerId: string
   const subject = await loadSubject(publicId, viewerId);
   return subject ? decideAccess(subject, viewerId) : null;
 });
+
+/**
+ * The read decision for an artifact named by an older value (its internal
+ * id or a legacy share id): the same decision as getArtifactAccess, in one
+ * query, and null both when no such row exists and when the viewer may not
+ * read it. Only for resolving a value a person copied
+ * (src/lib/artifact-ref/resolve.ts); everything else reads by public id.
+ */
+export async function getArtifactAccessByOlderKey(key: OlderArtifactKey, viewerId: string | null): Promise<ArtifactAccess | null> {
+  const [row] = await subjectQueryByOlderKey(getDb(), key, viewerId);
+  return row ? decideAccess(toSubject(row, viewerId), viewerId) : null;
+}
 
 /**
  * The read decision for a signed-out reader (as getArtifactAccess(publicId,

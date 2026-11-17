@@ -1,9 +1,10 @@
 "use client";
 
-import { IconArrowsHorizontal, IconCode, IconCopy, IconDots, IconLock, IconTransform, IconTrash } from "@tabler/icons-react";
+import { IconArrowsHorizontal, IconCode, IconCopy, IconDots, IconLink, IconLock, IconTransform, IconTrash } from "@tabler/icons-react";
 import { toast } from "sonner";
 
 import { ShowSidebarButton } from "@/components/app/sidebar-visibility";
+import { COPY_LINK_LABEL } from "@/components/copy-button";
 import { HarnessMenu } from "@/components/harness/harness-menu";
 import type { HarnessControl } from "@/components/harness/use-artifact-harness";
 import { OpenPageButton } from "@/components/page-width/open-page-button";
@@ -33,6 +34,8 @@ export interface SourceToggle {
 interface MoreMenuProps {
   /** The raw content, for Copy content. */
   content: string;
+  /** The artifact's own address, for Copy link: what opens it for a person, and for an agent's tools. */
+  link: string;
   source: SourceToggle;
   /** Opens the Format and language dialog. */
   onChangeFormat: () => void;
@@ -43,10 +46,11 @@ interface MoreMenuProps {
   onWithdraw: (() => void) | null;
 }
 
-/** View source, Format and language, Full width, and Made with for every editor; Delete for the author; Withdraw sharing for a team owner or admin editing a teammate's artifact. */
-function MoreMenu({ content, source, onChangeFormat, fullWidth, harness, onRequestDelete, onWithdraw }: MoreMenuProps) {
+/** Copy content, Copy link, View source, Format and language, Full width, and Made with for every editor; Delete for the author; Withdraw sharing for a team owner or admin editing a teammate's artifact. */
+function MoreMenu({ content, link, source, onChangeFormat, fullWidth, harness, onRequestDelete, onWithdraw }: MoreMenuProps) {
   const { copy } = useCopyToClipboard();
   const copyContent = () => { void copy(content).then((done) => { if (done) toast.success("Copied the content."); }); };
+  const copyLink = () => { void copy(link).then((done) => { if (done) toast.success("Copied the link."); }); };
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="More actions" />}>
@@ -55,6 +59,9 @@ function MoreMenu({ content, source, onChangeFormat, fullWidth, harness, onReque
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuItem onClick={copyContent} className="py-2">
           <IconCopy /> Copy content
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={copyLink} className="py-2">
+          <IconLink /> {COPY_LINK_LABEL}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={source.onToggle} className="py-2">
           <IconCode /> {source.open ? "Hide source" : "View source"}
@@ -86,6 +93,8 @@ function MoreMenu({ content, source, onChangeFormat, fullWidth, harness, onReque
 interface EditorToolbarProps {
   /** For Open: the artifact's own page in a new tab. */
   publicId: string;
+  /** The artifact's own address, for Copy link in the More menu. */
+  link: string;
   /** The breadcrumb: the artifact's project (null when it has none) and its title. */
   project: ArtifactProjectDto | null;
   title: string;
@@ -168,7 +177,7 @@ function KindMark({ kind }: { kind: ArtifactKind }) {
  * header (h-14) to keep History in reach; from md up the /app shell keeps it
  * in place.
  */
-export function EditorToolbar({ publicId, project, title, kind, content, shareControl, history, comments, views, source, onRequestDelete, onWithdraw, fullWidth, harness, onChangeFormat, notice }: EditorToolbarProps) {
+export function EditorToolbar({ publicId, link, project, title, kind, content, shareControl, history, comments, views, source, onRequestDelete, onWithdraw, fullWidth, harness, onChangeFormat, notice }: EditorToolbarProps) {
   return (
     <div className={toolbarClass}>
       <ShowSidebarButton />
@@ -180,7 +189,7 @@ export function EditorToolbar({ publicId, project, title, kind, content, shareCo
         {views}
         {shareControl}
         <OpenPageButton publicId={publicId} />
-        <MoreMenu content={content} source={source} onChangeFormat={onChangeFormat} fullWidth={hasWidthSetting(kind) ? fullWidth : null} harness={harness} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
+        <MoreMenu content={content} link={link} source={source} onChangeFormat={onChangeFormat} fullWidth={hasWidthSetting(kind) ? fullWidth : null} harness={harness} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
       </div>
     </div>
   );

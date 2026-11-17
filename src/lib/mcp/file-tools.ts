@@ -10,12 +10,12 @@ import { replaceFile } from "@/lib/files/replace";
 import { finalizeUpload, requestUpload } from "@/lib/files/uploads";
 import type { ArtifactRecord } from "@/db/schema";
 import type { McpAccess } from "@/lib/oauth/scopes";
-import { isPublicId } from "@/lib/public-id";
 import { siteUrl } from "@/lib/site-origin";
 import { listTeamsForUser } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { getVersionOf } from "@/lib/versions/history";
 
+import { ARTIFACT_REF_WORDS, artifactRefField } from "./artifact-ref-field";
 import { toMcpArtifact } from "./artifact-view";
 import { baseVersionOf } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
@@ -23,7 +23,7 @@ import { gateTools, type ToolServer } from "./tool-access";
 
 const fileIdField = z.uuid().describe("File id from files_request_upload");
 const fileIdsField = z.array(z.uuid()).min(1).max(fileLimits.maxFilesPerArtifact).describe("Ids of finished uploads (files_finalize)");
-const artifactIdField = z.string().refine(isPublicId, "Use the artifact's 22-character id.").describe("The id (22 characters) of an artifact you can edit");
+const artifactIdField = (userId: string) => artifactRefField(userId, `An artifact you can edit: ${ARTIFACT_REF_WORDS}`);
 
 const flow = `Upload flow: 1) files_request_upload with the filename, type, and exact byte size. 2) PUT the bytes to upload.url with exactly upload.headers, for example: curl -X PUT -H "Content-Type: <type>" --data-binary @<path> "<url>" (curl sets Content-Length). The URL works for ${String(fileLimits.uploadUrlSeconds / 60)} minutes. 3) files_finalize with the file id. 4) files_create_artifact, files_attach, or files_replace, within a day, or the upload is deleted.`;
 
@@ -137,7 +137,7 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
     {
       title: "Attach files to an artifact",
       description: "Adds your finished uploads to an artifact you can edit: your own, or one shared through your team. A file belongs to one artifact. In a ui artifact, Image and File elements can then show them.",
-      inputSchema: { artifact: artifactIdField, files: fileIdsField },
+      inputSchema: { artifact: artifactIdField(userId), files: fileIdsField },
     },
     ({ artifact, files }) => respond(async () => {
       const record = await editableArtifact(userId, artifact);

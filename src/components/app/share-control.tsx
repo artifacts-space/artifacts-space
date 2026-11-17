@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
+import { COPY_LINK_LABEL } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -294,7 +295,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated, renderTrigger = Wo
             <CommentsPicker visibility={visibility} team={team} value={comments} onChange={choice.chooseComments} />
             <ShareOutcome artifact={artifact} visibility={visibility} team={team} comments={comments} move={move} />
             {live ? (
-              <ValueField value={shareUrl} copyLabel="Copy link" />
+              <ValueField value={shareUrl} copyLabel={COPY_LINK_LABEL} />
             ) : null}
           </div>
           <DialogFooter>

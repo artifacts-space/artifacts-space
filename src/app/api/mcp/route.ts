@@ -7,18 +7,22 @@ import type { HarnessSource } from "@/lib/mcp/harness-context";
 import { registerAllTools } from "@/lib/mcp/register-tools";
 import { connectionHarness, recordRequestClientInfo } from "@/lib/mcp/request-harness";
 import { jsonRpcId, mcpLimitChecks, mcpRateLimitedResponse, mcpToolCalls } from "@/lib/mcp/rate-limits";
-import { SERVER_INSTRUCTIONS } from "@/lib/mcp/routing-copy";
+import { artifactLinkNote, SERVER_INSTRUCTIONS } from "@/lib/mcp/routing-copy";
 import { mcpServerInfo } from "@/lib/mcp/server-info";
 import { READ_ONLY_INSTRUCTIONS } from "@/lib/mcp/tool-access";
 import { bearerChallenge } from "@/lib/oauth/metadata";
+import { siteOrigin } from "@/lib/site-origin";
 
 export const maxDuration = 30;
 
+/** What every connection is told: the instructions, what an artifact's link looks like here, and the read-only note where it applies. */
+function instructionsFor(access: McpPrincipal["access"]): string {
+  const instructions = `${SERVER_INSTRUCTIONS} ${artifactLinkNote(siteOrigin())}`;
+  return access === "read" ? `${instructions} ${READ_ONLY_INSTRUCTIONS}` : instructions;
+}
+
 function createMcpServer({ userId, access }: McpPrincipal, harness: HarnessSource) {
-  const server = new McpServer(
-    mcpServerInfo(),
-    { instructions: access === "read" ? `${SERVER_INSTRUCTIONS} ${READ_ONLY_INSTRUCTIONS}` : SERVER_INSTRUCTIONS },
-  );
+  const server = new McpServer(mcpServerInfo(), { instructions: instructionsFor(access) });
 
   registerAllTools(server, userId, access, harness);
   return server;

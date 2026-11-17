@@ -22,7 +22,6 @@ import { setArtifactFullWidth } from "@/lib/page-width/store";
 import { projectChoiceSchema, projectNameKey } from "@/lib/projects/rules";
 import { setArtifactProject } from "@/lib/projects/store";
 import type { TagChange } from "@/lib/tags/rules";
-import { isPublicId } from "@/lib/public-id";
 import { setArtifactComments } from "@/lib/sharing/comments";
 import { requestArtifactSharing } from "@/lib/sharing/service";
 import { siteUrl } from "@/lib/site-origin";
@@ -34,6 +33,8 @@ import type { McpAccess } from "@/lib/oauth/scopes";
 import { EditConflictError } from "@/lib/edits/conflict-error";
 import { UserFacingError } from "@/lib/user-facing-error";
 
+import { artifactRefField } from "./artifact-ref-field";
+import { referencedListItem, withReferenced } from "./artifact-ref-search";
 import { toMcpArtifact, toMcpListItem, type McpViewContext } from "./artifact-view";
 import { asSaved, baseVersionField, baseVersionOf, editConflictResult } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
@@ -41,7 +42,6 @@ import { applyTagChangeFor, tagChangeFields, tagChangeFor, tagFilterField, tagFi
 import { artifactToolCopy } from "./routing-copy";
 import { gateTools, type ToolServer } from "./tool-access";
 
-const publicIdField = z.string().refine(isPublicId, "Use the artifact's 22-character id.").describe("Artifact id (22 characters)");
 const visibilityField = z
   .enum(artifactVisibilities)
   .optional()
@@ -263,7 +263,7 @@ function registerReadTools(server: ToolServer, userId: string) {
     {
       ...artifactToolCopy.artifacts_list,
       inputSchema: {
-        query: z.string().max(300).optional().describe("Text to find in artifacts"),
+        query: z.string().max(300).optional().describe("Text to find in artifacts, or one artifact's id or link"),
         project: z.string().max(projectLimits.maxNameChars * 2).optional().describe("Only artifacts in this project (name, any case)"),
         tags: tagFilterField,
         scope: z.string().max(39).optional().default("mine").describe("\"mine\" or a team slug from teams_list"),
@@ -272,8 +272,13 @@ function registerReadTools(server: ToolServer, userId: string) {
     },
     ({ query, project, tags, scope, limit }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
-      const artifacts = await listArtifacts(userId, { scope: scopeFor(teams, scope), query, project: projectFilterFor(project), tags: tagFilterFor(tags), limit });
-      return artifacts.map((item) => toMcpListItem(item, view));
+      // A query that is an artifact's id or link names that artifact, wherever it lives: it comes first when no filter narrows the list.
+      const filtered = project !== undefined || (tags?.length ?? 0) > 0;
+      const [named, artifacts] = await Promise.all([
+        filtered ? null : referencedListItem(userId, query),
+        listArtifacts(userId, { scope: scopeFor(teams, scope), query, project: projectFilterFor(project), tags: tagFilterFor(tags), limit }),
+      ]);
+      return withReferenced(named, artifacts, limit).map((item) => toMcpListItem(item, view));
     }),
   );
 
@@ -281,7 +286,7 @@ function registerReadTools(server: ToolServer, userId: string) {
     "artifacts_get",
     {
       ...artifactToolCopy.artifacts_get,
-      inputSchema: { id: publicIdField },
+      inputSchema: { id: artifactRefField(userId) },
     },
     ({ id }) => respond(async () => {
       const [loaded, { view }] = await Promise.all([loadArtifactForViewer(id, userId), loadContext(userId)]);
@@ -331,7 +336,7 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
     {
       ...artifactToolCopy.artifacts_update,
       inputSchema: {
-        id: publicIdField,
+        id: artifactRefField(userId),
         ...editableFields,
         title: editableFields.title.optional(),
         content: editableFields.content.optional(),
@@ -366,7 +371,7 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
     "artifacts_delete",
     {
       ...artifactToolCopy.artifacts_delete,
-      inputSchema: { id: publicIdField },
+      inputSchema: { id: artifactRefField(userId) },
     },
     ({ id }) => respond(async () => {
       const record = await findDeletableArtifact(userId, { publicId: id });

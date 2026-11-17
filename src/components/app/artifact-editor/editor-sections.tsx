@@ -4,7 +4,7 @@ import { IconLink } from "@tabler/icons-react";
 
 import { IconPicker } from "@/components/artifact-icon/icon-picker";
 import { addIconTrigger, changeIconTrigger } from "@/components/artifact-icon/icon-triggers";
-import { CopyButton } from "@/components/copy-button";
+import { COPY_LINK_LABEL, CopyButton } from "@/components/copy-button";
 import { LineField } from "@/components/line-field";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +20,7 @@ export function ShareBanner({ shareUrl, isPublic, column }: { shareUrl: string; 
       <div className={cn(column, "flex flex-wrap items-center gap-3")}>
         <IconLink className="size-3.5 text-muted-foreground" />
         <span className="text-sm text-muted-foreground">{isPublic ? "Anyone can find and read this artifact." : "Anyone with the link can read this artifact."}</span>
-        <CopyButton value={shareUrl} label="Copy link" variant="ghost" size="sm" className="ml-auto" />
+        <CopyButton value={shareUrl} label={COPY_LINK_LABEL} variant="ghost" size="sm" className="ml-auto" />
       </div>
     </div>
   );

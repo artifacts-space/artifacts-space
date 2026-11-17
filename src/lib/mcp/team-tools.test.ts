@@ -96,7 +96,8 @@ function tool(name: string) {
 /** Validates input the way the MCP server does, then runs the tool. */
 async function call(name: string, input: Record<string, unknown>) {
   const { inputSchema, handler } = tool(name);
-  const parsed = z.object(inputSchema).parse(input);
+  // As the server does: the artifact input is read with a lookup for older values, so the parse is async.
+  const parsed = await z.object(inputSchema).parseAsync(input);
   const result = await handler(parsed);
   return JSON.parse(result.content[0]?.text ?? "null") as unknown;
 }
@@ -174,10 +175,10 @@ describe("comment_create", () => {
     expect(service.createComment).not.toHaveBeenCalled();
   });
 
-  it("should reject the input when the quote is longer than a quote is kept", () => {
+  it("should reject the input when the quote is longer than a quote is kept", async () => {
     const schema = z.object(tool("comment_create").inputSchema);
-    expect(schema.safeParse({ artifact: publicId, body: "x", quote: "w".repeat(QUOTE_MAX_LENGTH + 1) }).success).toBe(false);
-    expect(schema.safeParse({ artifact: publicId, body: "x", quote: "w".repeat(QUOTE_MAX_LENGTH) }).success).toBe(true);
+    expect((await schema.safeParseAsync({ artifact: publicId, body: "x", quote: "w".repeat(QUOTE_MAX_LENGTH + 1) })).success).toBe(false);
+    expect((await schema.safeParseAsync({ artifact: publicId, body: "x", quote: "w".repeat(QUOTE_MAX_LENGTH) })).success).toBe(true);
   });
 });
 
