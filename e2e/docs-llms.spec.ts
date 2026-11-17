@@ -34,7 +34,8 @@ test("should serve llms.txt as plain text to a signed-out reader", async ({ requ
 test("should link every page llms.txt names to a page that answers", async ({ request }) => {
   const text = await (await request.get("/llms.txt")).text();
   const origin = linkOrigin(text);
-  const paths = [...text.matchAll(/\]\((\S+)\)/g)].flatMap((match) => (match[1]?.startsWith(origin) ? [new URL(match[1]).pathname] : []));
+  const links = [...text.matchAll(/\]\((\S+)\)/g)].map((match) => new URL(match[1] ?? ""));
+  const paths = links.filter((url) => url.origin === origin).map((url) => url.pathname);
   expect(paths.length).toBeGreaterThan(10);
   for (const path of paths) expect((await request.get(path)).status(), path).toBe(200);
 });

@@ -68,7 +68,8 @@ describe("robotsFor", () => {
   });
 
   it("should not hide from crawlers any page llms.txt links to on this site", () => {
-    const linked = [...llmsTxtFor(origin).matchAll(/\]\((\S+)\)/g)].flatMap((match) => (match[1]?.startsWith(origin) ? [new URL(match[1]).pathname] : []));
+    const links = [...llmsTxtFor(origin).matchAll(/\]\((\S+)\)/g)].map((match) => new URL(match[1] ?? ""));
+    const linked = links.filter((url) => url.origin === origin).map((url) => url.pathname);
     expect(linked.length).toBeGreaterThan(5);
     for (const path of linked) expect(crawlDisallowed.some((prefix) => path.startsWith(prefix)), path).toBe(false);
   });

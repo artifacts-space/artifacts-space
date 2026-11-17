@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Fragment } from "react";
 
 import { DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
-import { currentFormatKinds, formatInfo } from "@/lib/artifact-formats";
+import { currentFormatKinds, earlierFormatKinds, formatInfo } from "@/lib/artifact-formats";
 import { docsHref } from "@/lib/docs/pages";
 import { docsMetadata } from "@/lib/docs/metadata";
 
@@ -51,7 +52,7 @@ export default function DocsIntroduction() {
       </Prose>
       <FactTable head={["Format", "What it is"]} rows={currentFormatKinds.map((kind) => [kind, formatInfo[kind].helper])} />
       <Prose>
-        <p>See <Link href={docsHref("formats")}>Formats</Link> for the rules and limits of each. Two earlier formats, <code>ui</code> and <code>canvas</code>, are kept for the artifacts that use them; <Link href={docsHref("json-render")}>JSON Render</Link> describes them.</p>
+        <p>See <Link href={docsHref("formats")}>Formats</Link> for the rules and limits of each. The earlier formats ({earlierFormatKinds.map((kind, index) => <Fragment key={kind}>{index > 0 ? ", " : null}<code>{kind}</code></Fragment>)}) are kept for the artifacts that use them; <Link href={docsHref("json-render")}>JSON Render</Link> describes them.</p>
       </Prose>
 
       <DocsH page={page} id="visibility" />

@@ -29,9 +29,11 @@ function linkSection(heading: string, links: readonly string[]): string[] {
   return [`## ${heading}`, "", ...links, ""];
 }
 
-/** The names of the earlier formats as inline code: "`ui` and `canvas`". */
+const listWords = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
+
+/** The names of the earlier formats as inline code, as a list in words: "`ui` and `canvas`". */
 function earlierFormatNames(): string {
-  return earlierFormatKinds.map((kind) => `\`${kind}\``).join(" and ");
+  return listWords.format(earlierFormatKinds.map((kind) => `\`${kind}\``));
 }
 
 /** The llms.txt body for a site at `origin`. */
