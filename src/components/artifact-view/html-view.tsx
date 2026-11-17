@@ -1,13 +1,14 @@
 "use client";
 
 import { IconArrowsMaximize, IconArrowsMinimize } from "@tabler/icons-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import { CodeBlock } from "@/components/code/code-block";
 import { IconButton } from "@/components/icon-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { useArtifactFiles } from "./files-context";
 import { PageFrame, usePagesCanRun } from "./page-frame";
 import { ViewNotice } from "./view-notice";
 
@@ -75,6 +76,21 @@ function useWholeWindow(on: boolean, box: RefObject<HTMLElement | null>, bar: Re
 }
 
 /**
+ * A text that names the artifact's page files as they are now (each one's
+ * id, path, and last replace), or undefined when it has none: the frame
+ * loads the page under its files address, and again when a file is added,
+ * removed, or replaced.
+ */
+function usePageFilesKey(): string | undefined {
+  const files = useArtifactFiles();
+  return useMemo(() => {
+    const pageFiles = (files ?? []).filter((file) => file.pagePath !== undefined);
+    if (pageFiles.length === 0) return undefined;
+    return pageFiles.map((file) => `${file.id}:${file.pagePath ?? ""}:${file.replacedAt ?? ""}`).join("|");
+  }, [files]);
+}
+
+/**
  * The running page with a bar of this site's above it. The bar's button puts
  * the box over the whole window and back. The box and its frame stay the
  * same elements in both places, so the page keeps running and keeps what
@@ -85,6 +101,7 @@ function useWholeWindow(on: boolean, box: RefObject<HTMLElement | null>, bar: Re
  * this site. The frame has no permission to go full screen by itself.
  */
 function PageWindow({ content, title, pageKey }: { content: string; title: string; pageKey: string }) {
+  const filesKey = usePageFilesKey();
   const [fullScreen, setFullScreen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const bar = useRef<HTMLDivElement>(null);
@@ -112,7 +129,7 @@ function PageWindow({ content, title, pageKey }: { content: string; title: strin
           </IconButton>
         )}
       </div>
-      <PageFrame pageKey={pageKey} html={content} title={title} className="flex-1" />
+      <PageFrame pageKey={pageKey} html={content} title={title} filesKey={filesKey} className="flex-1" />
     </div>
   );
 }

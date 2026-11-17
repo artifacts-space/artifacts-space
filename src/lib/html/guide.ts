@@ -1,4 +1,6 @@
 import { artifactSizeLimits } from "@/lib/artifact-limits";
+import { fileLimits, formatBytes } from "@/lib/files/config";
+import { pageFileLimits, pageFileTypesHint } from "@/lib/page-files/rules";
 import { pageScriptHosts } from "@/lib/page-host/rules";
 
 const hostNames = pageScriptHosts.map((host) => host.replace("https://", ""));
@@ -15,16 +17,26 @@ export function buildHtmlGuide(): string {
     "",
     "The document",
     "- One HTML document. It must start with <!doctype html>.",
-    "- Put the CSS in <style> and the JavaScript in <script>, inside the document. There are no separate files.",
-    `- At most ${artifactSizeLimits.maxContentBytes.toLocaleString("en-US")} bytes.`,
+    "- For a small page, put the CSS in <style> and the JavaScript in <script>, inside the document: one call saves it all.",
+    `- The document is at most ${artifactSizeLimits.maxContentBytes.toLocaleString("en-US")} bytes. Put anything heavy (images, data, libraries you bundled, large scripts and styles) in page files.`,
     '- Add <meta name="viewport" content="width=device-width, initial-scale=1">, a <title>, and lang on <html>.',
     "",
     "What the page may load",
     `- Scripts, styles, fonts, images, and data may load only from: ${hostNames.join(", ")}. Styles and fonts may also load from fonts.googleapis.com and fonts.gstatic.com.`,
     "- Pin a version, for example https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js. For utility classes, https://cdn.tailwindcss.com works.",
     '- ES modules work: <script type="module"> with imports from https://esm.sh/.',
-    "- Every other request is refused: no fetch or XMLHttpRequest to your own API or any other site, no images or media from other sites, no analytics. Put the data in the page.",
-    "- Embed your own images as inline SVG or as data: URIs.",
+    "- Every other request is refused: no fetch or XMLHttpRequest to your own API or any other site, no images or media from other sites, no analytics. Put the data in the page, or in a page file.",
+    "- Small images of your own can be inline SVG or data: URIs. Larger ones are page files.",
+    "",
+    "Page files",
+    '- A page can have its own files and load them by relative path, as on any website: <link rel="stylesheet" href="css/site.css">, <script type="module" src="js/app.js"> (and its own import "./chart.js"), <img src="img/logo.png">, url(../img/bg.png) in a stylesheet, fetch("data.json").',
+    '- Paths are relative to the page, which is index.html. Do not start a path with / and do not use "..": write css/site.css, never /css/site.css.',
+    `- To add one: files_request_upload with pagePath (for example "css/site.css") and the exact size, PUT the bytes, files_finalize, then files_attach to the artifact. The page loads it at once; the document does not need to be saved again.`,
+    "- To change one: upload again with the same pagePath, then files_replace with the file's id. To remove one: files_delete.",
+    `- A page file may be ${pageFileTypesHint}. Its type comes from its extension. A second HTML document is refused: one artifact is one page.`,
+    `- At most ${String(pageFileLimits.maxFiles)} page files and ${formatBytes(pageFileLimits.maxTotalBytes)} in all per artifact, and ${formatBytes(fileLimits.maxBytes)} per file.`,
+    "- Load what the page needs when it starts. A file asked for more than about ten minutes after the page opened may be refused until the reader loads the page again.",
+    "- Readers of a shared page see the files that were approved with it, like the page itself.",
     "",
     "What the page cannot do",
     "- Submit a form to a server. Handle input with JavaScript in the page.",
@@ -33,7 +45,7 @@ export function buildHtmlGuide(): string {
     "- Read anything of artifacts.space, of the reader, or of another artifact.",
     "",
     "What works",
-    "- Inline scripts and styles, canvas, SVG, CSS animation, web workers from a blob: URL.",
+    "- Inline scripts and styles, canvas, SVG, CSS animation, web workers from a blob: URL or a page file.",
     "- localStorage and sessionStorage. They belong to this artifact and to the reader's browser: another reader, or the same reader in another browser, starts empty. Wrap each use in try/catch.",
     "",
     "How it is shown",

@@ -1,7 +1,7 @@
 import { siteOrigin } from "@/lib/site-origin";
 
 import { frameDocument } from "./frame-document";
-import { hostPort, pageHostBase, pageHostHeaders, pageHostRefusalHeaders, pageLabelOf } from "./rules";
+import { hostPort, pageHostBase, pageHostHeaders, pageHostPath, pageHostRefusalHeaders, pageLabelOf } from "./rules";
 
 /** What the proxy needs of a request to answer for a page host. */
 export interface PageHostRequest {
@@ -27,15 +27,20 @@ export function pageHostRefusal(status: 404 | 405 = 404): Response {
 }
 
 /**
- * The whole answer for a request whose Host looks like a page host. The
- * frame document at `/` of a page host on this deployment's page domain;
- * nothing else, ever: no app page, no API, no file, no sign-in, so no
- * session can exist there and a page has nothing to call.
+ * The answer for a request whose Host looks like a page host, or null for
+ * the one kind of request the proxy lets through: a GET or HEAD of a page
+ * file (`/f/<token>/<path>`) on a page host of this deployment's page
+ * domain, which its route answers (src/lib/page-files/serve.ts). Here: the
+ * frame document at `/`, and at `/f/<token>/index.html` for a page with
+ * files; a 404 for everything else, so no app page, no API, and no sign-in
+ * exists on a page host and no session can.
  */
-export function pageHostResponse(request: PageHostRequest, env: NodeJS.ProcessEnv = process.env): Response {
+export function pageHostResponse(request: PageHostRequest, env: NodeJS.ProcessEnv = process.env): Response | null {
   const label = pageLabelOf(request.host, pageHostBase(env));
-  if (!label || request.pathname !== "/") return pageHostRefusal(404);
+  const path = label ? pageHostPath(request.pathname) : "none";
+  if (path === "none") return pageHostRefusal(404);
   if (request.method !== "GET" && request.method !== "HEAD") return pageHostRefusal(405);
+  if (path === "file") return null;
   const site = framingSite(request.host, env);
   const headers = pageHostHeaders(site, env.NODE_ENV !== "development");
   return new Response(request.method === "HEAD" ? null : frameDocument(site), { status: 200, headers });

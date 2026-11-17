@@ -7,6 +7,7 @@ import { allowedTypesHint, fileLimits, formatBytes } from "@/lib/files/config";
 import { assertUsableFiles, attachFiles, deleteOwnFile } from "@/lib/files/attach";
 import { findReadableFile, signedFileUrl } from "@/lib/files/download";
 import { replaceFile } from "@/lib/files/replace";
+import { pageFileLimits, pageFileTypesHint } from "@/lib/page-files/rules";
 import { finalizeUpload, requestUpload } from "@/lib/files/uploads";
 import type { ArtifactRecord } from "@/db/schema";
 import type { McpAccess } from "@/lib/oauth/scopes";
@@ -23,6 +24,11 @@ import { gateTools, type ToolServer } from "./tool-access";
 
 const fileIdField = z.uuid().describe("File id from files_request_upload");
 const fileIdsField = z.array(z.uuid()).min(1).max(fileLimits.maxFilesPerArtifact).describe("Ids of finished uploads (files_finalize)");
+/** files_attach takes as many ids as an artifact holds page files; plain files keep their own limit, checked on attach. */
+const attachIdsField = z.array(z.uuid()).min(1).max(pageFileLimits.maxFiles).describe("Ids of finished uploads (files_finalize)");
+
+/** How an HTML artifact gets files its page loads by relative path, for the upload and attach tools. */
+const pageFilesNote = `Page files: to give an HTML artifact (kind "html") a file its page loads by a relative path, such as <link rel="stylesheet" href="css/site.css">, pass pagePath ("css/site.css") here, then finish the upload and files_attach it to the artifact. A page file may be ${pageFileTypesHint}. One artifact holds at most ${String(pageFileLimits.maxFiles)} page files, ${formatBytes(pageFileLimits.maxTotalBytes)} in all.`;
 const artifactIdField = z.string().refine(isPublicId, "Use the artifact's 22-character id.").describe("The id (22 characters) of an artifact you can edit");
 
 const flow = `Upload flow: 1) files_request_upload with the filename, type, and exact byte size. 2) PUT the bytes to upload.url with exactly upload.headers, for example: curl -X PUT -H "Content-Type: <type>" --data-binary @<path> "<url>" (curl sets Content-Length). The URL works for ${String(fileLimits.uploadUrlSeconds / 60)} minutes. 3) files_finalize with the file id. 4) files_create_artifact, files_attach, or files_replace, within a day, or the upload is deleted.`;
@@ -76,11 +82,12 @@ function registerUploadTools(server: ToolServer, userId: string) {
     "files_request_upload",
     {
       title: "Request a file upload",
-      description: `Starts a file upload and returns a presigned PUT URL. Up to ${formatBytes(fileLimits.maxBytes)} per file. Allowed: ${allowedTypesHint}. ${flow}`,
+      description: `Starts a file upload and returns a presigned PUT URL. Up to ${formatBytes(fileLimits.maxBytes)} per file. Allowed: ${allowedTypesHint}. ${flow} ${pageFilesNote}`,
       inputSchema: {
-        filename: z.string().min(1).max(255).describe("File name with its extension, such as report.pdf"),
-        contentType: z.string().max(255).optional().describe("MIME type, such as application/pdf. Omit to use the extension."),
+        filename: z.string().min(1).max(255).optional().describe("File name with its extension, such as report.pdf. Not needed with pagePath, whose last part is the name."),
+        contentType: z.string().max(255).optional().describe("MIME type, such as application/pdf. Omit to use the extension. Not read with pagePath: a page file's type comes from its path."),
         size: z.number().int().positive().describe("Exact size in bytes. The PUT must send exactly this many bytes."),
+        pagePath: z.string().min(1).max(pageFileLimits.maxPathLength).optional().describe('For a page file of an HTML artifact: the relative path the page loads it by, such as "css/site.css" or "js/app.js". Folders and a file name of letters, digits, dots, dashes, and underscores, joined by /. The path is fixed for this upload; attach it with files_attach.'),
       },
     },
     (input) => respond(async () => {
@@ -104,6 +111,7 @@ function registerUploadTools(server: ToolServer, userId: string) {
     },
     ({ fileId }) => respond(async () => {
       const file = await finalizeUpload(userId, fileId);
+      if (file.pagePath !== undefined) return { file, next: `Attach it with files_attach to the HTML artifact whose page loads "${file.pagePath}". To change a page file that is already there, use files_replace with that file's id and this upload.` };
       return { file, next: `Use the id in files_create_artifact, files_attach, files_replace (a new version of a file already in an artifact), an Image or File element of a ui artifact, or a Markdown media block: ![Alt text](/api/files/${file.id}) on its own line (artifacts_formats_guide, kind "markdown").` };
     }),
   );
@@ -136,8 +144,8 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
     "files_attach",
     {
       title: "Attach files to an artifact",
-      description: "Adds your finished uploads to an artifact you can edit: your own, or one shared through your team. A file belongs to one artifact. In a ui artifact, Image and File elements can then show them.",
-      inputSchema: { artifact: artifactIdField, files: fileIdsField },
+      description: `Adds your finished uploads to an artifact you can edit: your own, or one shared through your team. A file belongs to one artifact. In a ui artifact, Image and File elements can then show them. An upload requested with pagePath becomes a page file of an HTML artifact: its page then loads it by that relative path (the result lists each file's pagePath). Such an upload attaches only to an HTML artifact, and a path the page already has is refused: change that file with files_replace. Up to ${String(pageFileLimits.maxFiles)} ids in one call.`,
+      inputSchema: { artifact: artifactIdField, files: attachIdsField },
     },
     ({ artifact, files }) => respond(async () => {
       const record = await editableArtifact(userId, artifact);
@@ -152,7 +160,7 @@ function registerArtifactFileTools(server: ToolServer, userId: string, harness: 
     {
       title: "Replace a file in an artifact",
       description:
-        "Replaces a file in an artifact you can edit with your finished upload, such as a new draft of a statement of work or a deck. The file keeps its id, place, and name (the extension follows the new type), so links and embeds open the new file. The old copy stays in the artifact's History for people who can edit it, and readers outside the team keep the copy their approved version shows until the change is approved. Upload first (files_request_upload, PUT, files_finalize). Media a document embeds, and icon or cover images, change in the document or their picker instead.",
+        "Replaces a file in an artifact you can edit with your finished upload, such as a new draft of a statement of work or a deck. The file keeps its id, place, and name (the extension follows the new type), so links and embeds open the new file. The old copy stays in the artifact's History for people who can edit it, and readers outside the team keep the copy their approved version shows until the change is approved. Upload first (files_request_upload, PUT, files_finalize). A page file of an HTML artifact is replaced by an upload requested with the same pagePath, and the page loads the new file from the same path. Media a document embeds, and icon or cover images, change in the document or their picker instead.",
       inputSchema: {
         file: z.uuid().describe("Id of the file to replace, from the artifact's files"),
         upload: z.uuid().describe("Id of your finished upload with the new content (files_finalize)"),

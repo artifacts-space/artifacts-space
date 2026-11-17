@@ -1,27 +1,51 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
-import { PAGE_ANSWER_MS, pageLabelFor, pageMessages, pageOrigin, pageSandbox } from "@/lib/page-host/rules";
+import type { PageAddress, PageAddressRequest } from "@/lib/page-files/address";
+import { PAGE_ANSWER_MS, pageFramePath, pageLabelFor, pageMessages, pageOrigin, pageSandbox } from "@/lib/page-host/rules";
 import { cn } from "@/lib/utils";
 
-/*
- * The page host's domain for the frames inside. There is none by default, so
- * a page that never set one up (a fixture, a static page) shows no frame;
- * a real page wraps its views in PageHostProvider with the server's
- * `pageHostBase()`.
+/**
+ * Asks the server where a page loads its files from: the token for its
+ * frame's address, for this viewer (src/lib/page-files/actions.ts). Null
+ * when the viewer may not read the artifact, or it could not be made.
  */
-const PageHostContext = createContext<string | null>(null);
+export type PageAddressLoader = (request: PageAddressRequest) => Promise<PageAddress | null>;
 
-/** Gives the page frames inside it the page host's domain, or null when pages cannot run here. */
-export function PageHostProvider({ base, children }: { base: string | null; children: ReactNode }) {
-  return <PageHostContext value={base}>{children}</PageHostContext>;
+interface PageHost {
+  /** The page host's domain, or null where pages cannot run. */
+  base: string | null;
+  /** How the frames inside get the address of their page's files; null where a page's files cannot load (a fixture without them). */
+  address: PageAddressLoader | null;
+}
+
+/*
+ * The page host for the frames inside. There is none by default, so a page
+ * that never set one up (a fixture, a static page) shows no frame; a real
+ * page wraps its views in ServerPageHost, which hands over the server's
+ * `pageHostBase()` and the action that makes page file addresses.
+ */
+const PageHostContext = createContext<PageHost>({ base: null, address: null });
+
+/** Gives the page frames inside it the page host's domain (null when pages cannot run here), and how to ask for a page's files address. */
+export function PageHostProvider({ base, address, children }: { base: string | null; address?: PageAddressLoader | undefined; children: ReactNode }) {
+  const value = useMemo(() => ({ base, address: address ?? null }), [base, address]);
+  return <PageHostContext value={value}>{children}</PageHostContext>;
 }
 
 /** Whether HTML pages can run on this page: a page host is set up. */
 export function usePagesCanRun(): boolean {
-  return useContext(PageHostContext) !== null;
+  return useContext(PageHostContext).base !== null;
+}
+
+/** The version of the artifact the frames inside show, when it is one from History: its page files are the ones it had. */
+const PageVersionContext = createContext<string | null>(null);
+
+/** Tells the page frames inside that they show this version of the artifact (History), so they load the page files as that version had them. */
+export function PageVersionProvider({ versionId, children }: { versionId: string | null; children: ReactNode }) {
+  return <PageVersionContext value={versionId}>{children}</PageVersionContext>;
 }
 
 /** Where an artifact's page runs: its origin once the label is worked out, or that it could not be. */
@@ -33,7 +57,7 @@ interface PagePlace {
 
 /** The origin of an artifact's page host. Null before the label is worked out, and where no page host is set up. */
 function usePagePlace(pageKey: string): PagePlace {
-  const base = useContext(PageHostContext);
+  const { base } = useContext(PageHostContext);
   const [found, setFound] = useState<{ key: string; origin: string | null } | null>(null);
   const key = `${base ?? ""}\n${pageKey}`;
   useEffect(() => {
@@ -46,6 +70,47 @@ function usePagePlace(pageKey: string): PagePlace {
   }, [pageKey, base, key]);
   const mine = found?.key === key ? found : null;
   return { origin: mine?.origin ?? null, failed: mine !== null && mine.origin === null };
+}
+
+/** How long before its end an address counts as ended, so a page never starts on one that ends while it loads. */
+const ADDRESS_MARGIN_MS = 60_000;
+
+/** A page files address the frame holds: which page and files it is for, and its token (null when none could be made). */
+interface HeldAddress {
+  key: string;
+  token: string | null;
+  /** When the token ends, in milliseconds; 0 for no token, so the next load asks again. */
+  endsAt: number;
+}
+
+/**
+ * The path the frame loads: `/`, or, for a page with files, its name under
+ * the files address the server makes for this viewer (pageFramePath), so
+ * the page's relative URLs reach its files. Null while that address is on
+ * its way. The address is asked for when the page or its files change
+ * (`filesKey`), and again before a later load (`load`) once it is near its
+ * end, so typing in the editor does not ask for one per change. When no
+ * address can be made, the page runs at `/` without its files.
+ */
+function usePagePath(pageKey: string, filesKey: string | undefined, load: string): string | null {
+  const { address } = useContext(PageHostContext);
+  const versionId = useContext(PageVersionContext);
+  const [held, setHeld] = useState<HeldAddress | null>(null);
+  const key = `${pageKey}\n${versionId ?? ""}\n${filesKey ?? ""}`;
+  const wanted = filesKey !== undefined && address !== null;
+  const mine = held?.key === key ? held : null;
+  const endsAt = mine?.endsAt ?? null;
+  useEffect(() => {
+    if (!wanted || (endsAt !== null && endsAt - ADDRESS_MARGIN_MS > Date.now())) return undefined;
+    let alive = true;
+    address({ pageKey, ...(versionId === null ? {} : { versionId }) })
+      .then((made) => { if (alive) setHeld({ key, token: made?.token ?? null, endsAt: made ? Date.parse(made.expiresAt) : 0 }); })
+      .catch(() => { if (alive) setHeld({ key, token: null, endsAt: 0 }); });
+    return () => { alive = false; };
+    // `load` is here so each new load of the page checks that the address still works.
+  }, [wanted, address, pageKey, versionId, key, endsAt, load]);
+  if (!wanted) return pageFramePath(null);
+  return mine ? pageFramePath(mine.token) : null;
 }
 
 /** Counts up each time the HTML changes, so a new version loads in a fresh frame document. */
@@ -141,19 +206,21 @@ function usePageHandshake({ frameRef, origin, html, onLeft }: Handshake) {
 
 interface PageWindowProps {
   origin: string;
+  /** The frame document's path on the page host (pageFramePath). */
+  path: string;
   html: string;
   title: string;
   onLeft: () => void;
 }
 
 /** One load of the frame document, with the page written into it. */
-function PageWindow({ origin, html, title, onLeft }: PageWindowProps) {
+function PageWindow({ origin, path, html, title, onLeft }: PageWindowProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const { shown, onLoad } = usePageHandshake({ frameRef, origin, html, onLeft });
   return (
     <iframe
       ref={frameRef}
-      src={`${origin}/`}
+      src={`${origin}${path}`}
       title={title}
       sandbox={pageSandbox}
       referrerPolicy="no-referrer"
@@ -192,6 +259,11 @@ interface PageFrameProps {
   html: string;
   /** The frame's accessible name. */
   title: string;
+  /**
+   * Set for a page that has page files: a text that changes whenever they do (a file added, removed, or replaced).
+   * The frame then loads under the page's files address, and loads again when the text changes.
+   */
+  filesKey?: string | undefined;
   /** Sizes the frame: it fills this box, and the page scrolls inside it. */
   className?: string;
 }
@@ -200,22 +272,44 @@ interface PageFrameProps {
  * An HTML artifact's page, running: scripts and all, in a sandboxed iframe
  * on the artifact's own page host, never on this site's origin
  * (src/lib/page-host/rules.ts). A page that sends its frame to another
- * address is closed, with a way to show it again. Draws nothing where no
- * page host is set up; the caller shows the source there (`usePagesCanRun`).
+ * address is closed, with a way to show it again. A page with page files
+ * (`filesKey`) loads under the address the server makes for this viewer,
+ * so its relative URLs reach those files (src/lib/page-files). Draws
+ * nothing where no page host is set up; the caller shows the source there
+ * (`usePagesCanRun`).
  */
-export function PageFrame({ pageKey, html, title, className }: PageFrameProps) {
+export function PageFrame({ pageKey, html, title, filesKey, className }: PageFrameProps) {
   const { origin, failed } = usePagePlace(pageKey);
   const generation = useGeneration(html);
+  const filesGeneration = useGeneration(filesKey ?? "");
   const [attempt, setAttempt] = useState(0);
-  const load = `${String(generation)}:${String(attempt)}`;
+  const load = `${String(generation)}.${String(filesGeneration)}:${String(attempt)}`;
+  const path = usePagePath(pageKey, filesKey, load);
   const [leftLoad, setLeftLoad] = useState<string | null>(null);
   const onLeft = useCallback(() => { setLeftLoad(load); }, [load]);
   const showAgain = useCallback(() => { setAttempt((current) => current + 1); }, []);
+  // Where the frame loads from, once both the page's host and its path are known.
+  const place = origin && path !== null ? { origin, path } : null;
   return (
-    <div data-slot="page-frame-box" aria-busy={origin || failed ? undefined : true} className={cn("min-h-0 overflow-hidden", className)}>
+    <div data-slot="page-frame-box" aria-busy={place || failed ? undefined : true} className={cn("min-h-0 overflow-hidden", className)}>
       {failed ? <PageCannotStart /> : null}
-      {origin && leftLoad !== load ? <PageWindow key={load} origin={origin} html={html} title={title} onLeft={onLeft} /> : null}
-      {origin && leftLoad === load ? <PageLeft onShowAgain={showAgain} /> : null}
+      {place ? <PlacedPage key={load} place={place} left={leftLoad === load} html={html} title={title} onLeft={onLeft} onShowAgain={showAgain} /> : null}
     </div>
   );
+}
+
+interface PlacedPageProps {
+  place: { origin: string; path: string };
+  /** This load of the page left its frame, and was closed. */
+  left: boolean;
+  html: string;
+  title: string;
+  onLeft: () => void;
+  onShowAgain: () => void;
+}
+
+/** One load of the page where it runs, or, once it left its frame, the note that it was closed. */
+function PlacedPage({ place, left, html, title, onLeft, onShowAgain }: PlacedPageProps) {
+  if (left) return <PageLeft onShowAgain={onShowAgain} />;
+  return <PageWindow origin={place.origin} path={place.path} html={html} title={title} onLeft={onLeft} />;
 }

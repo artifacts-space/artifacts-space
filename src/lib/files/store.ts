@@ -17,7 +17,8 @@ import type { FileDto } from "./types";
 
 /** Maps a row to the shape the app and agents see. */
 export function toFileDto(row: ArtifactFileRecord): FileDto {
-  return { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null, embedded: row.attachedByContent };
+  const file: FileDto = { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null, embedded: row.attachedByContent };
+  return row.pagePath === null ? file : { ...file, pagePath: row.pagePath };
 }
 
 /**
@@ -97,9 +98,9 @@ export async function clearIconForFile(artifactId: string, fileId: string): Prom
   await getDb().update(artifact).set({ cover: null }).where(and(eq(artifact.id, artifactId), or(eq(artifact.cover, ref), like(artifact.cover, `${ref}@%`))));
 }
 
-/** How many files an artifact holds. */
+/** How many files an artifact holds, page files aside: those have limits of their own (src/lib/page-files/rules.ts). */
 export async function countArtifactFiles(artifactId: string): Promise<number> {
-  const [row] = await getDb().select({ count: sql<number>`count(*)::int` }).from(artifactFile).where(eq(artifactFile.artifactId, artifactId));
+  const [row] = await getDb().select({ count: sql<number>`count(*)::int` }).from(artifactFile).where(and(eq(artifactFile.artifactId, artifactId), isNull(artifactFile.pagePath)));
   return row?.count ?? 0;
 }
 
@@ -117,14 +118,17 @@ export async function countPendingUploads(uploaderId: string, now: Date = new Da
  * Attaches the uploader's own ready, unattached files to an artifact. Files
  * already attached anywhere are left alone. `byContent` marks them as
  * content media: true only when a content save attaches the uploads its
- * content names (content-files.ts). Returns how many changed.
+ * content names (content-files.ts). An upload requested as a page file is
+ * never attached here (src/lib/page-files/attach.ts does that), so a type
+ * only a page file may be never becomes a plain attachment. Returns how
+ * many changed.
  */
 export async function attachFileRows(uploaderId: string, artifactId: string, fileIds: readonly string[], options: { byContent?: boolean } = {}): Promise<number> {
   if (fileIds.length === 0) return 0;
   const rows = await getDb()
     .update(artifactFile)
     .set({ artifactId, attachedAt: sql`now()`, attachedByContent: options.byContent ?? false })
-    .where(and(inArray(artifactFile.id, [...fileIds]), eq(artifactFile.uploaderId, uploaderId), eq(artifactFile.status, "ready"), isNull(artifactFile.artifactId)))
+    .where(and(inArray(artifactFile.id, [...fileIds]), eq(artifactFile.uploaderId, uploaderId), eq(artifactFile.status, "ready"), isNull(artifactFile.artifactId), isNull(artifactFile.pagePath)))
     .returning();
   return rows.length;
 }

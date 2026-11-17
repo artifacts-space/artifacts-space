@@ -40,10 +40,14 @@ export function canReadFile(file: FileAccessSubject, viewerId: string | null, ar
 
 /**
  * Whether a person may use a file in an artifact they write: it is ready,
- * and either already belongs to that artifact or is their own unattached upload.
+ * and either already belongs to that artifact or is their own unattached
+ * upload. An unattached upload that was requested as a page file
+ * (`pagePath`) is never usable this way: it becomes a page file of an HTML
+ * artifact (src/lib/page-files/attach.ts) or nothing, so a script or a
+ * stylesheet is never a plain attachment, an icon, a cover, or media.
  */
-export function canUseFileInArtifact(file: Pick<FileAccessSubject, "status" | "uploaderId" | "artifactId">, authorId: string, artifactId: string | null): boolean {
+export function canUseFileInArtifact(file: Pick<FileAccessSubject, "status" | "uploaderId" | "artifactId"> & { pagePath?: string | null }, authorId: string, artifactId: string | null): boolean {
   if (file.status !== "ready") return false;
   if (file.artifactId !== null) return artifactId !== null && file.artifactId === artifactId;
-  return file.uploaderId === authorId;
+  return file.uploaderId === authorId && (file.pagePath ?? null) === null;
 }

@@ -368,6 +368,9 @@ export const artifactFile = pgTable(
     attachedByContent: boolean("attached_by_content").notNull().default(false),
     // When its current object replaced an older one (src/lib/files/replace.ts); the old ones are in artifact_file_copy. Null until replaced.
     replacedAt: timestamp("replaced_at", { withTimezone: true }),
+    // Set for a page file: the relative path an HTML artifact's page loads it by, such as css/site.css (src/lib/page-files/rules.ts).
+    // Chosen when the upload is requested and never changed. A row with a path attaches only as a page file of an html artifact.
+    pagePath: text("page_path"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -375,6 +378,8 @@ export const artifactFile = pgTable(
     index("artifact_file_artifact_idx").on(table.artifactId),
     index("artifact_file_uploader_status_idx").on(table.uploaderId, table.status),
     index("artifact_file_status_created_idx").on(table.status, table.createdAt),
+    // One page file per path in an artifact; two paths that differ only by letter case are refused, since some file systems cannot hold both.
+    uniqueIndex("artifact_file_page_path_idx").on(table.artifactId, sql`lower(${table.pagePath})`).where(sql`${table.pagePath} is not null`),
     check("artifact_file_size_check", sql`${table.size} > 0 and ${table.size} <= ${sql.raw(String(fileLimits.maxBytes))}`),
   ],
 );

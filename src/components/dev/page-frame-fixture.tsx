@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 
+import { ArtifactFilesProvider } from "@/components/artifact-view/files-context";
+import { HtmlView } from "@/components/artifact-view/html-view";
 import { PageFrame } from "@/components/artifact-view/page-frame";
+import type { FileDto } from "@/lib/files/types";
 
 /*
  * Development only: HTML pages for e2e/page-frame.spec.ts. Each page
@@ -61,8 +64,60 @@ function isPageName(value: string): value is PageName {
   return Object.hasOwn(pages, value);
 }
 
-/** One page in a frame (`page`: probe, leave, reload, or plain), with a button that swaps it for a second version. */
+/**
+ * A page that loads its own page files by relative path, and reports what
+ * arrived: a stylesheet, a picture the stylesheet names, a module that
+ * imports its sibling, and data it fetches. It also asks for a file under
+ * an address that is not its own, and for the site.
+ */
+const filesPage = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Page files</title><link rel="stylesheet" href="css/site.css"></head>
+<body>
+<p id="styled">Styled by the page's stylesheet</p>
+<div id="pictured"></div>
+<p id="picture"></p>
+<p id="module">Module did not run</p>
+<p id="data">No data</p>
+<p id="other-address"></p>
+<p id="site-fetch"></p>
+<img id="image" src="img/dot.svg" alt="A dot">
+<script type="module" src="js/app.js"></script>
+<script>${report}
+  window.addEventListener("load", function () {
+    var picture = getComputedStyle(document.getElementById("pictured")).backgroundImage;
+    attempt("picture", function () { return fetch(picture.slice(5, -2)).then(function (response) { return response.ok ? "loaded " + new URL(response.url).pathname.split("/").slice(3).join("/") : "failed " + response.status; }); });
+    attempt("other-address", function () { return fetch("/f/" + "A".repeat(120) + "/data.json").then(function (response) { return "status " + response.status; }); });
+    attempt("site-fetch", function () { return fetch(location.ancestorOrigins[0] + "/dev/page-frame", { mode: "no-cors" }).then(function () { return "sent"; }); });
+  });
+</script>
+</body>
+</html>`;
+
+/** The fixture page's files as the artifact lists them: the paths that fixture-source.ts serves. */
+const filesPageFiles: readonly FileDto[] = (
+  [["css/site.css", "text/css"], ["js/app.js", "text/javascript"], ["js/message.js", "text/javascript"], ["data.json", "application/json"], ["img/dot.svg", "image/svg+xml"]] as const
+).map(([pagePath, contentType], index) => ({ id: `00000000-0000-4000-8000-00000000000${String(index)}`, filename: pagePath.slice(pagePath.lastIndexOf("/") + 1), contentType, size: 100, createdAt: "2026-11-17T00:00:00.000Z", replacedAt: null, pagePath }));
+
+/** The files page, through the artifact's own HTML view: it reads the files and asks for the page's files address. */
+function FilesPage() {
+  return (
+    <main className="mx-auto flex max-w-4xl flex-col gap-3 p-4">
+      <h1 className="text-lg font-semibold">Page files fixture</h1>
+      <ArtifactFilesProvider files={filesPageFiles}>
+        <HtmlView content={filesPage} title="Fixture page" pageKey="fixture-page-files" />
+      </ArtifactFilesProvider>
+    </main>
+  );
+}
+
+/** One page in a frame (`page`: probe, leave, reload, plain, or files), with a button that swaps it for a second version. */
 export function PageFrameFixture({ page }: { page: string }) {
+  return page === "files" ? <FilesPage /> : <SandboxPage page={page} />;
+}
+
+/** One of the sandbox pages, drawn straight in a page frame. */
+function SandboxPage({ page }: { page: string }) {
   const name = isPageName(page) ? page : "probe";
   const [version, setVersion] = useState(1);
   const html = version === 1 ? pages[name] : pages[name].replace("</body>", `<p id="version">Version ${String(version)}</p></body>`);

@@ -4,6 +4,7 @@ import { IconArrowBackUp, IconLoader2 } from "@tabler/icons-react";
 
 import { CoverArt } from "@/components/artifact-cover/cover-art";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
+import { PageVersionProvider } from "@/components/artifact-view/page-frame";
 import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { EditDiff } from "@/components/teams/edit-diff";
 import { Button } from "@/components/ui/button";
@@ -45,15 +46,24 @@ interface BodyProps {
   pageKey: string;
 }
 
+/** The version drawn with its files as it had them: replaced ones as they were then, and an HTML page's own files as of that version. */
+function VersionPreview({ selected, files, pageKey }: Pick<BodyProps, "selected" | "files" | "pageKey">) {
+  return (
+    <VersionFiles files={files} replacedSince={selected.latest ? [] : selected.replacedSince ?? []}>
+      <PageVersionProvider versionId={selected.latest ? null : selected.id}>
+        <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} pageKey={pageKey} />
+      </PageVersionProvider>
+    </VersionFiles>
+  );
+}
+
 function VersionBody({ view, selected, compareWith, compareId, files, pageKey }: BodyProps) {
   if (view === "preview") {
     // The preview shows the version in the theme it was saved with (a team preset as it is now, or the team default), under its cover.
     return (
       <ThemeScope theme={selected.renderTheme ?? resolveTheme(selected.theme, null).theme} className="text-foreground">
         {selected.cover ? <div data-version-cover="" className="relative mb-6 h-20 overflow-hidden rounded-lg"><CoverArt cover={selected.cover} /></div> : null}
-        <VersionFiles files={files} replacedSince={selected.latest ? [] : selected.replacedSince ?? []}>
-          <ArtifactView kind={selected.kind} content={selected.content} title={selected.title} language={selected.language} pageKey={pageKey} />
-        </VersionFiles>
+        <VersionPreview selected={selected} files={files} pageKey={pageKey} />
       </ThemeScope>
     );
   }

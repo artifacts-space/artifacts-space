@@ -11,6 +11,8 @@ export interface FileDto {
   embedded?: boolean;
   /** True for an image a version of the artifact shows as its icon or cover: it changes through those pickers, so it is never replaced. Set by the server. */
   pictured?: boolean;
+  /** Set for a page file of an HTML artifact: the relative path the page loads it by, such as css/site.css (src/lib/page-files/rules.ts). */
+  pagePath?: string;
 }
 
 /** An old copy of a replaced file, for History. Only people who may edit the artifact see these. */

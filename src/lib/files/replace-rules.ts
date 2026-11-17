@@ -70,8 +70,10 @@ export function replaceTargetProblem(target: ReplaceTarget | null, options: { sh
  * page has them now). The server checks the same (replaceTargetProblem);
  * this only spares people an upload it would refuse.
  */
-export function offersReplace(file: { id: string; embedded?: boolean | undefined; pictured?: boolean | undefined }, artifact: { icon: string | null; cover: string | null }): boolean {
+export function offersReplace(file: { id: string; embedded?: boolean | undefined; pictured?: boolean | undefined; pagePath?: string | undefined }, artifact: { icon: string | null; cover: string | null }): boolean {
   if (file.embedded === true || file.pictured === true) return false;
+  // A page file is replaced by an upload requested for its own path (replacementPathProblem), which the Files section does not make yet; agents do, with files_replace.
+  if (file.pagePath !== undefined) return false;
   return iconFileId(artifact.icon) !== file.id && coverFileId(artifact.cover) !== file.id;
 }
 

@@ -313,6 +313,13 @@ catch this, so test the generated SQL with `.toSQL()`, as
   file they just loaded for that long. Refusals and errors are never cached.
   The numbers are tied in `src/lib/files/redirect-cache-rules.ts`; keep them
   there rather than going back to `no-store`.
+  A second one: the page files of an HTML artifact load from its page host
+  under a token the site makes for a viewer who passed the access check
+  (see Page files). The token works for 10 to 15 minutes
+  (`pageTokenLimits`), and the viewer's browser may keep a file no longer
+  than that, so someone who loses access can still load the page's files
+  from an address they already hold until it ends. The token names no
+  viewer; never log one.
 - Every MCP tool is classified read or write in `src/lib/mcp/tool-access.ts`.
   A tool missing from that list cannot be registered, and read-only
   connections never see write tools. Its MCP annotations come from the same
@@ -569,29 +576,41 @@ on a second domain (`src/lib/page-host/rules.ts`).
   public id is the key to a link-shared artifact, and the hash cannot be
   turned back into it. One host per artifact keeps each page's browser
   storage apart.
-- A page host serves one thing: the frame document at `/`
-  (`frame-document.ts`). The proxy answers every request whose Host looks
-  like a page host, whole, before any app code (`pageHostResponse`, and the
-  matcher's last entry): the frame document, or 404. No app page, API, file,
-  or sign-in exists there, so no session can, and a page has nothing of ours
-  to call. `pageHostPattern` (in `security-header-rules.ts`) is the one
-  literal the matcher and the header rules share; a test keeps the matcher's
-  copy equal. Never add a route that answers on a page host.
-- The page host reads nothing. The site's page (`PageFrame`) shows the frame
-  document in a sandboxed iframe and hands it the HTML with `postMessage`,
-  to the page host's origin only. So the access check stays where it was:
-  whoever was given the content can run it. Never put a session, a token,
-  or an artifact's id in a page host address.
+- A page host serves two things: the frame document (`frame-document.ts`),
+  at `/` and, for a page with files of its own, at
+  `/f/<token>/index.html`; and that page's files, at `/f/<token>/<path>`
+  (see Page files). The proxy answers every request whose Host looks like a
+  page host before any app code (`pageHostResponse`, and the matcher's last
+  entry): the frame document, a 404, or a 405. The one request it lets
+  through is a GET or HEAD of `/f/<token>/<path>` on a page host of this
+  deployment, which one route handler answers
+  (`src/app/f/[token]/[...path]/route.ts`); that route checks the Host
+  again and answers 404 on every other host. No app page, API, or sign-in
+  exists there, so no session can, and a page has nothing of ours to call
+  but its own files. `pageHostPattern` (in `security-header-rules.ts`) is
+  the one literal the matcher and the header rules share; a test keeps the
+  matcher's copy equal. Never add another route that answers on a page host.
+- The page host reads no session and no cookie. The site's page
+  (`PageFrame`) shows the frame document in a sandboxed iframe and hands it
+  the HTML with `postMessage`, to the page host's origin only. So the
+  access check for the page's content stays where it was: whoever was given
+  the content can run it. The page host reads one thing from the database:
+  a page file, for a token it can open. Never put a session, a cookie, a
+  public id, or an artifact's id in a page host address; the only thing
+  that goes there is the page files token, which is opaque and short-lived.
 - The frame document takes the page from the window that frames it, and only
   when that window is the site (`framingSite`: `siteOrigin()` in production,
   never the request). Its `frame-ancestors` names the site alone, so the
   address shows nothing in a tab of its own.
 - What a page may do is the frame document's Content-Security-Policy
   (`pageContentPolicy`): inline scripts run; other requests go only to the
-  public package and font hosts in `pageScriptHosts`. No request to this
-  site, to the page host, or to any other site; no form posts; no frames. A
-  page cannot loosen it. Add a host to the list only for a public,
-  read-only package or font host.
+  page's own host (`'self'`: scripts, styles, fonts, images, media, fetch,
+  and workers, which is how it loads its page files) and to the public
+  package and font hosts in `pageScriptHosts`. No request to this site or
+  to any other site; no form posts; no frames; no `<base>`. `'self'` is one
+  artifact's host, where only the frame document and that page's own files
+  answer. A page cannot loosen it. Add a host to the list only for a
+  public, read-only package or font host.
 - The iframe's sandbox (`pageSandbox`) never has `allow-top-navigation`,
   `allow-downloads`, or `allow-popups-to-escape-sandbox`: a tab the page
   opens keeps the sandbox. A page can still send its own frame to another
@@ -603,12 +622,13 @@ on a second domain (`src/lib/page-host/rules.ts`).
   share a window, so never rely on one.
 - The site-wide header rule skips page hosts (`missing` host), because its
   `frame-ancestors 'none'` and `X-Frame-Options: DENY` would stop the site
-  from framing the frame document. `pageHostResponse` sends its own headers.
+  from framing the frame document. `pageHostResponse` sends its own
+  headers, and so does the page file route (`pageFileHeaders`).
 - Known limit: hosts under one page domain are the same site to a browser,
   so a page can set a cookie for the whole page domain that another
   artifact's page can read. Nothing of ours reads cookies there. Listing
   the page domain on the Public Suffix List would close it.
-- The page domain serves frame documents and nothing else. A wildcard
+- The page domain serves frame documents and page files, and nothing else. A wildcard
   (`*.<PAGE_HOST>`) sends every host under the domain to this app, so a
   host there that is not a page host (`www.<PAGE_HOST>`) must never show
   the site: it would be the same site, to a browser, as pages that run
@@ -616,7 +636,10 @@ on a second domain (`src/lib/page-host/rules.ts`).
   checked before any file or page, sends every path of every host under
   the page domain to `/page-host-refusal`, a 404 (`pageDomainRewrites`);
   and the proxy refuses those hosts on the paths it runs first
-  (`isUnderPageDomain`). The rewrite is read when the app is built, so
+  (`isUnderPageDomain`). The rewrite leaves out one shape of path,
+  `/f/<token>/<path>` (`pageDomainRewriteSource`), or it would take a page
+  file's address on a real page host too; on a host that is no page host
+  the proxy and the route both answer 404 for it. The rewrite is read when the app is built, so
   `PAGE_HOST` is set for the build as well as at run time. The domain
   itself (no label) is not covered: never point it at this app.
   `rules.ts` has no `@/` import, because `next.config.ts` loads it.
@@ -649,6 +672,110 @@ on a second domain (`src/lib/page-host/rules.ts`).
   draws nothing (`usePagesCanRun`). Tests: `rules.test.ts`,
   `proxy.test.ts`, `e2e/page-frame.spec.ts` on `/dev/page-frame`, and
   `e2e/security-headers.prod.spec.ts` for the production build.
+
+### Page files
+
+An HTML artifact can have files of its own that its page loads by relative
+path, as on any website: `<link href="css/site.css">`, a module's
+`import "./chart.js"`, `url(../img/bg.png)` in a stylesheet,
+`fetch("data.json")` (`src/lib/page-files`).
+
+- A page file is an attached file with a path: `artifact_file.page_path`,
+  set when the upload is requested (`pagePath` on `files_request_upload`)
+  and never changed. One file per path per artifact, with paths that differ
+  only by letter case counted as one (the partial unique index
+  `artifact_file_page_path_idx` on `artifact_id, lower(page_path)`). The
+  path rules are pure (`rules.ts`): relative, `/` between parts, each part
+  of letters, digits, dots, dashes, and underscores, no empty part, no `.`
+  or `..`, no leading dot, at most 200 characters and 8 parts. The page
+  itself is `index.html`; an `.html` or `.htm` page file is refused, because
+  one artifact is one page.
+- The type comes from the path's extension alone (`typesByExtension`); a
+  declared type is not read. Stylesheets, scripts, SVG, fonts, and
+  WebAssembly are types only a page file may be. They exist only as page
+  files of an `html` artifact: an upload requested with a page path can
+  only ever be attached as one (`canUseFileInArtifact`, and `page_path is
+  null` in every plain attach statement: `attachFileRows`, the save's
+  `attachedCte`, and the replace), and replaced only by an upload requested
+  for the same path (`replacementPathProblem`). Their first bytes are
+  checked on finalize (`matchesPageFileSignature`). They are never served
+  inline from this site: on `/api/files/<id>` and on a signed storage URL
+  they download as an attachment (`isInlineType`;
+  `src/lib/files/page-file-inline.test.ts` fails if a script, a stylesheet,
+  or an SVG ever becomes inline there). Never add a page-only type to
+  `allowedFileTypes`.
+- Limits are one constant (`pageFileLimits`): 100 page files and 16 MiB in
+  all per artifact. The 20-file limit is for plain attachments only
+  (`countArtifactFiles` leaves page files out). The attach is one statement
+  that holds the rules itself (`attachPageFileRows`: the uploader's own
+  ready uploads with a path, an `html` artifact, the count, the bytes).
+  Two attaches at one moment can each pass that check, so the attach reads
+  the totals again afterwards and takes its files back out when the
+  artifact is over (`attachPageFilesWithinLimits`). Attach, replace, and
+  delete file a version through `recordArtifactChange`, like any file.
+- Serving (`serve.ts`, headers in `serve-rules.ts`): the route streams the
+  object from R2 (`openObject`); it never redirects, so a signed storage
+  URL never reaches a page, and never reads a body into memory (the host
+  caps a response that is not streamed). GET and HEAD only, one checked
+  `Range` passed on. Headers: the type from the table, `nosniff`, the
+  page's own policy plus `sandbox` (`pageFilePolicy`: a file opened as a
+  document of its own, such as an SVG in a tab, runs nothing and has no
+  origin), `Referrer-Policy: no-referrer`, `X-Robots-Tag`,
+  `Cross-Origin-Resource-Policy: same-origin`, and a private cache no
+  longer than the token's remaining life. Order: the Host must be a page
+  host of this deployment, the path must be a page path, the token must
+  open, then the per-network limit (`pageFileByNetwork`, by
+  `networkPrefixKey`) is counted, then the database is read. A bad token
+  costs no database read and no count.
+- The token (`token.ts`) is the access check carried to a host that has no
+  session. The site makes it only for a viewer who passed
+  `getArtifactAccess` (`pageAddressFor` in `address.ts`, called by the
+  server action `pageAddressAction` when a frame loads): AES-256-GCM under
+  a key derived from the server secret with HKDF and its own purpose label.
+  It holds the internal artifact id, which files (the latest, or "as saved
+  at" a time), an expiry, and the save time of what the viewer is shown; the
+  page host label is bound as authenticated data, so a token opens only on
+  its own artifact's host. It ends 15 minutes after the start of its
+  5-minute step (`pageTokenLimits`), so it works for 10 to 15 minutes, and
+  within a step the same grant gives the same token (the nonce is derived
+  from the grant), so a reload reuses the browser's cache. It names no
+  viewer. An expired, changed, or other-host token is a 404; `token.test.ts`
+  and `serve.test.ts` have a test for each that fails if access is granted.
+  Never log a token, and never put anything else in a page host address.
+  The page can read its own token (it is in its address). That gives it
+  nothing new: the token serves only that page's own files, as that viewer
+  gets them, and the page can read those already.
+- Known limit: a file the page asks for after its token ended (a lazy
+  import, a seek in a video, more than 10 to 15 minutes after the frame
+  loaded) gets a 404 until the reader loads the page again. The life is one
+  constant; a longer life is a longer window after access is lost.
+- Which files a viewer gets follows the version they are served, like
+  every attachment: a reader of the approved version gets only files
+  attached by that version's time, and the copy of a replaced file that was
+  current then (`findPageFile`, `fileServedAt`), never a newer one. A
+  version in History shows its own files, to people who may edit only
+  (`PageVersionProvider`). Their address does not change when an edit they
+  are not shown is saved. `page-files.db.test.ts` checks each rule against
+  a real database.
+- The frame (`PageFrame`): a page with page files loads at
+  `/f/<token>/index.html` (`pageFramePath`), so its relative URLs resolve
+  under `/f/<token>/`; a page without them still loads `/`. The name is
+  needed: Next redirects a path that ends with `/`. The frame asks for a
+  new address when the page's files change (`usePageFilesKey`) and before a
+  load once the one it holds is near its end, never on a timer and not on
+  every keystroke in the editor. When no address can be made, the page runs
+  at `/` without its files.
+- Agents: `files_request_upload` takes `pagePath`, `files_attach` attaches
+  it, `files_replace` and `files_delete` change it, and every artifact
+  result lists each file's `pagePath`. `buildHtmlGuide` tells them the
+  rules from the same constants. The Files section shows a page file's
+  path; adding one in the web app is not built yet.
+- Tests without a database: under `next dev` only, a token for the stand-in
+  artifact id `fixture:page-files` is answered from files held in memory
+  (`fixture-source.ts`), so `e2e/page-files.spec.ts` on
+  `/dev/page-frame?page=files` runs the real proxy, token, route, headers,
+  and frame. `serve.test.ts` fails if that source ever answers outside
+  `next dev`.
 
 ## Testing
 
