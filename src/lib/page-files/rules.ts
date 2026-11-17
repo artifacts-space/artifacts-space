@@ -185,3 +185,16 @@ export function replacementPathProblem(target: { pagePath: string | null }, uplo
   if (target.pagePath !== null) return `This is the page file ${target.pagePath}. Request the new upload with the same pagePath, then replace it.`;
   return "This upload was requested as a page file. Replace a plain attachment with an upload requested without pagePath.";
 }
+
+/**
+ * Asks once, and once more when the call itself fails (a request that was
+ * dropped on the way). An answer is final, a refusal included: only a
+ * failed call is tried again, and only once.
+ */
+export async function askAgainOnFailure<T>(ask: () => Promise<T>): Promise<T> {
+  try {
+    return await ask();
+  } catch {
+    return ask();
+  }
+}

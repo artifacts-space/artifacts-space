@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { checkPagePath, pageFileContentTypes, pageFileLabel, pageFileLimits, pageFileName, pageFileTotalsProblem, pageFileTypeFor, pagePathProblem, replacementPathProblem, servedContentType } from "./rules";
+import { askAgainOnFailure, checkPagePath, pageFileContentTypes, pageFileLabel, pageFileLimits, pageFileName, pageFileTotalsProblem, pageFileTypeFor, pagePathProblem, replacementPathProblem, servedContentType } from "./rules";
 
 describe("pagePathProblem", () => {
   it.each(["site.css", "css/site.css", "js/app.js", "js/vendor/chart.min.mjs", "img/logo_2x.png", "fonts/Inter-Regular.woff2", "data.json", "a/b/c/d/e/f/g/h.js", "app.js.map"])("should accept %s", (path) => {
@@ -100,5 +100,25 @@ describe("replacementPathProblem", () => {
   it("should never let an upload requested as a page file replace a plain attachment", () => {
     expect(replacementPathProblem({ pagePath: null }, { pagePath: null })).toBeNull();
     expect(replacementPathProblem({ pagePath: null }, { pagePath: "js/app.js" })).toContain("requested as a page file");
+  });
+});
+
+describe("askAgainOnFailure", () => {
+  it("should take the first answer, a refusal included, without asking again", async () => {
+    const granted = vi.fn().mockResolvedValue("address");
+    const refused = vi.fn().mockResolvedValue(null);
+    await expect(askAgainOnFailure(granted)).resolves.toBe("address");
+    await expect(askAgainOnFailure(refused)).resolves.toBeNull();
+    expect(granted).toHaveBeenCalledTimes(1);
+    expect(refused).toHaveBeenCalledTimes(1);
+  });
+
+  it("should ask once more when the call itself fails, and give up after that", async () => {
+    const dropped = vi.fn().mockRejectedValueOnce(new Error("dropped")).mockResolvedValue("address");
+    await expect(askAgainOnFailure(dropped)).resolves.toBe("address");
+    expect(dropped).toHaveBeenCalledTimes(2);
+    const down = vi.fn().mockRejectedValue(new Error("down"));
+    await expect(askAgainOnFailure(down)).rejects.toThrow("down");
+    expect(down).toHaveBeenCalledTimes(2);
   });
 });

@@ -52,6 +52,16 @@ describe("attachFiles with page files and plain files", () => {
     expect(versions.recordArtifactChange).not.toHaveBeenCalled();
   });
 
+  it("should say so in the log, and still report the first failure, when the page files cannot be taken back out", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    store.attachFileRows.mockRejectedValue(new Error("the statement failed"));
+    pageStore.detachPageFileRows.mockRejectedValue(new TypeError("the undo failed"));
+    await expect(attachFiles("author", "a1", [pageId, plainId], "agent")).rejects.toThrow("the statement failed");
+    expect(logged).toHaveBeenCalledWith("[files] Page files could not be taken back out after a failed attach.", "TypeError");
+    expect(versions.recordArtifactChange).not.toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
   it("should attach no plain file when the page files are refused", async () => {
     pages.attachPageUploads.mockRejectedValue(new Error("The page already has a file at css/site.css"));
     await expect(attachFiles("author", "a1", [pageId, plainId], "agent")).rejects.toThrow("already has a file");

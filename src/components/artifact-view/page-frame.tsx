@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 
 import { Button } from "@/components/ui/button";
 import type { PageAddress, PageAddressRequest } from "@/lib/page-files/address";
+import { askAgainOnFailure } from "@/lib/page-files/rules";
 import { PAGE_ANSWER_MS, pageFramePath, pageLabelFor, pageMessages, pageOrigin, pageSandbox } from "@/lib/page-host/rules";
 import { cn } from "@/lib/utils";
 
@@ -116,9 +117,11 @@ function usePagePath(pageKey: string, filesKey: string | undefined, load: string
     let alive = true;
     // The address in hand still has time: this load uses it too. Otherwise the server makes a new one.
     const inHand = mine && mine.endsAt - ADDRESS_MARGIN_MS > Date.now() ? Promise.resolve({ token: mine.token, endsAt: mine.endsAt }) : null;
-    const next = inHand ?? address({ pageKey, ...(versionId === null ? {} : { versionId }) }).then((made) => ({ token: made?.token ?? null, endsAt: made ? Date.parse(made.expiresAt) : 0 }));
+    // A request that fails on the way is sent once more; a refusal (no address) is an answer and is not.
+    const next = inHand ?? askAgainOnFailure(() => address({ pageKey, ...(versionId === null ? {} : { versionId }) })).then((made) => ({ token: made?.token ?? null, endsAt: made ? Date.parse(made.expiresAt) : 0 }));
     next
       .then((found) => { if (alive) setHeld({ key, load, ...found }); })
+      // Both tries failed: this load runs without its files, like a refusal. The next load asks again.
       .catch(() => { if (alive) setHeld({ key, load, token: null, endsAt: 0 }); });
     return () => { alive = false; };
   }, [wanted, settled, mine, address, pageKey, versionId, key, load]);

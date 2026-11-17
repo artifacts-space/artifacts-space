@@ -67,7 +67,10 @@ async function attachPlainOrUndo(editorId: string, artifactId: string, plainIds:
   try {
     return await attachFileRows(editorId, artifactId, plainIds);
   } catch (error) {
-    await detachPageFileRows(artifactId, attachedPages).catch(() => undefined);
+    await detachPageFileRows(artifactId, attachedPages).catch((undo: unknown) => {
+      // The page files stay in the artifact with no version that records them; this line is how an operator finds out.
+      console.error("[files] Page files could not be taken back out after a failed attach.", undo instanceof Error ? undo.name : "unknown error");
+    });
     throw error;
   }
 }
