@@ -173,15 +173,26 @@ export async function presignDownload(
  * such an answer states no Content-Length, on a HEAD too. A read without a
  * length looks like a missing or broken object: finishing an upload refused
  * every stylesheet and script over about a hundred bytes that way.
+ *
+ * A read with a Range does not take this header: `fetch` adds its own
+ * `Accept-Encoding: identity` to every request that has a Range, and a
+ * second one would make the header that is sent differ from the one that
+ * was signed, which R2 refuses.
  */
 export const storedBytesOnly = { "Accept-Encoding": "identity" } as const;
+
+/** The headers of a read: those given, and the stored-bytes header unless a Range is among them. */
+export function readHeaders(extra: Readonly<Record<string, string>>): Record<string, string> {
+  const ranged = Object.keys(extra).some((name) => name.toLowerCase() === "range");
+  return ranged ? { ...extra } : { ...storedBytesOnly, ...extra };
+}
 
 async function send(config: R2Config, operation: string, method: "HEAD" | "GET" | "DELETE" | "PUT", key: string, extra: Record<string, string> = {}, body?: Uint8Array<ArrayBuffer>): Promise<Response> {
   const reads = method === "HEAD" || method === "GET";
   const signer = new AwsV4Signer({
     url: r2ObjectUrl(config, key).toString(),
     method,
-    headers: reads ? { ...storedBytesOnly, ...extra } : extra,
+    headers: reads ? readHeaders(extra) : extra,
     ...(body ? { body } : {}),
     accessKeyId: config.accessKeyId,
     secretAccessKey: config.secretAccessKey,

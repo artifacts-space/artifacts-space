@@ -736,7 +736,9 @@ path, as on any website: `<link href="css/site.css">`, a module's
   costs no database read and no count.
 - Every read of R2 by the server asks for the bytes as stored
   (`storedBytesOnly` in `src/lib/files/r2.ts`: `Accept-Encoding: identity`,
-  signed). R2 compresses a text type for a client that accepts it, as
+  signed), except a read with a Range, where `fetch` adds that header
+  itself and a second, signed one would not match what is sent
+  (`readHeaders`). R2 compresses a text type for a client that accepts it, as
   `fetch` does by default, and such an answer states no length, on a HEAD
   too. Without the header, finishing an upload refused every stylesheet,
   script, and SVG over about a hundred bytes ("the stored file is -1
