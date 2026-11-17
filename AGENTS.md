@@ -734,6 +734,15 @@ path, as on any website: `<link href="css/site.css">`, a module's
   open, then the per-network limit (`pageFileByNetwork`, by
   `networkPrefixKey`) is counted, then the database is read. A bad token
   costs no database read and no count.
+- Every read of R2 by the server asks for the bytes as stored
+  (`storedBytesOnly` in `src/lib/files/r2.ts`: `Accept-Encoding: identity`,
+  signed). R2 compresses a text type for a client that accepts it, as
+  `fetch` does by default, and such an answer states no length, on a HEAD
+  too. Without the header, finishing an upload refused every stylesheet,
+  script, and SVG over about a hundred bytes ("the stored file is -1
+  bytes"), and a page file would stream without a length or a usable
+  Range. Local stand-in stores do not compress, so only `r2.test.ts`, which
+  answers as R2 does, catches a read that drops the header.
 - The token (`token.ts`) is the access check carried to a host that has no
   session. The site makes it only for a viewer who passed
   `getArtifactAccess` (`pageAddressFor` in `address.ts`, called by the

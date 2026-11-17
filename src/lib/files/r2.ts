@@ -166,11 +166,22 @@ export async function presignDownload(
   return { url, expiresAt: new Date(signedAt.getTime() + input.expiresIn * 1000) };
 }
 
+/**
+ * What every read asks of R2: the object's bytes as stored, never a
+ * compressed copy. R2 compresses a text type (CSS, JavaScript, SVG, JSON,
+ * plain text) for a client that accepts it, as `fetch` does by default, and
+ * such an answer states no Content-Length, on a HEAD too. A read without a
+ * length looks like a missing or broken object: finishing an upload refused
+ * every stylesheet and script over about a hundred bytes that way.
+ */
+export const storedBytesOnly = { "Accept-Encoding": "identity" } as const;
+
 async function send(config: R2Config, operation: string, method: "HEAD" | "GET" | "DELETE" | "PUT", key: string, extra: Record<string, string> = {}, body?: Uint8Array<ArrayBuffer>): Promise<Response> {
+  const reads = method === "HEAD" || method === "GET";
   const signer = new AwsV4Signer({
     url: r2ObjectUrl(config, key).toString(),
     method,
-    headers: extra,
+    headers: reads ? { ...storedBytesOnly, ...extra } : extra,
     ...(body ? { body } : {}),
     accessKeyId: config.accessKeyId,
     secretAccessKey: config.secretAccessKey,

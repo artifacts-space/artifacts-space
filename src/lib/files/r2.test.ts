@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { amzDate, downloadSigningTime, isR2Configured, parseEndpoint, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, readObject, streamObject, type R2Config } from "./r2";
+import { amzDate, downloadSigningTime, headObject, isR2Configured, openObject, parseEndpoint, presignDownload, presignUpload, presignUrl, r2ConfigFromEnv, r2ObjectUrl, readObject, readObjectStart, streamObject, type R2Config } from "./r2";
 
 const config: R2Config = {
   accountId: "0123456789abcdef0123456789abcdef",
@@ -118,6 +118,51 @@ describe("endpoint override", () => {
 
   it("should accept an https endpoint anywhere", () => {
     expect(parseEndpoint("https://eu.example.com/")).toBe("https://eu.example.com");
+  });
+});
+
+describe("reads ask for the stored bytes", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** Answers as R2 does: a text type is compressed, with no length, unless the request asks for the bytes as stored. */
+  function likeR2(bytes: Uint8Array<ArrayBuffer>) {
+    const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>((_url, init) => {
+      const stored = new Headers(init.headers).get("accept-encoding") === "identity";
+      const headers: Record<string, string> = stored ? { "Content-Type": "text/css", "Content-Length": String(bytes.length) } : { "Content-Type": "text/css", "Content-Encoding": "gzip" };
+      return Promise.resolve(new Response(init.method === "HEAD" ? null : bytes, { status: 200, headers }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  const css = new TextEncoder().encode("body{margin:0}".repeat(20));
+
+  it("should read the real size of a stylesheet when R2 would compress it", async () => {
+    likeR2(css);
+    expect(await headObject(config, key)).toEqual({ size: css.length, contentType: "text/css" });
+  });
+
+  it("should open a stylesheet with its length when R2 would compress it", async () => {
+    likeR2(css);
+    const opening = await openObject(config, key);
+    expect(opening.state === "open" ? opening.object.length : null).toBe(css.length);
+  });
+
+  it.each([
+    ["headObject", () => headObject(config, key)],
+    ["readObjectStart", () => readObjectStart(config, key, 16)],
+    ["streamObject", () => streamObject(config, key, css.length)],
+    ["readObject", () => readObject(config, key, css.length)],
+    ["openObject", () => openObject(config, key)],
+    ["openObject for a HEAD", () => openObject(config, key, { head: true })],
+  ])("should ask for the bytes as stored from %s, and sign the header", async (_name, read) => {
+    const fetchMock = likeR2(css);
+    await read();
+    const headers = new Headers(fetchMock.mock.calls[0]?.[1].headers);
+    expect(headers.get("accept-encoding")).toBe("identity");
+    expect(headers.get("authorization")).toContain("accept-encoding");
   });
 });
 
