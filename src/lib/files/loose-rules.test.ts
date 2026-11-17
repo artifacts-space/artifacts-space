@@ -84,7 +84,6 @@ describe("looseFilesWords", () => {
     expect(looseFilesWords([])).toBe("");
   });
 
-
   it("should say the files are not shown on the page when none is a page file", () => {
     expect(looseFilesWords([{}])).toBe("1 file, not shown on the page");
     expect(looseFilesWords([{}, {}])).toBe("2 files, not shown on the page");
