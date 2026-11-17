@@ -80,14 +80,14 @@ export default function FormatsPage() {
       />
       <Prose>
         <p>Content is checked on every save, from MCP and the web app alike. Agents can check it first, without saving, with <Link href={`${docsHref("mcp")}#artifacts_validate`}><code>artifacts_validate</code></Link>. Changing the kind of an existing artifact checks the stored content against the new kind.</p>
-        <p>Every format can also have a theme, which sets the colors and fonts of the artifact and its page. See <Link href={docsHref("themes")}>Themes</Link>.</p>
+        <p>Every format can also have a theme, which sets the colors and fonts of the artifact and its page. A web page (<code>html</code>) sets its own inside its frame. See <Link href={docsHref("themes")}>Themes</Link>.</p>
       </Prose>
 
       <DocsH page={page} id="limits" />
       <FactTable
         head={["Limit", "Value", "Applies to"]}
         rows={[
-          ["Content", size(artifactSizeLimits.maxContentBytes), "Every kind, in UTF-8 bytes. Split larger work into several artifacts."],
+          ["Content", size(artifactSizeLimits.maxContentBytes), "Every kind, in UTF-8 bytes. An HTML page counts whole, with its styles and scripts. Split larger work into several artifacts."],
           ["Metadata", size(artifactSizeLimits.maxMetadataBytes), "The metadata object, as JSON text."],
           ["ui spec", size(uiLimits.maxSpecBytes), "ui content and each frame of a canvas, plus element and depth limits."],
           ["Canvas", size(canvasLimits.maxCanvasBytes), `canvas content: up to ${String(canvasLimits.maxFrames)} frames and ${canvasLimits.maxElements.toLocaleString("en-US")} elements across them.`],

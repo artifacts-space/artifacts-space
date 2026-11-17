@@ -55,6 +55,9 @@ export default function SharingPage() {
         This works like turning off download, print, and copy for viewers in Google Sheets. Anyone who can see the sheet can still read it off the screen, and the page has to send the rows to the browser to show them. Use team or private sharing for data that must not leave the team.
       </Note>
       <Prose>
+        <p><strong>Web pages</strong> (<code>html</code> artifacts) run for every reader who can open them, in a sandbox on a host of their own, apart from this site and the reader&apos;s account. On a link or public artifact, readers who cannot edit it see a note above the page: it was made by its author, not by artifacts.space, and nobody should type a password or payment details into it. The note carries the Report link. See <Link href={docsHref("formats", "html")}>Formats</Link> for what a page can and cannot do.</p>
+      </Prose>
+      <Prose>
         <p>Link and public pages carry a <strong>Report</strong> button. Readers pick one of {reasons.length} reasons ({reasons.join(", ").toLowerCase()}), the site operator gets an email, and the team&apos;s owners and admins see the report on the team page. The author, or an owner or admin of the artifact&apos;s team, can always make an artifact private again, with no approval and no limit.</p>
       </Prose>
 

@@ -1403,6 +1403,33 @@ artifacts that use them and get no new work:
   (a stream, Follow, pictures after an agent's save) are paused until HTML
   pages have a runtime.
 
+### What crawlers and language models are told
+
+`/llms.txt` says what the site is and links its docs, as Markdown for
+language models (`llmsTxtFor` in `src/lib/llms-txt.ts`; the route only
+calls it). It is built from the lists the site already keeps, never
+written by hand: the docs pages (`src/lib/docs/pages.ts`), the formats
+(`currentFormatKinds` and `earlierFormatKinds` in
+`src/lib/artifact-formats.ts`), and the MCP endpoint. A new docs page is in
+it at once, and a test fails when one is missing.
+
+- The docs of the earlier formats are one section, last in the list
+  (`earlierFormatsSection`: JSON Render and every page under it). llms.txt
+  links them only under `## Optional`, and the sitemap leaves them out
+  (`crawledDocsPaths` in `src/lib/crawl-rules.ts`). They stay reachable and
+  linked from the docs menu: no `noindex`, no redirect. A new page about
+  `ui` or canvas goes into that section; a new page about anything else
+  never does.
+- The sitemap lists `/llms.txt`. robots.txt allows it by name and keeps one
+  rule for every crawler; it has no directive that points at llms.txt,
+  because none exists. Naming a crawler, or treating one apart, is the
+  owner's decision.
+- llms.txt links only pages a signed-out reader can open, and only by this
+  site's own origin (`crawlOrigin`), so a self-hosted copy points at itself.
+  Like every path, it answers 404 on a host under the page domain.
+- Docs copy for new work leads with Markdown and `html`. The docs home's
+  format table lists the current formats only.
+
 ### Section templates
 
 Section templates are ready-made pieces of a website or app screen (a

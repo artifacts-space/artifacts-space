@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Fragment } from "react";
 
 import { DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
-import { formatInfo, formatKinds } from "@/lib/artifact-formats";
+import { currentFormatKinds, earlierFormatKinds, formatInfo } from "@/lib/artifact-formats";
 import { docsHref } from "@/lib/docs/pages";
 import { docsMetadata } from "@/lib/docs/metadata";
 
@@ -11,9 +12,9 @@ export const metadata: Metadata = { ...docsMetadata(""), title: { absolute: "Doc
 
 const nextSteps = [
   { href: docsHref("quickstart"), title: "Quickstart", body: "Connect your agent and save a first artifact." },
-  { href: docsHref("json-render"), title: "JSON Render", body: "Build dashboards and reports from one JSON spec." },
+  { href: docsHref("formats"), title: "Formats", body: "Markdown for prose, a web page for anything visual." },
   { href: docsHref("mcp"), title: "MCP reference", body: "Every tool, its arguments, and its errors." },
-  { href: docsHref("json-render/playground"), title: "Playground", body: "Write a spec and watch it render as you type." },
+  { href: docsHref("sharing"), title: "Sharing, teams, and agents", body: "Who can read, edit, and approve." },
 ];
 
 /** Docs home: what artifacts.space is and the ideas the rest of the docs build on. */
@@ -27,7 +28,7 @@ export default function DocsIntroduction() {
           A coding agent does real work: it reads the codebase, weighs options, makes a plan, and writes a report. Then the session ends, and that context is gone. The next session starts from zero, and the people who depend on the work never see it.
         </p>
         <p>
-          artifacts.space keeps that work. Agents save plans, decisions, research, and dashboards as <strong>artifacts</strong> through one MCP server. People open them in the browser, edit them, comment, and share them with their team. The next agent session can search and read the same record.
+          artifacts.space keeps that work. Agents save plans, decisions, research, and web pages as <strong>artifacts</strong> through one MCP server. People open them in the browser, edit them, comment, and share them with their team. The next agent session can search and read the same record.
         </p>
         <p>It works with any MCP client: Claude Code, Cursor, ChatGPT, Codex, OpenCode, Kimi Code CLI, fx, and others. There is no SDK to install.</p>
       </Prose>
@@ -47,11 +48,11 @@ export default function DocsIntroduction() {
 
       <DocsH page={page} id="formats" />
       <Prose>
-        <p>Pick the format that fits the content. Plain formats show source or simple views; <code>html</code> is a real web page that runs in a sandbox; <code>ui</code> builds a rich page from components.</p>
+        <p>Pick the format that fits the content. Markdown is for prose. <code>html</code> is a real web page that runs in a sandbox, for anything visual or interactive. The other formats show source, data, a diagram, or uploaded files.</p>
       </Prose>
-      <FactTable head={["Format", "What it is"]} rows={formatKinds.map((kind) => [kind, formatInfo[kind].helper])} />
+      <FactTable head={["Format", "What it is"]} rows={currentFormatKinds.map((kind) => [kind, formatInfo[kind].helper])} />
       <Prose>
-        <p>See <Link href={docsHref("formats")}>Formats</Link> for the rules and limits of each, and <Link href={docsHref("json-render")}>JSON Render</Link> for <code>ui</code>.</p>
+        <p>See <Link href={docsHref("formats")}>Formats</Link> for the rules and limits of each. The earlier formats ({earlierFormatKinds.map((kind, index) => <Fragment key={kind}>{index > 0 ? ", " : null}<code>{kind}</code></Fragment>)}) are kept for the artifacts that use them; <Link href={docsHref("json-render")}>JSON Render</Link> describes them.</p>
       </Prose>
 
       <DocsH page={page} id="visibility" />
@@ -95,7 +96,7 @@ export default function DocsIntroduction() {
         </p>
       </Prose>
       <Note title="For coding agents">
-        Read <Link href={docsHref("mcp")} className="underline underline-offset-2">the MCP reference</Link> for exact tool arguments, and call <code>artifacts_formats_guide</code> with <code>kind: &quot;ui&quot;</code> before you write a rich page.
+        Read <Link href={docsHref("mcp")} className="underline underline-offset-2">the MCP reference</Link> for exact tool arguments, and call <code>artifacts_formats_guide</code> with <code>kind: &quot;html&quot;</code> before you write a web page.
       </Note>
 
       <DocsH page={page} id="next" />

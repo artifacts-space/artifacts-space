@@ -22,6 +22,12 @@ export type FormatKind = ArtifactKind;
  */
 export const newVisualWork = 'For a new mockup, dashboard, or report, prefer kind "html", a full web page.';
 
+/** The earlier formats: kept for the artifacts that use them, and never put forward for new work. */
+export const earlierFormatKinds: readonly FormatKind[] = ["ui", "canvas"];
+
+/** The formats put forward for new work: every format but the earlier ones, in picker order. */
+export const currentFormatKinds: readonly FormatKind[] = formatKinds.filter((kind) => !earlierFormatKinds.includes(kind));
+
 /** The same, for the opening of the two earlier formats' guides. */
 export const earlierFormatNote = `This is an earlier format, kept for the artifacts that use it. ${newVisualWork} Call artifacts_formats_guide with kind "html" for its rules.`;
 export const formatInfo: Record<FormatKind, FormatInfo> = {

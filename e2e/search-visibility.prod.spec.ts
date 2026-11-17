@@ -28,6 +28,24 @@ test("should list the site's pages and no artifacts in the sitemap when the data
   expect(body).not.toContain("/artifact/");
 });
 
+test("should put llms.txt in the sitemap and leave the earlier formats' docs out of it", async ({ request }) => {
+  const body = await (await request.get("/sitemap.xml")).text();
+  expect(body).toContain("/llms.txt</loc>");
+  expect(body).toContain("/docs/formats</loc>");
+  expect(body).not.toContain("json-render");
+});
+
+test("should allow llms.txt by name in robots.txt, keep one rule for every crawler, and serve llms.txt", async ({ request }) => {
+  const robots = await (await request.get("/robots.txt")).text();
+  expect(robots).toMatch(/^Allow: \/llms\.txt$/m);
+  expect(robots.match(/^User-Agent:/gim)).toHaveLength(1);
+  expect(robots).toMatch(/^Sitemap: \S+\/sitemap\.xml$/m);
+  const llms = await request.get("/llms.txt");
+  expect(llms.status()).toBe(200);
+  expect(llms.headers()["content-type"]).toBe("text/plain; charset=utf-8");
+  expect(await llms.text()).toContain("## Optional");
+});
+
 test("should serve the sitemap from the cache instead of building it per request", async ({ request }) => {
   const response = await request.get("/sitemap.xml");
   // HIT or STALE: served from the prerendered cache. A per-request route sends no x-nextjs-cache header.

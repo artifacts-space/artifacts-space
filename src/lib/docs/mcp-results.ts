@@ -101,7 +101,7 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   "daily": [ { "day": "2026-11-08", "views": 4, "visitors": 3 }, … ], "referrers": [ { "domain": "news.ycombinator.com", "views": 40 } ] }`,
   },
   artifacts_formats_guide: {
-    summary: "Plain text. Without `kind`, one line per format. With `kind: \"ui\"`, the full JSON Render guide: rules, every component and its props, and an example spec. With `kind: \"canvas\"`, the canvas guide: the frame rules, the frame tools, and an example.",
+    summary: "Plain text. Without `kind`, one line per format. With `kind: \"html\"`, the rules for a web page: what the document holds, what it may load, what it cannot do, and an example. With `kind: \"ui\"`, the full JSON Render guide: rules, every component and its props, and an example spec. With `kind: \"canvas\"`, the canvas guide: the frame rules, the frame tools, and an example.",
   },
   artifacts_validate: {
     summary: "Plain text: \"Valid <kind> content. It is ready to save.\", or a list of every error and warning with the element key and the fix. Nothing is saved.",

@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
 
-import { docsHref, docsPages } from "@/lib/docs/pages";
+import { docsHref, docsPages, earlierFormatsSection } from "@/lib/docs/pages";
 import { siteOrigin } from "@/lib/site-origin";
 
 /**
  * What crawlers and security researchers read about this site: robots.txt,
- * the sitemap, and /.well-known/security.txt. Pure, so the lists can be
+ * the sitemap, and /.well-known/security.txt. (llms.txt is in llms-txt.ts.) Pure, so the lists can be
  * tested; the route files in src/app only call these.
  */
 
@@ -32,9 +32,21 @@ export const securityTxtExpires = new Date("2027-11-01T00:00:00.000Z");
  */
 export const crawlDisallowed = ["/app", "/inbox", "/teams", "/threads", "/invitations", "/api/", "/oauth/", "/dev/", "/preview", "/share/"] as const;
 
-/** The site's own pages for the sitemap: the home page, the legal pages, Support, and every docs page. */
+/** Where the site describes itself to language models: the llms.txt convention (src/lib/llms-txt.ts). */
+export const llmsTxtPath = "/llms.txt";
+
+/**
+ * The docs pages put forward to crawlers: every page but the earlier
+ * formats' (JSON Render). Those pages stay reachable and linked, with no
+ * noindex and no redirect; the sitemap only stops naming them.
+ */
+export function crawledDocsPaths(): string[] {
+  return docsPages.filter((page) => page.section !== earlierFormatsSection).map((page) => docsHref(page.slug));
+}
+
+/** The site's own pages for the sitemap: the home page, the legal pages, Support, llms.txt, and the docs pages put forward to crawlers. */
 export function publicPaths(): string[] {
-  return ["/", "/privacy", "/terms", "/support", ...docsPages.map((page) => docsHref(page.slug))];
+  return ["/", "/privacy", "/terms", "/support", llmsTxtPath, ...crawledDocsPaths()];
 }
 
 /**
@@ -50,10 +62,15 @@ export function crawlOrigin(env: NodeJS.ProcessEnv = process.env): string {
   }
 }
 
-/** The robots.txt rules for a site at `origin`. */
+/**
+ * The robots.txt rules for a site at `origin`. One rule for every crawler:
+ * none is named or treated apart. llms.txt is allowed by name, so a later
+ * disallow cannot shut it out by accident; robots.txt has no directive that
+ * points at it, and the sitemap lists it.
+ */
 export function robotsFor(origin: string): MetadataRoute.Robots {
   return {
-    rules: { userAgent: "*", allow: "/", disallow: [...crawlDisallowed] },
+    rules: { userAgent: "*", allow: ["/", llmsTxtPath], disallow: [...crawlDisallowed] },
     sitemap: `${origin}/sitemap.xml`,
   };
 }
