@@ -142,6 +142,13 @@ export const rateLimits = {
   /** Started file uploads per user per hour, from the web app and MCP together. */
   fileUpload: { limit: 200, windowSeconds: hour },
   /**
+   * Page file uploads started through page_files_request_uploads per user
+   * per hour, counted per file. One call may ask for a whole site (100
+   * files), so these have their own budget: ten whole sites an hour, and
+   * the single-file limit above stays what it was.
+   */
+  pageFileUpload: { limit: 1000, windowSeconds: hour },
+  /**
    * Frame capture needed-list calls per person per hour (src/lib/canvas/captures.ts).
    * An open canvas asks when it opens, when its tab comes back, and after
    * each batch it drew: a few calls per visit. This is the runaway cap.
@@ -317,6 +324,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   reportByNetworkArtifact: "We have received a lot of reports about this artifact from your network in the last hour.",
   feedbackByUser: "You have sent several problem reports in the last hour.",
   fileUpload: "You have uploaded a lot of files in the last hour.",
+  pageFileUpload: "You have uploaded a lot of page files in the last hour.",
   frameCaptureNeeded: "Your open canvases have asked which frames to draw a lot in the last hour.",
   frameCaptureStart: "Your browser has drawn a lot of frame images in the last hour.",
   frameCaptureStartByArtifact: "A lot of frame images were drawn for this canvas in the last few minutes.",

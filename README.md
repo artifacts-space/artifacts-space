@@ -149,7 +149,7 @@ version and title in step with the server.
 | Formats | `artifacts_formats_guide`, `artifacts_validate` |
 | Canvas frames | `canvas_frames_list`, `canvas_frame_get`, `canvas_frame_image`, `canvas_frame_save`, `canvas_frame_update`, `canvas_frame_delete` |
 | Section templates | `ui_templates_list`, `ui_template_get` |
-| Files | `files_request_upload`, `files_finalize`, `files_create_artifact`, `files_attach`, `files_replace`, `files_get_download_url`, `files_delete` |
+| Files | `files_request_upload`, `files_finalize`, `files_create_artifact`, `files_attach`, `files_replace`, `files_get_download_url`, `files_delete`, `page_files_request_uploads`, `page_files_publish` |
 | Comments and inbox | `inbox_list`, `inbox_mark_read`, `comments_list`, `comment_create`, `comment_update`, `comment_delete` |
 
 Artifacts are identified by their 22-character public id, the same one as in

@@ -64,6 +64,9 @@ const typesByExtension: Readonly<Record<string, PageFileType>> = {
   wav: stored("audio/wav", "WAV audio"),
 };
 
+/** Every kind of page file, for the docs: the extension, the type it is stored and served as, and its name for people. */
+export const pageFileExtensions: readonly { extension: string; contentType: string; label: string }[] = Object.entries(typesByExtension).map(([extension, type]) => ({ extension, contentType: type.contentType, label: type.label }));
+
 const typesByContentType = new Map(Object.values(typesByExtension).map((type) => [type.contentType, type]));
 
 /** Every content type a page file is stored with. */

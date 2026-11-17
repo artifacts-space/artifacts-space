@@ -197,6 +197,19 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     summary: "Confirms the delete. A file deleted from an artifact saves the artifact: the result names it with the `baseVersion` of this save.",
     shape: `{ "deleted": true, "fileId": "…", "artifact": "<22-character id>", "versionId": "…", "baseVersion": "…" }`,
   },
+  page_files_request_uploads: {
+    summary: "One started upload for each file of the set: its path, its file id, the PUT URL, and the headers to send. Also the file ids as one list for page_files_publish, when the URLs expire, a shell loop that sends every file, and the next step. If a file is at fault, nothing starts and the error names every one.",
+    shape: `{ "artifact": "<22-character id>",
+  "uploads": [ { "path": "css/site.css", "fileId": "…", "size": 1820, "url": "…", "headers": { "Content-Type": "text/css", "Content-Length": "1820" } }, … ],
+  "fileIds": ["…", "…"], "expiresAt": "…", "put": "PUT each file's bytes to its url … <a shell loop>",
+  "next": "After every PUT succeeds, call page_files_publish once …" }`,
+  },
+  page_files_publish: {
+    summary: "What the publish did (`published`: the paths added, replaced, and removed, and whether the change is live, `applied`, or waits for approval, `pending`), the artifact's files as it left them, and the `baseVersion` of this save. The document is not repeated: it did not change. If a file is at fault, nothing changes and the error names every one.",
+    shape: `{ "id": "<22-character id>", "url": "…", "title": "…", "kind": "html",
+  "published": { "status": "applied", "added": ["js/app.js"], "replaced": ["css/site.css"], "removed": ["js/old.js"] },
+  "files": [ { "id", "filename", "contentType", "size", "pagePath": "css/site.css" }, … ], "versionId": "…", "baseVersion": "…" }`,
+  },
   inbox_list: {
     summary: "Your mentions, newest first, each with the comment, the comments just before it, and how to reply. Every comment body is wrapped as untrusted text.",
     shape: `{ "untrustedContentNotice": "…",

@@ -35,14 +35,16 @@ function bucketWindowsFor(name: RateLimitName, subject: string, nowMs: number) {
   return { key: `${name}:${subject}`, limit, windowMs, current, previous: new Date(current.getTime() - windowMs) };
 }
 
-async function decideFromStoredCounts(name: RateLimitName, subject: string, nowMs: number) {
+/** Whether `hits` more hits fit under the limit (one, unless a call counts several at once). */
+async function decideFromStoredCounts(name: RateLimitName, subject: string, nowMs: number, hits = 1) {
   const bucket = bucketWindowsFor(name, subject, nowMs);
   const rows = await getDb()
     .select({ windowStart: rateLimitBucket.windowStart, count: rateLimitBucket.count })
     .from(rateLimitBucket)
     .where(and(eq(rateLimitBucket.key, bucket.key), inArray(rateLimitBucket.windowStart, [bucket.previous, bucket.current])));
   const countAt = (start: Date) => rows.find((row) => row.windowStart.getTime() === start.getTime())?.count ?? 0;
-  return decideRateLimit({ previous: countAt(bucket.previous), current: countAt(bucket.current), nowMs, windowMs: bucket.windowMs, limit: bucket.limit });
+  // decideRateLimit asks whether one more hit fits; the other hits of this call count as made already.
+  return decideRateLimit({ previous: countAt(bucket.previous), current: countAt(bucket.current) + hits - 1, nowMs, windowMs: bucket.windowMs, limit: bucket.limit });
 }
 
 /**
@@ -54,13 +56,13 @@ export function peekRateLimit(name: RateLimitName, subject: string, nowMs = Date
   return decideFromStoredCounts(name, subject, nowMs);
 }
 
-/** Counts one hit for `subject` against a named limit, without deciding anything. */
-export async function countRateLimitHit(name: RateLimitName, subject: string, nowMs = Date.now()): Promise<void> {
+/** Counts one hit for `subject` against a named limit (or `hits` of them at once), without deciding anything. */
+export async function countRateLimitHit(name: RateLimitName, subject: string, nowMs = Date.now(), hits = 1): Promise<void> {
   const { key, current } = bucketWindowsFor(name, subject, nowMs);
   await getDb()
     .insert(rateLimitBucket)
-    .values({ key, windowStart: current, count: 1 })
-    .onConflictDoUpdate({ target: [rateLimitBucket.key, rateLimitBucket.windowStart], set: { count: sql`${rateLimitBucket.count} + 1` } });
+    .values({ key, windowStart: current, count: hits })
+    .onConflictDoUpdate({ target: [rateLimitBucket.key, rateLimitBucket.windowStart], set: { count: sql`${rateLimitBucket.count} + ${hits}` } });
   await cleanUpOldBuckets(nowMs).catch((error: unknown) => {
     console.error("[rate-limit] Cleanup failed", error instanceof Error ? error.name : "unknown error");
   });
@@ -140,6 +142,19 @@ export function rateLimitMessage(name: RateLimitName, retryAfterSeconds: number)
 export async function enforceRateLimit(name: RateLimitName, subject: string): Promise<void> {
   const decision = await hitRateLimit(name, subject);
   if (!decision.allowed) throw new RateLimitError(name, decision.retryAfterSeconds);
+}
+
+/**
+ * Counts `hits` hits at once against a named limit, all or none: a call
+ * that starts many things (the uploads of a whole set of page files) counts
+ * each of them. Throws a RateLimitError, counting nothing, unless they all
+ * fit.
+ */
+export async function enforceRateLimitHits(name: RateLimitName, subject: string, hits: number, nowMs = Date.now()): Promise<void> {
+  if (hits <= 0) return;
+  const decision = await decideFromStoredCounts(name, subject, nowMs, hits);
+  if (!decision.allowed) throw new RateLimitError(name, decision.retryAfterSeconds);
+  await countRateLimitHit(name, subject, nowMs, hits);
 }
 
 /** Throws a RateLimitError for the first limit that refuses, checking them in order and stopping there. */

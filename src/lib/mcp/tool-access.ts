@@ -48,6 +48,9 @@ export const toolAccess = {
   files_attach: "write",
   files_replace: "write",
   files_delete: "write",
+  // Page files of an HTML artifact, many in few calls.
+  page_files_request_uploads: "write",
+  page_files_publish: "write",
   // Inbox and comments
   inbox_list: "read",
   comments_list: "read",
@@ -112,6 +115,11 @@ export const writeTraits = {
   files_delete: { destructive: true, idempotent: true, openWorld: false },
   // Replaces the current file; a repeat with a new upload replaces it again.
   files_replace: { destructive: true, idempotent: false, openWorld: false },
+  // New pending uploads on every call; nothing in the artifact changes.
+  page_files_request_uploads: { destructive: false, idempotent: false, openWorld: false },
+  // Replaces the files at paths the page already has and deletes the paths named in remove. A repeat is
+  // refused (its uploads are in the artifact, its removed paths are gone), so it is not a no-op.
+  page_files_publish: { destructive: true, idempotent: false, openWorld: false },
   inbox_mark_read: { destructive: false, idempotent: true, openWorld: false },
   comment_create: { destructive: false, idempotent: false, openWorld: false },
   // Replaces the body. A repeat notifies no one again but still moves updatedAt, so it is not a no-op.

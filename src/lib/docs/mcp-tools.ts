@@ -5,6 +5,7 @@ import { registerArtifactTools } from "@/lib/mcp/artifact-tools";
 import { registerCanvasTools } from "@/lib/mcp/canvas-tools";
 import { registerFileTools } from "@/lib/mcp/file-tools";
 import { registerFormatTools } from "@/lib/mcp/format-tools";
+import { registerPageFileTools } from "@/lib/mcp/page-file-tools";
 import { registerProjectTools } from "@/lib/mcp/project-tools";
 import { registerTagTools } from "@/lib/mcp/tag-tools";
 import { registerTeamTools } from "@/lib/mcp/team-tools";
@@ -77,6 +78,7 @@ function recordTools(): DocsMcpTool[] {
   registerTemplateTools(recordingServer("Section templates", tools), "full");
   registerThemeTools(recordingServer("Themes", tools), docsUserId, "full");
   registerFileTools(recordingServer("Files", tools), docsUserId, "full");
+  registerPageFileTools(recordingServer("Files", tools), docsUserId, "full");
   registerTeamTools(recordingServer("Inbox and comments", tools), docsUserId, "full");
   registerVersionTools(recordingServer("Version history", tools), docsUserId, "full");
   registerViewTools(recordingServer("Views", tools), docsUserId, "full");

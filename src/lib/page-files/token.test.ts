@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MissingPageTokenSecretError, mintPageToken, openPageToken, pageTokenLimits, pageTokenPattern, pageTokenSecret, type PageGrant } from "./token";
+import { MissingPageTokenSecretError, mintPageToken, mintShorterPageToken, openPageToken, pageTokenLimits, pageTokenPattern, pageTokenSecret, type PageGrant } from "./token";
 
 const secret = "unit-test-secret-0123456789-abcdefghijklmnop";
 const label = "0123456789abcdef0123456789abcdef";
@@ -87,5 +87,22 @@ describe("page files token", () => {
     expect(() => pageTokenSecret({})).toThrow(MissingPageTokenSecretError);
     expect(() => pageTokenSecret({ BETTER_AUTH_SECRET: "  " })).toThrow(MissingPageTokenSecretError);
     expect(pageTokenSecret({ BETTER_AUTH_SECRET: " s " })).toBe("s");
+  });
+});
+
+describe("a token that ends sooner", () => {
+  it("should end when it was asked to, and open until then", () => {
+    const endsAt = new Date(at.getTime() + 8_000);
+    const { token, expiresAt } = mintShorterPageToken(grant, endsAt, at, secret);
+    expect(expiresAt.getTime()).toBe(Math.floor(endsAt.getTime() / 1000) * 1000);
+    expect(openPageToken(token, label, at, secret)).not.toBeNull();
+    expect(openPageToken(token, label, expiresAt, secret)).toBeNull();
+  });
+
+  it("should never make a token that outlives the usual one", () => {
+    const usual = mintPageToken(grant, at, secret).expiresAt;
+    expect(mintShorterPageToken(grant, usual, at, secret).expiresAt).toEqual(usual);
+    expect(() => mintShorterPageToken(grant, new Date(usual.getTime() + 1_000), at, secret)).toThrow(RangeError);
+    expect(() => mintShorterPageToken(grant, new Date(at.getTime() + 24 * 3_600_000), at, secret)).toThrow(RangeError);
   });
 });
