@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { forgetUpload, queueUpload, retryUpload, startUpload, subscribeUpload, uploadState, type MediaUploader } from "./media-uploads";
+import { forgetUpload, queueUpload, retryUpload, startUpload, subscribeUpload, uploadedFacts, uploadState, type MediaUploader } from "./media-uploads";
 
 const pdf = () => new File([new Uint8Array([37, 80, 68, 70])], "q3.pdf", { type: "application/pdf" });
 const ready = { id: "0f8fad5b-d9cb-469f-a165-70867728950e", filename: "q3.pdf", contentType: "application/pdf" };
@@ -41,6 +41,41 @@ describe("media uploads", () => {
     retryUpload(uploadId, uploader);
     await expect(settled(uploadId)).resolves.toEqual({ status: "done", file: ready });
     expect(uploader).toHaveBeenCalledTimes(2);
+  });
+
+  it("should stop the request of an upload that is forgotten while it is on its way", async () => {
+    let stopped: AbortSignal | undefined;
+    const uploader = vi.fn<MediaUploader>((_file, _onProgress, signal) => { stopped = signal; return new Promise(() => undefined); });
+    const uploadId = queueUpload(pdf());
+    startUpload(uploadId, uploader);
+    await vi.waitFor(() => { expect(uploader).toHaveBeenCalled(); });
+    expect(stopped?.aborted).toBe(false);
+    forgetUpload(uploadId);
+    expect(stopped?.aborted).toBe(true);
+  });
+
+  it("should give Retry a request of its own, which the first one's end does not stop", async () => {
+    const signals: (AbortSignal | undefined)[] = [];
+    const uploader = vi.fn<MediaUploader>((_file, _onProgress, signal) => { signals.push(signal); return signals.length === 1 ? Promise.reject(new Error("The upload stopped.")) : Promise.resolve(ready); });
+    const uploadId = queueUpload(pdf());
+    startUpload(uploadId, uploader);
+    await settled(uploadId);
+    retryUpload(uploadId, uploader);
+    await expect(settled(uploadId)).resolves.toMatchObject({ status: "done" });
+    expect(signals[1]).not.toBe(signals[0]);
+    expect(signals[1]?.aborted).toBe(false);
+    forgetUpload(uploadId);
+  });
+
+  it("should keep what an upload answered about its file, for the block that then names the file", async () => {
+    const report = { id: "9B2F6C1E-3D4A-4F5B-8C7D-1E2F3A4B5C6D", filename: "q3.pdf", contentType: "application/pdf", size: 48_200 };
+    const uploadId = queueUpload(pdf());
+    expect(uploadedFacts(report.id)).toBeNull();
+    startUpload(uploadId, vi.fn<MediaUploader>().mockResolvedValue(report));
+    await expect(settled(uploadId)).resolves.toMatchObject({ status: "done" });
+    expect(uploadedFacts(report.id.toLowerCase())).toEqual(report);
+    forgetUpload(uploadId);
+    expect(uploadedFacts(report.id)).toEqual(report);
   });
 
   it("should read as failed when a block names an upload this tab never started", () => {

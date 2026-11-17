@@ -68,9 +68,9 @@ function avifSize(bytes: Uint8Array): ImageDimensions | null {
   if (!text(bytes, 4, "ftyp")) return null;
   let best: ImageDimensions | null = null;
   let turned = false;
-  for (let offset = 4; offset + 16 <= bytes.length; offset += 1) {
+  for (let offset = 4; offset + 5 <= bytes.length; offset += 1) {
     if (text(bytes, offset, "irot")) turned = ((bytes[offset + 4] ?? 0) & 1) === 1;
-    if (text(bytes, offset, "ispe")) best = larger(best, keptDimensions(uint(bytes, offset + 8, 4, false), uint(bytes, offset + 12, 4, false)));
+    if (offset + 16 <= bytes.length && text(bytes, offset, "ispe")) best = larger(best, keptDimensions(uint(bytes, offset + 8, 4, false), uint(bytes, offset + 12, 4, false)));
   }
   if (!best) return null;
   return turned ? { width: best.height, height: best.width } : best;
