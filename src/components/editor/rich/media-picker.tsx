@@ -13,7 +13,7 @@ import { IMAGE_SOURCE_ACCEPT } from "@/lib/images/prepare-rules";
 
 import { useEditorMedia } from "./media-context";
 import { fetchableUrl } from "./media-upload-rules";
-import { fetchFromLink, retryUpload, startUpload, subscribeUpload, uploadFile, uploadPreviewUrl, uploadState, type UploadedMedia } from "./media-uploads";
+import { canRetryUpload, fetchFromLink, retryUpload, startUpload, subscribeUpload, uploadFile, uploadPreviewUrl, uploadState, type UploadedMedia } from "./media-uploads";
 
 /**
  * The two states of a media block before it has a file: the picker (upload
@@ -151,7 +151,7 @@ export function UploadingMedia({ uploadId, kind, onDone, onRemove }: UploadingPr
       <PickerFrame label="Upload failed">
         <p role="alert" className="text-destructive">{name}: {state.message}</p>
         <div className="flex gap-2">
-          {uploadFile(uploadId) ? <Button type="button" variant="outline" onClick={() => { retryUpload(uploadId, media.upload); }}>Try again</Button> : null}
+          {canRetryUpload(uploadId) ? <Button type="button" variant="outline" onClick={() => { retryUpload(uploadId, media.upload); }}>Try again</Button> : null}
           <Button type="button" variant="ghost" onClick={onRemove}>Remove</Button>
         </div>
       </PickerFrame>

@@ -7,15 +7,22 @@ import type { EditorView } from "@tiptap/pm/view";
 import { mediaKindForType } from "@/lib/files/media-rules";
 
 import { addMediaEvent, dropZoneAttribute, readMediaRequest, showsMedia, takenByPage, takesFilesAttribute, type AttachedFile, type MediaRequest } from "./media-bridge";
-import { endLanding, fileLanding, LandingMark, type Point } from "./media-landing";
+import { caretLanding, endLanding, fileLanding, LandingMark, type Point } from "./media-landing";
 import { emptyMediaAttrs, MEDIA_NODE } from "./media-markdown";
-import { defaultMediaLabel, insertableFiles, pasteIsFiles, uploadMediaKind } from "./media-upload-rules";
+import { defaultMediaLabel, insertProblems, pasteIsFiles, uploadMediaKind } from "./media-upload-rules";
 import { forgetUpload, queueUpload } from "./media-uploads";
 
-/** A media block that waits for `file` to upload. */
-export function uploadingMediaNode(file: File): JSONContent {
+/** A media block that waits for `file` to upload, or that says why it cannot (`refusal`). */
+export function uploadingMediaNode(file: File, refusal: string | null = null): JSONContent {
   const kind = uploadMediaKind(file);
-  return { type: MEDIA_NODE, attrs: { ...emptyMediaAttrs(kind), alt: defaultMediaLabel(kind, file.name), uploadId: queueUpload(file) } };
+  return { type: MEDIA_NODE, attrs: { ...emptyMediaAttrs(kind), alt: defaultMediaLabel(kind, file.name), uploadId: queueUpload(file, refusal) } };
+}
+
+/** How many media blocks the document shows now. */
+function mediaBlockCount(editor: Editor): number {
+  let count = 0;
+  editor.state.doc.descendants((node) => { if (node.type.name === MEDIA_NODE) count += 1; });
+  return count;
 }
 
 /**
@@ -29,9 +36,15 @@ function keepTrailingLine({ tr, state }: CommandProps): boolean {
   return true;
 }
 
-/** Inserts one uploading media block per file at `position`, or at the cursor. */
+/**
+ * Inserts one media block per file at `position`, or at the cursor: every
+ * file, in order, however many. A file that cannot go in (its size or type,
+ * or a document that already shows as many files as it may) gets a block
+ * too, which says why and offers Remove; no file goes with no word.
+ */
 export function insertFiles(editor: Editor, files: readonly File[], position?: number): boolean {
-  const nodes = insertableFiles(files).map(uploadingMediaNode);
+  const problems = insertProblems(files, mediaBlockCount(editor));
+  const nodes = files.map((file, index) => uploadingMediaNode(file, problems[index]));
   if (nodes.length === 0) return false;
   const chain = editor.chain().focus();
   return (position === undefined ? chain.insertContent(nodes) : chain.insertContentAt(position, nodes)).command(keepTrailingLine).run();
@@ -51,9 +64,16 @@ function attachedMediaNode(file: AttachedFile): JSONContent {
   return { type: MEDIA_NODE, attrs: { ...emptyMediaAttrs(kind), src: `/api/files/${file.id}`, alt: defaultMediaLabel(kind, file.filename) } };
 }
 
-/** Puts a file the artifact already has at the end of the document, in view. */
-function insertAttached(editor: Editor, file: AttachedFile): boolean {
-  return editor.chain().focus().insertContentAt(endLanding(editor.state.doc), attachedMediaNode(file)).command(keepTrailingLine).scrollIntoView().run();
+/**
+ * Puts files the artifact already has into the text, in order and in view:
+ * after the block the cursor is in when the person has put it somewhere
+ * (`atCaret`), else at the end of the document. One change, so one Undo
+ * takes them all out again.
+ */
+function insertAttached(editor: Editor, files: readonly AttachedFile[], atCaret: boolean): boolean {
+  const { doc, selection } = editor.state;
+  const position = atCaret ? caretLanding(doc, selection.$to) : endLanding(doc);
+  return editor.chain().focus().insertContentAt(position, files.map(attachedMediaNode)).command(keepTrailingLine).scrollIntoView().run();
 }
 
 /** True when a drag holds files, from the desktop or from another page. */
@@ -143,15 +163,19 @@ function fileDragPlugin(editor: Editor): Plugin {
       const leave = (event: DragEvent) => {
         if (leftWindow(event)) hide();
       };
+      // Until the person has put the cursor in the text, it sits at the start, where nobody chose it.
+      let caretPlaced = view.hasFocus();
+      const placed = () => { caretPlaced = true; };
       const sent = (event: Event) => {
         const request = readMediaRequest(event);
-        if (request && view.editable && takeRequest(editor, view, request)) event.preventDefault();
+        if (request && view.editable && takeRequest(editor, view, request, caretPlaced)) event.preventDefault();
       };
       window.addEventListener("dragover", over, true);
       window.addEventListener("drop", drop, true);
       window.addEventListener("dragleave", leave, true);
       window.addEventListener("dragend", hide, true);
       view.dom.addEventListener(addMediaEvent, sent);
+      view.dom.addEventListener("focus", placed);
       return {
         destroy: () => {
           hide();
@@ -160,15 +184,16 @@ function fileDragPlugin(editor: Editor): Plugin {
           window.removeEventListener("dragleave", leave, true);
           window.removeEventListener("dragend", hide, true);
           view.dom.removeEventListener(addMediaEvent, sent);
+          view.dom.removeEventListener("focus", placed);
         },
       };
     },
   });
 }
 
-/** Does what the page asked of the document (media-bridge.ts): files at a point or at the cursor, or a file the artifact already has. */
-function takeRequest(editor: Editor, view: EditorView, request: MediaRequest): boolean {
-  if ("attached" in request) return insertAttached(editor, request.attached);
+/** Does what the page asked of the document (media-bridge.ts): files at a point or at the cursor, or files the artifact already has. */
+function takeRequest(editor: Editor, view: EditorView, request: MediaRequest, caretPlaced: boolean): boolean {
+  if ("attached" in request) return insertAttached(editor, request.attached, caretPlaced);
   return insertFiles(editor, request.files, request.point ? fileLanding(view, request.point).pos : undefined);
 }
 

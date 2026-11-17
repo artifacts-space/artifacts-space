@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { forgetUpload, queueUpload, retryUpload, startUpload, subscribeUpload, uploadState, type MediaUploader } from "./media-uploads";
+import { maxUploadsAtOnce } from "./media-upload-rules";
+import { canRetryUpload, forgetUpload, queueUpload, retryUpload, startUpload, subscribeUpload, uploadState, type MediaUploader, type UploadedMedia } from "./media-uploads";
 
 const pdf = () => new File([new Uint8Array([37, 80, 68, 70])], "q3.pdf", { type: "application/pdf" });
 const ready = { id: "0f8fad5b-d9cb-469f-a165-70867728950e", filename: "q3.pdf", contentType: "application/pdf" };
@@ -41,6 +42,35 @@ describe("media uploads", () => {
     retryUpload(uploadId, uploader);
     await expect(settled(uploadId)).resolves.toEqual({ status: "done", file: ready });
     expect(uploader).toHaveBeenCalledTimes(2);
+  });
+
+  it("should never upload a file that was refused for the document, and offer no retry", () => {
+    const uploader = vi.fn<MediaUploader>();
+    const uploadId = queueUpload(pdf(), "A document shows at most 100 files.");
+    startUpload(uploadId, uploader);
+    retryUpload(uploadId, uploader);
+    expect(uploadState(uploadId)).toEqual({ status: "failed", message: "A document shows at most 100 files." });
+    expect(canRetryUpload(uploadId)).toBe(false);
+    expect(uploader).not.toHaveBeenCalled();
+    forgetUpload(uploadId);
+  });
+
+  it("should upload a few files at a time and start the next when one ends", async () => {
+    const finish: ((file: UploadedMedia) => void)[] = [];
+    const uploader = vi.fn<MediaUploader>(() => new Promise((resolve) => { finish.push(resolve); }));
+    const ids = Array.from({ length: maxUploadsAtOnce + 2 }, () => queueUpload(pdf()));
+    for (const uploadId of ids) startUpload(uploadId, uploader);
+    await vi.waitFor(() => { expect(uploader).toHaveBeenCalledTimes(maxUploadsAtOnce); });
+    expect(uploadState(ids.at(-1) ?? "")).toEqual({ status: "waiting" });
+    // A block removed while its upload waited gives its place to the next one.
+    forgetUpload(ids.at(-2) ?? "");
+    finish[0]?.(ready);
+    await vi.waitFor(() => { expect(uploader).toHaveBeenCalledTimes(maxUploadsAtOnce + 1); });
+    for (const done of finish) done(ready);
+    await expect(settled(ids.at(-1) ?? "")).resolves.toEqual({ status: "done", file: ready });
+    await vi.waitFor(() => { expect(ids.slice(0, maxUploadsAtOnce).every((uploadId) => uploadState(uploadId).status === "done")).toBe(true); });
+    expect(uploader).toHaveBeenCalledTimes(maxUploadsAtOnce + 1);
+    for (const uploadId of ids) forgetUpload(uploadId);
   });
 
   it("should read as failed when a block names an upload this tab never started", () => {

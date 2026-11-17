@@ -2,7 +2,7 @@ import { prepareImage } from "@/components/images/prepare-image";
 import { fileLimits, formatBytes } from "@/lib/files/config";
 import { documentPrepareProfile, uploadsUnprepared } from "@/lib/images/prepare-rules";
 
-import { filenameFromUrl, mediaUploadProblem, uploadMediaKind } from "./media-upload-rules";
+import { filenameFromUrl, maxUploadsAtOnce, mediaUploadProblem, uploadMediaKind } from "./media-upload-rules";
 
 /**
  * Uploads that media blocks wait for, in this browser. A block stores only
@@ -32,6 +32,8 @@ export type UploadState =
 
 interface Entry {
   file: File;
+  /** Why this file can never upload (its size or type, or a document that is full), so Try again is not offered. */
+  refused: string | null;
   /** A local URL of the picked image, made on first use and released with the entry. */
   preview: string | null;
   state: UploadState;
@@ -50,13 +52,22 @@ function setState(uploadId: string, state: UploadState) {
   for (const listener of entry.listeners) listener();
 }
 
-/** Keeps `file` for a new media block and returns the upload id the block stores. */
-export function queueUpload(file: File): string {
+/**
+ * Keeps `file` for a new media block and returns the upload id the block
+ * stores. With `refusal` (a document that is full) the file never uploads:
+ * its block shows the reason and Remove.
+ */
+export function queueUpload(file: File, refusal: string | null = null): string {
   nextId += 1;
   const uploadId = `upload-${String(Date.now())}-${String(nextId)}`;
-  const problem = mediaUploadProblem(file);
-  entries.set(uploadId, { file, preview: null, state: problem ? { status: "failed", message: problem } : { status: "waiting" }, started: Boolean(problem), listeners: new Set() });
+  const refused = refusal ?? mediaUploadProblem(file);
+  entries.set(uploadId, { file, refused, preview: null, state: refused ? { status: "failed", message: refused } : { status: "waiting" }, started: Boolean(refused), listeners: new Set() });
   return uploadId;
+}
+
+/** True when the upload can be tried again: its file is here, and nothing about the file or the document rules it out. */
+export function canRetryUpload(uploadId: string): boolean {
+  return entries.get(uploadId)?.refused === null;
 }
 
 /** The picked file of an upload, for a preview while it uploads. */
@@ -102,18 +113,41 @@ async function run(uploadId: string, entry: Entry, uploader: MediaUploader) {
   }
 }
 
-/** Starts the upload once, however many views ask; a view mounted again later picks up where it is. */
+/** Uploads that wait for one of the tab's few places (maxUploadsAtOnce), first come first served. */
+const waiting: (() => Promise<void>)[] = [];
+let running = 0;
+
+/** Starts waiting uploads while a place is free. Each one that ends frees its place for the next. */
+function pump() {
+  while (running < maxUploadsAtOnce) {
+    const next = waiting.shift();
+    if (!next) return;
+    running += 1;
+    void next().finally(() => {
+      running -= 1;
+      pump();
+    });
+  }
+}
+
+/**
+ * Starts the upload once, however many views ask; a view mounted again
+ * later picks up where it is. A few upload at a time and the rest wait in
+ * their blocks ("Waiting to upload…"). An upload whose block was removed
+ * while it waited gives its place straight to the next.
+ */
 export function startUpload(uploadId: string, uploader: MediaUploader): void {
   const entry = entries.get(uploadId);
   if (!entry || entry.started) return;
   entry.started = true;
-  void run(uploadId, entry, uploader);
+  waiting.push(() => (entries.get(uploadId) === entry ? run(uploadId, entry, uploader) : Promise.resolve()));
+  pump();
 }
 
 /** Tries a failed upload again. */
 export function retryUpload(uploadId: string, uploader: MediaUploader): void {
   const entry = entries.get(uploadId);
-  if (entry?.state.status !== "failed" || mediaUploadProblem(entry.file)) return;
+  if (entry?.state.status !== "failed" || entry.refused !== null) return;
   entry.started = false;
   setState(uploadId, { status: "waiting" });
   startUpload(uploadId, uploader);
