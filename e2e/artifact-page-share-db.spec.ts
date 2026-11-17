@@ -63,11 +63,11 @@ test("should let the owner move a private artifact into a team from the page and
   await header(page).getByRole("button", { name: "Private. Share settings" }).click();
   const dialog = page.getByRole("dialog", { name: `Share “${title}”` });
   await dialog.getByRole("radiogroup", { name: "Who can read it" }).getByRole("radio", { name: /^Team/ }).click();
-  await dialog.getByRole("combobox", { name: "Share with" }).click();
+  await dialog.getByRole("combobox", { name: "Move to" }).click();
   await page.getByRole("option", { name: new RegExp(`^Theme team ${team.id.slice(0, 4)}`) }).click();
-  await dialog.getByRole("button", { name: "Save" }).click();
+  await dialog.getByRole("button", { name: /^Move to Theme team/ }).click();
 
-  await expect(page.getByText("Sharing saved.")).toBeVisible();
+  await expect(page.getByText(`Moved “${title}” to Theme team`, { exact: false })).toBeVisible();
   await expect(header(page).getByRole("button", { name: "Team. Share settings" }), "the page refreshes from the server").toBeVisible();
   expect(await sharingOf(publicId)).toEqual({ visibility: "team", teamId: team.id });
 
@@ -92,9 +92,9 @@ test("should say Pending and start the dialog from the level that still applies 
   await header(page).getByRole("button", { name: "Private. Share settings" }).click();
   const dialog = page.getByRole("dialog", { name: `Share “${title}”` });
   await dialog.getByRole("radio", { name: /^Team/ }).click();
-  await dialog.getByRole("combobox", { name: "Share with" }).click();
+  await dialog.getByRole("combobox", { name: "Move to" }).click();
   await page.getByRole("option", { name: new RegExp(`^Theme team ${team.id.slice(0, 4)}`) }).click();
-  await dialog.getByRole("button", { name: "Save" }).click();
+  await dialog.getByRole("button", { name: /^Ask to move to Theme team/ }).click();
 
   await expect(page.getByText("Request sent. An owner or admin will review it.")).toBeVisible();
   const pending = header(page).getByRole("button", { name: "Pending. Share settings" });
@@ -106,7 +106,7 @@ test("should say Pending and start the dialog from the level that still applies 
   const reopened = page.getByRole("dialog");
   await expect(reopened.getByText(/Waiting for approval: team in Theme team/)).toBeVisible();
   await expect(reopened.getByRole("radio", { name: /^Private/ })).toHaveAttribute("aria-checked", "true");
-  await expect(reopened.getByRole("combobox", { name: "Share with" })).toHaveCount(0);
+  await expect(reopened.getByRole("combobox", { name: /^(Move to|Team)$/ })).toHaveCount(0);
 });
 
 test("should keep the read-only status for a teammate who may edit someone else's artifact", async ({ page }, testInfo) => {

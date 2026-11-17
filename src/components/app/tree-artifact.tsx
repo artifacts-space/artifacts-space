@@ -2,6 +2,7 @@
 
 import { IconCheck, IconDots, IconFolderShare, IconX } from "@tabler/icons-react";
 
+import { useRowWorkspace } from "@/components/app/home-moves";
 import { visibilityLabel } from "@/components/app/share-options";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { HarnessMark } from "@/components/harness/harness-byline";
@@ -87,6 +88,13 @@ function SharingBadge({ artifact }: { artifact: ArtifactListItemDto }) {
   );
 }
 
+/** The workspace the artifact lives in, on a row a link opened outside it; nothing on a row at home. */
+function ElsewhereMark({ artifact }: { artifact: ArtifactListItemDto }) {
+  const name = useRowWorkspace(artifact);
+  if (!name) return null;
+  return <span data-slot="row-workspace" className="min-w-0 truncate">In {name}</span>;
+}
+
 interface TreeArtifactProps {
   artifact: ArtifactListItemDto;
   active: boolean;
@@ -127,6 +135,7 @@ export function TreeArtifact({ artifact, active, onSelect, moves }: TreeArtifact
           <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             <SavedAt at={artifact.updatedAt} />
             <SharingBadge artifact={artifact} />
+            <ElsewhereMark artifact={artifact} />
             <HarnessMark harness={artifact.harness} />
           </span>
         </span>

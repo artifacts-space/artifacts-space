@@ -8,6 +8,7 @@ import type { ProjectFilter } from "@/lib/projects/rules";
 import { matchesProjectFilter, projectKeyOf } from "@/lib/projects/sidebar-rules";
 import { countsArePartial, narrowsTree, sidebarViewCounts, type ScopeTotals } from "@/lib/projects/sidebar-count-rules";
 import { groupByProject, matchesView, type WorkspaceView } from "@/lib/projects/sidebar-view-rules";
+import { listedInWorkspace, type HomeTeam } from "@/lib/sharing/home-move-rules";
 
 /** The sidebar's search, format filter, and view: browser state, unlike the project and tag filters in the URL. */
 export function useListFilters() {
@@ -25,6 +26,8 @@ interface WorkspaceListOptions {
   tagFilter: string[];
   /** The shared team whose list this is, or null for the viewer's own. */
   teamId: string | null;
+  /** The viewer's teams, which decide each artifact's home workspace. */
+  teams: readonly HomeTeam[];
   viewerId: string;
   /** The project tree's entries, in order. */
   entryKeys: readonly string[];
@@ -37,9 +40,11 @@ interface WorkspaceListOptions {
  * search, format, and view, and those artifacts under their projects. With
  * no filter on, the counts are the server's over the whole scope; with any
  * filter on, they are the matches (sidebar-count-rules), and `partial` says
- * when those come from a list cut at its newest 100.
+ * when those come from a list cut at its newest 100. The counts are this
+ * workspace's alone: an artifact a link opened here whose home is another
+ * workspace has a row, and is never counted.
  */
-export function useWorkspaceList({ artifacts, filters, projectFilter, tagFilter, teamId, viewerId, entryKeys, totals }: WorkspaceListOptions) {
+export function useWorkspaceList({ artifacts, filters, projectFilter, tagFilter, teamId, teams, viewerId, entryKeys, totals }: WorkspaceListOptions) {
   const { query, kind, view } = filters;
   // The minute, as a number, so the list is filtered again only when Recent's window moves.
   const nowMs = useNow()?.getTime() ?? null;
@@ -53,7 +58,8 @@ export function useWorkspaceList({ artifacts, filters, projectFilter, tagFilter,
   }, [matching, view, viewerId, nowMs]);
   const groups = useMemo(() => groupByProject(filtered, entryKeys, (item) => projectKeyOf(item.project)), [filtered, entryKeys]);
   const narrowing = { query, kind, view, tags: tagFilter, project: projectFilter !== null };
-  const counts = useMemo(() => sidebarViewCounts(totals, { query, kind, view, tags: tagFilter, project: projectFilter !== null }, matching, viewerId), [totals, query, kind, view, tagFilter, projectFilter, matching, viewerId]);
+  const atHome = useMemo(() => matching.filter((item) => listedInWorkspace(item, teams, teamId)), [matching, teams, teamId]);
+  const counts = useMemo(() => sidebarViewCounts(totals, { query, kind, view, tags: tagFilter, project: projectFilter !== null }, atHome, viewerId), [totals, query, kind, view, tagFilter, projectFilter, atHome, viewerId]);
   // A search's matches come from the server, which searches every artifact but also stops at 100.
   const partial = countsArePartial(narrowing, serverMatches?.length ?? inFilter.length);
   return { counts, partial, filtered, groups, narrowed: narrowsTree(narrowing) };

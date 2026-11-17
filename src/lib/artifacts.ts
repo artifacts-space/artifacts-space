@@ -7,8 +7,8 @@ import { getDb } from "@/db";
 import { artifact, sharingRequest, type ArtifactRecord } from "@/db/schema";
 import { CreateRequestTaken } from "@/lib/create/created-by-request";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
-import { getEditableArtifact, viewableInTeamCondition } from "@/lib/access";
-import { authoredByViewerCondition, findDeletableArtifact, ownedAgentIds } from "@/lib/agents/owner-access";
+import { getEditableArtifact } from "@/lib/access";
+import { findDeletableArtifact, ownedAgentIds } from "@/lib/agents/owner-access";
 import { loadActors } from "@/lib/agents/queries";
 import { assertValidArtifactContent } from "@/lib/artifact-content";
 import { removeArtifactCaptures } from "@/lib/canvas/captures-store";
@@ -32,6 +32,7 @@ import { artifactSizeProblem } from "@/lib/artifact-limits";
 import { defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { firstSaveTime } from "@/lib/edits/save-time";
 import { PREVIEW_CHARS, previewKinds } from "@/lib/artifact-preview";
+import { projectScopeOf, scopeCondition, type ArtifactScope } from "@/lib/artifact-list-scope";
 import { loadProjectFacets, projectFilterCondition, projectSearchCondition, projectsForViewer, type ProjectFacets, type ProjectFilter } from "@/lib/projects/queries";
 import { loadTagFacets, tagFilterCondition, tagSearchCondition, tagsForViewer, type TagFacet } from "@/lib/tags/queries";
 import { assertRoomForNewTags, parseNewTags } from "@/lib/tags/store";
@@ -251,8 +252,7 @@ async function toArtifactListItems(rows: (ArtifactMetaRecord & { preview: string
 /** The preview column: the first characters of readable formats, computed in Postgres so content never leaves it. */
 const previewColumn = sql<string>`case when ${artifact.kind} in (${sql.join(previewKinds.map((kind) => sql`${kind}`), sql`, `)}) then left(${artifact.content}, ${PREVIEW_CHARS}) else '' end`;
 
-/** Which artifacts a list shows: the viewer's own (with their agents'), or those shared with one of their teams. */
-export type ArtifactScope = { kind: "mine" } | { kind: "team"; teamId: string };
+export type { ArtifactScope } from "@/lib/artifact-list-scope";
 
 export interface ListOptions {
   scope?: ArtifactScope | undefined;
@@ -269,36 +269,32 @@ async function searchCondition(viewerId: string, scope: ArtifactScope, query: st
   const text = query?.trim();
   if (!text) return undefined;
   const pattern = `%${text}%`;
-  const [inProject, inTags] = await Promise.all([projectSearchCondition(viewerId, scope, pattern), tagSearchCondition(viewerId, pattern)]);
+  const [inProject, inTags] = await Promise.all([projectSearchCondition(viewerId, projectScopeOf(scope), pattern), tagSearchCondition(viewerId, pattern)]);
   return or(ilike(artifact.title, pattern), ilike(artifact.summary, pattern), ilike(artifact.content, pattern), inProject, inTags);
-}
-
-function scopeCondition(viewerId: string, scope: ArtifactScope) {
-  if (scope.kind === "mine") return authoredByViewerCondition(getDb(), viewerId);
-  return viewableInTeamCondition(viewerId, scope.teamId);
 }
 
 /** The project filter's entries and counts for a list scope (every artifact, not only the first page). */
 export async function listProjectFacets(viewerId: string, scope: ArtifactScope): Promise<ProjectFacets> {
-  return loadProjectFacets(viewerId, scope, scopeCondition(viewerId, scope));
+  return loadProjectFacets(viewerId, projectScopeOf(scope), await scopeCondition(viewerId, scope));
 }
 
 /** The tag filter's entries and counts for a list scope, among artifacts whose tags the viewer may see. */
 export async function listTagFacets(viewerId: string, scope: ArtifactScope): Promise<TagFacet[]> {
-  return loadTagFacets(viewerId, scopeCondition(viewerId, scope));
+  return loadTagFacets(viewerId, await scopeCondition(viewerId, scope));
 }
 
 /**
- * Lists artifacts the viewer may read in one scope, newest first. The team
+ * Lists artifacts the viewer may read in one scope, newest first: everything
+ * they wrote by default (mine), or one workspace (artifact-list-scope.ts). The team
  * scope checks membership in the query itself, so a non-member gets nothing.
  * Items carry a short preview, never content: load one artifact to read it.
  */
 export async function listArtifacts(viewerId: string, options: ListOptions = {}): Promise<ArtifactListItemDto[]> {
   const scope = options.scope ?? { kind: "mine" };
-  const conditions: SQL[] = [scopeCondition(viewerId, scope)];
+  const conditions: SQL[] = [await scopeCondition(viewerId, scope)];
   const search = await searchCondition(viewerId, scope, options.query);
   if (search) conditions.push(search);
-  if (options.project) conditions.push(await projectFilterCondition(viewerId, scope, options.project));
+  if (options.project) conditions.push(await projectFilterCondition(viewerId, projectScopeOf(scope), options.project));
   if (options.tags && options.tags.length > 0) conditions.push(await tagFilterCondition(viewerId, options.tags));
 
   const rows = await getDb()

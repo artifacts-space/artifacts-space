@@ -12,6 +12,7 @@ import { parseArtifactLink, type ArtifactLink } from "@/lib/app-link";
 import { toArtifactListItem } from "@/lib/artifact-preview";
 import { loadArtifactForViewer } from "@/lib/artifact-read";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
+import { projectScopeOf } from "@/lib/artifact-list-scope";
 import { listArtifacts, listProjectFacets, listTagFacets } from "@/lib/artifacts";
 import { parseProjectFilter, parseTagFilter, projectFilterId } from "@/lib/projects/filter-params";
 import { listSidebarProjects } from "@/lib/projects/sidebar-queries";
@@ -71,14 +72,15 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
   const scopeTeam = scopeTeamFor(teams, params.team);
 
   // Previews only: content loads when an artifact is opened (loadArtifactAction).
-  const scope = scopeTeam ? { kind: "team" as const, teamId: scopeTeam.id } : { kind: "mine" as const };
+  // Each workspace lists only the artifacts whose home it is: Personal never lists what is shared through a team (artifact-list-scope.ts).
+  const scope = scopeTeam ? { kind: "team" as const, teamId: scopeTeam.id } : { kind: "personal" as const };
   const projectFilter = parseProjectFilter(params);
   const tagFilter = parseTagFilter(params);
   const [artifacts, facets, tagFacets, projectSources, welcome] = await Promise.all([
     listArtifacts(session.user.id, { scope, project: projectFilter ?? undefined, tags: tagFilter }),
     listProjectFacets(session.user.id, scope),
     listTagFacets(session.user.id, scope),
-    listSidebarProjects(session.user.id, scope),
+    listSidebarProjects(session.user.id, projectScopeOf(scope)),
     welcomeFor(session.user.id, scopeTeam),
   ]);
   // A link (from a notification, say) opens its artifact even when the list does not hold it: the workspace pins it to the top.
