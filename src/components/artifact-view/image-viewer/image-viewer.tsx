@@ -26,7 +26,8 @@ interface ImageViewerProps {
 function StepButton({ delta, disabled, onStep }: { delta: -1 | 1; disabled: boolean; onStep: (delta: number) => void }) {
   const Icon = delta < 0 ? IconChevronLeft : IconChevronRight;
   return (
-    <Button type="button" variant="outline" size="icon" aria-label={delta < 0 ? "Previous image" : "Next image"} disabled={disabled} onClick={() => { onStep(delta); }} className="shrink-0 bg-background">
+    // At an end the button stays focusable: a button that loses the focus as it turns off would take the arrow keys with it.
+    <Button type="button" variant="outline" size="icon" aria-label={delta < 0 ? "Previous image" : "Next image"} disabled={disabled} focusableWhenDisabled onClick={() => { onStep(delta); }} className="shrink-0 bg-background">
       <Icon aria-hidden />
     </Button>
   );
