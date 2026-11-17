@@ -23,14 +23,14 @@ test("should count every artifact when the scope holds more than the newest 100,
   await open(page, "/dev/workspace?many=1");
   await expect(views(page).getByRole("button", { name: /^All artifacts/ })).toContainText("340");
   await expect(views(page)).not.toContainText("newest");
-  // 100 listed: Design's 2, Research's 1, and Launch's 1, and 96 of the 336 in no project (340 less the 4 in one).
-  await expect(loose(page).locator("li")).toHaveCount(96);
-  await expect(loose(page)).toContainText("Showing 96 of 336");
+  // 100 listed: Design's 2 and Research's 1, and 97 of the 337 in no project (340 less the 3 in one).
+  await expect(loose(page).locator("li")).toHaveCount(97);
+  await expect(loose(page)).toContainText("Showing 97 of 337");
   await expect(tree(page).getByRole("group", { name: "Design" })).not.toContainText("Showing");
-  await loose(page).getByRole("button", { name: "Show all 336 artifacts without a project" }).click();
+  await loose(page).getByRole("button", { name: "Show all 337 artifacts without a project" }).click();
   await expect(page).toHaveURL(/noproject=1/);
   await expect(loose(page).locator("li")).toHaveCount(100);
-  await expect(loose(page)).toContainText("Showing the newest 100 of 336. Search to find older ones.");
+  await expect(loose(page)).toContainText("Showing the newest 100 of 337. Search to find older ones.");
   await expect(loose(page).getByRole("button", { name: /^Show all/ })).toHaveCount(0);
   // The views now count the filtered list, which stops at 100, and say so.
   await expect(views(page).getByRole("button", { name: /^All artifacts/ })).toContainText("100");

@@ -9,7 +9,7 @@ import type { SidebarProjectsControls } from "@/components/app/use-sidebar-proje
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import type { ArtifactListItemDto } from "@/lib/artifact-types";
 import { projectNameKey, type ProjectFilter } from "@/lib/projects/rules";
-import { deleteProjectCopy, projectKeyOf, type SidebarList, type SidebarProject, type SidebarProjectRow, type SidebarTeam } from "@/lib/projects/sidebar-rules";
+import { deleteProjectCopy, projectKeyOf, type SidebarProject, type SidebarProjectRow, type SidebarTeam } from "@/lib/projects/sidebar-rules";
 import { groupCount, looseCount, moreRow, showsLoose, type GroupCount } from "@/lib/projects/sidebar-count-rules";
 import type { TreeGroup } from "@/lib/projects/sidebar-view-rules";
 
@@ -45,8 +45,8 @@ interface SidebarProjectsProps {
 
 /**
  * The form for a new project. It belongs to the list it is made in: the
- * team's on a team tab, the viewer's own on Mine. A team's project is made
- * on the team's tab, since Mine does not list a team's empty projects.
+ * team's on a team tab, the viewer's own in their own list. A team's project
+ * is made on the team's tab: a person's own list never shows a team's.
  */
 function CreateForm({ controls, scopeTeam, onDone }: Pick<SidebarProjectsProps, "controls" | "scopeTeam"> & { onDone: () => void }) {
   async function submit(name: string) {
@@ -98,14 +98,12 @@ function selectedIn(artifact: ArtifactListItemDto | undefined, known: ReadonlySe
 }
 
 type TreeProps = Pick<SidebarProjectsProps, "controls" | "filter" | "onFilter" | "onDropArtifact" | "blockedKeys" | "groups" | "narrowed" | "selectedId" | "onSelect" | "moves"> & {
-  /** Which list this is: Mine never renames or deletes a team's project. */
-  list: SidebarList;
   closed: ReadonlySet<string>;
   onToggle: (key: string) => void;
 };
 
 /** Every project with its artifacts, with rename in place and delete behind a confirm. */
-function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, list, groups, narrowed, selectedId, onSelect, moves, closed, onToggle }: TreeProps) {
+function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, groups, narrowed, selectedId, onSelect, moves, closed, onToggle }: TreeProps) {
   const baseId = useId();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<{ row: SidebarProjectRow; count: number | null } | null>(null);
@@ -150,7 +148,6 @@ function ProjectTree({ controls, filter, onFilter, onDropArtifact, blockedKeys, 
             project={{ ...project, count: count.count }}
             active={active}
             blocked={blockedKeys.has(project.key)}
-            list={list}
             disclosure={open}
             onFilter={() => { onFilter(active ? null : { key: project.key }); }}
             onDropArtifact={(id) => { onDropArtifact(id, project); }}
@@ -235,9 +232,9 @@ function TreeNotice({ state, onClearFilters }: { state: ArtifactListState; onCle
 
 /**
  * The sidebar's projects, then the artifacts in no project. The tree holds
- * every project of this list (on Mine, the viewer's own, and a team's only
- * while it holds one of their artifacts), with its count and the artifacts
- * it holds. Click a project's chevron to show or hide its artifacts, and its
+ * every project of this list (the viewer's own in their own list, the
+ * team's on a team tab; never both), with its count and the artifacts it
+ * holds. Click a project's chevron to show or hide its artifacts, and its
  * name to show only it (the filter follows). Drop an artifact on a project
  * to move it, or use the artifact's menu; create, rename, or delete projects
  * in place. Deleting keeps the artifacts; they just have no project then.
@@ -263,7 +260,7 @@ export function SidebarProjects({ dragging, scopeTeam, listState, onClearFilters
           onCreate={() => { setCreating(true); }}
         />
         {creating ? <CreateForm controls={tree.controls} scopeTeam={scopeTeam} onDone={() => { setCreating(false); }} /> : null}
-        <ProjectTree {...tree} list={scopeTeam === null ? "mine" : "team"} closed={closed} onToggle={toggle} />
+        <ProjectTree {...tree} closed={closed} onToggle={toggle} />
         {tree.controls.entries.length === 0 && !creating ? <p className="px-2 pt-1 text-xs text-muted-foreground">Create a project, then move artifacts into it.</p> : null}
       </section>
       <Loose {...tree} total={total} dragging={dragging} />

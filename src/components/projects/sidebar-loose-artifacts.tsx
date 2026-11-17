@@ -5,7 +5,7 @@ import type { MoreRow as More } from "@/lib/projects/sidebar-count-rules";
 import { cn } from "@/lib/utils";
 
 import { ArtifactRows, MoreRow, type ArtifactRowsProps } from "./sidebar-group-items";
-import { useDropTarget } from "./sidebar-project-entry";
+import { useDropTarget } from "./use-drop-target";
 
 /** The section's accessible name. Its heading says "Artifacts": plain rows after the projects, not a project of their own. */
 export const looseArtifactsLabel = "Artifacts without a project";
@@ -17,7 +17,7 @@ interface LooseArtifactsProps extends ArtifactRowsProps {
   more: More | null;
   /** True while a card is dragged: the section then takes a drop, even when it lists nothing. */
   dragging: boolean;
-  /** True while the list is filtered to the artifacts without a project. */
+  /** True while the list is filtered to the artifacts without a project: the heading then offers the way back to every project. Other filters (search, format, view, tags) stay as they are. */
   filterOn: boolean;
   onShowAll: () => void;
   onClearFilter: () => void;
@@ -47,7 +47,7 @@ export function LooseArtifacts({ items, more, dragging, filterOn, onShowAll, onC
         </h2>
         {filterOn ? (
           <button type="button" onClick={onClearFilter} className="shrink-0 rounded-md px-1.5 py-1 text-xs font-medium text-foreground underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none pointer-coarse:min-h-11">
-            Show every artifact
+            Show every project
           </button>
         ) : null}
       </div>

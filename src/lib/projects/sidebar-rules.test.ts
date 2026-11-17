@@ -6,11 +6,9 @@ import {
   afterRowRenamed,
   countsFromFacets,
   homeSpaceOf,
-  manageableRows,
   moveTarget,
   deleteProjectCopy,
   matchesProjectFilter,
-  sharedWithTeams,
   shiftCount,
   sidebarProjects,
   toSidebarRows,
@@ -28,67 +26,15 @@ function state(rows: SidebarProjectRow[], byKey: Record<string, number>, none = 
 
 describe("sidebarProjects", () => {
   it("should merge rows with the same name key into one entry when a team shares the name", () => {
-    const entries = sidebarProjects([teamRow("t1", "DESIGN"), own("o1", "Design")], { byKey: { design: 3 }, none: 0 }, "mine");
+    const entries = sidebarProjects([teamRow("t1", "DESIGN"), own("o1", "Design")], { byKey: { design: 3 }, none: 0 });
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({ key: "design", name: "Design", icon: null, count: 3 });
     expect(entries[0]?.rows.map((row) => row.id)).toEqual(["t1", "o1"]);
   });
 
-  it("should keep the viewer's empty projects and sort by name when counts are missing", () => {
-    const entries = sidebarProjects([own("b", "beta"), own("a", "Alpha")], { byKey: {}, none: 2 }, "mine");
+  it("should keep empty projects and sort by name when counts are missing", () => {
+    const entries = sidebarProjects([own("b", "beta"), own("a", "Alpha")], { byKey: {}, none: 2 });
     expect(entries.map((entry) => [entry.name, entry.count])).toEqual([["Alpha", 0], ["beta", 0]]);
-  });
-
-  it("should leave a team's project out of the viewer's own list when it holds none of their artifacts", () => {
-    const rows = [own("o1", "Design"), teamRow("t1", "Handbook"), teamRow("t2", "Launch")];
-    const entries = sidebarProjects(rows, { byKey: { launch: 1 }, none: 0 }, "mine");
-    expect(entries.map((entry) => entry.name)).toEqual(["Design", "Launch"]);
-  });
-
-  it("should keep a team's empty project on the team's own tab, so it can take its first artifact", () => {
-    const entries = sidebarProjects([teamRow("t1", "Handbook")], { byKey: {}, none: 0 }, "team");
-    expect(entries.map((entry) => [entry.name, entry.count])).toEqual([["Handbook", 0]]);
-  });
-
-  it("should drop a team's project from the viewer's own list when their last artifact leaves it", () => {
-    const rows = [teamRow("t1", "Launch")];
-    const before = { byKey: { launch: 1 }, none: 0 };
-    expect(sidebarProjects(rows, before, "mine")).toHaveLength(1);
-    expect(sidebarProjects(rows, shiftCount(before, "launch", null), "mine")).toEqual([]);
-  });
-});
-
-describe("manageableRows", () => {
-  const [mixed] = sidebarProjects([teamRow("t1", "Design"), own("o1", "Design")], { byKey: { design: 2 }, none: 0 }, "mine");
-  const [teams] = sidebarProjects([teamRow("t2", "Launch")], { byKey: { launch: 1 }, none: 0 }, "mine");
-
-  it("should never offer a team's project for rename or delete in the viewer's own list", () => {
-    if (!mixed || !teams) throw new Error("The entries are missing.");
-    expect(manageableRows(mixed, "mine").map((row) => row.id)).toEqual(["o1"]);
-    expect(manageableRows(teams, "mine")).toEqual([]);
-  });
-
-  it("should offer the team's projects on the team's own tab", () => {
-    if (!teams) throw new Error("The entry is missing.");
-    expect(manageableRows(teams, "team").map((row) => row.id)).toEqual(["t2"]);
-  });
-});
-
-describe("sharedWithTeams", () => {
-  const globex = { slug: "globex", name: "Globex" };
-
-  it("should name the team beside a project that is only a team's, in the viewer's own list", () => {
-    const [entry] = sidebarProjects([teamRow("t1", "Launch"), { id: "t2", name: "launch", icon: null, team: globex }], { byKey: { launch: 2 }, none: 0 }, "mine");
-    if (!entry) throw new Error("The entry is missing.");
-    expect(sharedWithTeams(entry, "mine")).toBe("Acme, Globex");
-  });
-
-  it("should say nothing when the viewer has a project with that name, or on a team tab", () => {
-    const [mixed] = sidebarProjects([teamRow("t1", "Design"), own("o1", "Design")], { byKey: { design: 2 }, none: 0 }, "mine");
-    const [teams] = sidebarProjects([teamRow("t2", "Launch")], { byKey: {}, none: 0 }, "team");
-    if (!mixed || !teams) throw new Error("The entries are missing.");
-    expect(sharedWithTeams(mixed, "mine")).toBeNull();
-    expect(sharedWithTeams(teams, "team")).toBeNull();
   });
 });
 

@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /*
  * The sidebar's project rows against a real Postgres. The viewer's own list
- * holds their projects, the empty ones too, and a team's project only while
- * it holds one of the viewer's artifacts; a team's other projects stay on
- * the team's tab. Runs only when TEST_DATABASE_URL names a throwaway local
+ * holds their projects, the empty ones too, and never a team's, even one
+ * that holds an artifact the viewer shared with that team; a team's
+ * projects are on the team's tab. Runs only when TEST_DATABASE_URL names a throwaway local
  * database with the migrations applied; never point it at a shared one.
  */
 
@@ -79,9 +79,9 @@ describe.runIf(Boolean(databaseUrl))("sidebar project rows with a database", asy
 
   const names = async (viewerId: string, scope: Parameters<typeof listSidebarProjects>[1]) => (await listSidebarProjects(viewerId, scope)).map((item) => item.name);
 
-  it("should list the viewer's projects, and a team's only when it holds one of their artifacts, in their own list", async () => {
-    // Never "Crew empty" or "Crew with theirs": those hold nothing of the viewer's, so they are not theirs to delete from here.
-    expect(await names(viewer, { kind: "mine" })).toEqual(["Crew with mine", "Own", "Own empty"]);
+  it("should list only the viewer's own projects in their own list, never a team's", async () => {
+    // Never a project of Crew, not even "Crew with mine", which holds an artifact the viewer shared with Crew.
+    expect(await names(viewer, { kind: "mine" })).toEqual(["Own", "Own empty"]);
   });
 
   it("should list every project of the team, the empty ones too, on the team's tab", async () => {

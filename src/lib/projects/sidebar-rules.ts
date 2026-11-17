@@ -3,17 +3,12 @@ import { projectNameKey, type ProjectFilter } from "./rules";
 
 /**
  * The Projects group in the workspace sidebar, as pure rules. It lists the
- * project rows of the current list, merged by name key the same way the
- * project filter merges them, with the list's counts. On a team tab they
- * are the team's. On Mine they are the viewer's own, and a team's project
- * only while it holds one of the viewer's artifacts: it is named with its
- * team there, and is renamed or deleted on the team's tab, never from Mine.
- * Moves, renames, and deletes update it optimistically through these
- * functions.
+ * project rows of the current list (the viewer's own in their own list; the
+ * team's on a team tab: the two are never mixed, see sidebar-queries.ts),
+ * merged by name key the same way the project filter merges them, with the
+ * list's counts. Moves, renames, and deletes update it optimistically
+ * through these functions.
  */
-
-/** Which list the sidebar is for: the viewer's own artifacts, or a team's tab. */
-export type SidebarList = "mine" | "team";
 
 /** A team, as the sidebar names it. */
 export interface SidebarTeam {
@@ -67,19 +62,12 @@ export function countsFromFacets(facets: { projects: readonly { key: string; cou
   return { byKey: Object.fromEntries(facets.projects.map((facet) => [facet.key, facet.count])), none: facets.none };
 }
 
-/** True when an entry belongs in the list: on Mine, a team's project only while it holds one of the viewer's artifacts. */
-function listedIn(entry: SidebarProject, list: SidebarList): boolean {
-  return list === "team" || entry.count > 0 || entry.rows.some((row) => row.team === null);
-}
-
 /**
  * The Projects group's entries: rows merged by name key and sorted by name.
  * The viewer's own row names the entry when a team row shares its key, as in
- * the filter. Empty projects stay, so a new one can take its first artifact;
- * but on Mine an empty project that is only a team's is left out, as the
- * server leaves it out (sidebar-queries.ts): it is not the viewer's.
+ * the filter. Empty projects stay, so a new one can take its first artifact.
  */
-export function sidebarProjects(rows: readonly SidebarProjectRow[], counts: ProjectCounts, list: SidebarList): SidebarProject[] {
+export function sidebarProjects(rows: readonly SidebarProjectRow[], counts: ProjectCounts): SidebarProject[] {
   const byKey = new Map<string, SidebarProject>();
   for (const row of rows) {
     const key = projectNameKey(row.name);
@@ -91,27 +79,7 @@ export function sidebarProjects(rows: readonly SidebarProjectRow[], counts: Proj
     current.rows.push(row);
     if (row.team === null) Object.assign(current, { name: row.name, icon: row.icon });
   }
-  return [...byKey.values()].filter((entry) => listedIn(entry, list)).sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
-}
-
-/**
- * The rows of an entry that this list may rename or delete: on a team tab,
- * the team's; on Mine, only the viewer's own. A team's project is changed on
- * the team's tab, where everyone it affects can see it is the team's.
- */
-export function manageableRows(entry: SidebarProject, list: SidebarList): SidebarProjectRow[] {
-  return list === "team" ? entry.rows : entry.rows.filter((row) => row.team === null);
-}
-
-/**
- * The teams an entry is shared with, to say beside its name on Mine: set
- * when none of its rows is the viewer's own, so a team's project never
- * reads as theirs. Null on a team tab, and for an entry the viewer owns.
- */
-export function sharedWithTeams(entry: SidebarProject, list: SidebarList): string | null {
-  if (list === "team" || entry.rows.some((row) => row.team === null)) return null;
-  const names = [...new Set(entry.rows.flatMap((row) => (row.team ? [row.team.name] : [])))];
-  return names.length > 0 ? names.join(", ") : null;
+  return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
 }
 
 function adjust(byKey: Readonly<Record<string, number>>, key: string, delta: number): Record<string, number> {

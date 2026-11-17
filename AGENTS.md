@@ -846,14 +846,14 @@ An artifact's project lives in the artifact's home scope
 author. The sidebar's rules are in `src/lib/projects/sidebar-rules.ts` and
 `sidebar-queries.ts`.
 
-- **A person's own list is theirs.** It lists every project they made, the
-  empty ones too. It lists a team's project only while it holds one of their
-  artifacts (one they shared with that team): the row names the team after
-  the project's name ("Launch Acme 1"; its accessible name begins with the
-  same words), and it has no Rename or Delete there. A team's project
-  is created, renamed, and deleted on the team's tab. Never list a team's
-  project in a person's own list by membership alone: a person once could
-  delete a team's empty project for everyone from their own list.
+- **Personal and team are separate** (the owner's decision, 16 Nov 2026:
+  "personal projects show personal projects and team show team - keep them
+  separate"). A person's own list holds only the projects they made, the
+  empty ones too. A team's tab holds only that team's. A team's project
+  never shows in a person's own list, in any state, and is created,
+  renamed, and deleted on the team's tab. Never load a team's project into
+  a person's own list: a person once could delete a team's empty project
+  for everyone from a list that read as theirs.
 - **An artifact does not need a project.** Artifacts without one are listed
   plainly after the projects, newest first, under the quiet heading
   "Artifacts" (`sidebar-loose-artifacts.tsx`). Never show them as a row that
