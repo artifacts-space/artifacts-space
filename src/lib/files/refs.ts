@@ -5,7 +5,7 @@ import { markdownFileRefs } from "./media-rules";
 /** ui components that point at an uploaded file through their `file` prop. */
 export const fileComponentTypes: ReadonlySet<string> = new Set(["Image", "File"]);
 
-/** Most distinct files one artifact's content may use (Image and File elements of a ui spec or a canvas, or files a Markdown save attaches). */
+/** Most distinct files a ui spec's or a canvas's content, or one attach call, may name. A Markdown save has its own cap (maxMarkdownFileRefs in limit-rules.ts). */
 export const maxFileRefs = 50;
 
 function refsInElements(elements: unknown): string[] {

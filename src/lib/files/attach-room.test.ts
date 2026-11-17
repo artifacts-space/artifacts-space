@@ -33,19 +33,30 @@ beforeEach(() => {
 
 describe("assertUsableFiles", () => {
   it("should accept a new cover upload when the artifact is full only of images kept for Restore", async () => {
-    store.countArtifactFiles.mockResolvedValue(fileLimits.maxFilesPerArtifact);
-    cleanup.countHistoryOnlyFiles.mockResolvedValue(3);
+    store.countArtifactFiles.mockResolvedValue({ plain: fileLimits.maxFilesPerArtifact, inline: 0 });
+    cleanup.countHistoryOnlyFiles.mockResolvedValue({ plain: 3, inline: 0 });
     await expect(assertUsableFiles("author", "a1", [upload])).resolves.toBeUndefined();
   });
 
   it("should refuse a new file when the artifact is full of files it still shows", async () => {
-    store.countArtifactFiles.mockResolvedValue(fileLimits.maxFilesPerArtifact);
-    cleanup.countHistoryOnlyFiles.mockResolvedValue(0);
+    store.countArtifactFiles.mockResolvedValue({ plain: fileLimits.maxFilesPerArtifact, inline: 0 });
+    cleanup.countHistoryOnlyFiles.mockResolvedValue({ plain: 0, inline: 0 });
+    await expect(assertUsableFiles("author", "a1", [upload])).rejects.toThrow(/at most 20 files/);
+  });
+
+  it("should take a plain attachment when the artifact is full only of files its content shows", async () => {
+    store.countArtifactFiles.mockResolvedValue({ plain: 0, inline: fileLimits.maxInlineFilesPerArtifact });
+    await expect(assertUsableFiles("author", "a1", [upload])).resolves.toBeUndefined();
+  });
+
+  it("should not let content media kept for Restore make room for a plain attachment", async () => {
+    store.countArtifactFiles.mockResolvedValue({ plain: fileLimits.maxFilesPerArtifact, inline: 5 });
+    cleanup.countHistoryOnlyFiles.mockResolvedValue({ plain: 0, inline: 5 });
     await expect(assertUsableFiles("author", "a1", [upload])).rejects.toThrow(/at most 20 files/);
   });
 
   it("should not count history images when there is room anyway", async () => {
-    store.countArtifactFiles.mockResolvedValue(2);
+    store.countArtifactFiles.mockResolvedValue({ plain: 2, inline: 0 });
     await expect(assertUsableFiles("author", "a1", [upload])).resolves.toBeUndefined();
     expect(cleanup.countHistoryOnlyFiles).not.toHaveBeenCalled();
   });
@@ -63,7 +74,7 @@ describe("checkContentFiles for Markdown", () => {
       { id: otherUpload, status: "ready", uploaderId: "author", artifactId: "another-artifact" },
       { id: "3b241101-e2bb-4255-8caf-4136c566a962", status: "ready", uploaderId: "author", artifactId: null },
     ]);
-    store.countArtifactFiles.mockResolvedValue(0);
+    store.countArtifactFiles.mockResolvedValue({ plain: 0, inline: 0 });
     await expect(checkContentFiles("author", "a1", "markdown", markdown)).resolves.toEqual([upload]);
   });
 
@@ -72,22 +83,49 @@ describe("checkContentFiles for Markdown", () => {
     await expect(checkContentFiles("author", "a1", "markdown", markdown)).resolves.toEqual([]);
   });
 
-  it("should refuse the save when new uploads would go over the file limit", async () => {
-    store.countArtifactFiles.mockResolvedValue(fileLimits.maxFilesPerArtifact);
-    cleanup.countHistoryOnlyFiles.mockResolvedValue(0);
-    await expect(checkContentFiles("author", "a1", "markdown", markdown)).rejects.toThrow(/at most 20 files/);
+  it("should take the 21st file a document shows in its text", async () => {
+    store.countArtifactFiles.mockResolvedValue({ plain: 0, inline: 20 });
+    await expect(checkContentFiles("author", "a1", "markdown", markdown)).resolves.toEqual([upload]);
+  });
+
+  it("should take a file in the text when the artifact is full of plain attachments", async () => {
+    store.countArtifactFiles.mockResolvedValue({ plain: fileLimits.maxFilesPerArtifact, inline: 0 });
+    await expect(checkContentFiles("author", "a1", "markdown", markdown)).resolves.toEqual([upload]);
+  });
+
+  it("should take the 100th file a document shows in its text", async () => {
+    store.countArtifactFiles.mockResolvedValue({ plain: 0, inline: fileLimits.maxInlineFilesPerArtifact - 1 });
+    await expect(checkContentFiles("author", "a1", "markdown", markdown)).resolves.toEqual([upload]);
+  });
+
+  it("should refuse the save when the 101st file would go into the text", async () => {
+    store.countArtifactFiles.mockResolvedValue({ plain: 0, inline: fileLimits.maxInlineFilesPerArtifact });
+    cleanup.countHistoryOnlyFiles.mockResolvedValue({ plain: 0, inline: 0 });
+    await expect(checkContentFiles("author", "a1", "markdown", markdown)).rejects.toThrow(/at most 100 files in its content/);
+  });
+
+  it("should take a file in the text when the artifact is full only of media kept for Restore", async () => {
+    store.countArtifactFiles.mockResolvedValue({ plain: 0, inline: fileLimits.maxInlineFilesPerArtifact + 4 });
+    cleanup.countHistoryOnlyFiles.mockResolvedValue({ plain: 0, inline: 5 });
+    await expect(checkContentFiles("author", "a1", "markdown", markdown)).resolves.toEqual([upload]);
+  });
+
+  it("should refuse a new document whose text names more new uploads than a document shows", async () => {
+    const ids = Array.from({ length: fileLimits.maxInlineFilesPerArtifact + 1 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`);
+    store.usableFileRows.mockResolvedValue(ids.map((id) => ({ id, status: "ready", uploaderId: "author", artifactId: null })));
+    await expect(checkContentFiles("author", null, "markdown", ids.map((id) => `![](/api/files/${id})`).join("\n\n"))).rejects.toThrow(/at most 100 files in its content/);
   });
 
   it("should save Markdown that links more than 50 files it cannot use, attaching only its own upload", async () => {
     const others = Array.from({ length: 60 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`);
     const linked = [...others.map((id) => `[file](/api/files/${id})`), `![Shot](/api/files/${upload})`].join("\n\n");
-    store.countArtifactFiles.mockResolvedValue(0);
+    store.countArtifactFiles.mockResolvedValue({ plain: 0, inline: 0 });
     await expect(checkContentFiles("author", "a1", "markdown", linked)).resolves.toEqual([upload]);
   });
 
   it("should attach the editor's own upload however many links come before it", async () => {
     const many = Array.from({ length: 2000 }, (_, index) => `[f](/api/files/00000000-0000-4000-8000-${String(index).padStart(12, "0")})`).join("\n");
-    store.countArtifactFiles.mockResolvedValue(0);
+    store.countArtifactFiles.mockResolvedValue({ plain: 0, inline: 0 });
     await expect(checkContentFiles("author", "a1", "markdown", `${many}\n\n![Shot](/api/files/${upload})`)).resolves.toEqual([upload]);
     // The lookup reads the files the author may use, never the linked ids.
     expect(store.usableFileRows).toHaveBeenCalledWith("author", "a1");
@@ -103,14 +141,14 @@ describe("checkContentFiles for Markdown", () => {
 
 describe("attachFiles", () => {
   it("should record the agent's harness on the files save when an agent attaches files", async () => {
-    store.countArtifactFiles.mockResolvedValue(0);
+    store.countArtifactFiles.mockResolvedValue({ plain: 0, inline: 0 });
     store.attachFileRows.mockResolvedValue(1);
     await attachFiles("author", "a1", [upload], "agent", () => Promise.resolve({ harness: "codex", label: null }));
     expect(versions.recordArtifactChange).toHaveBeenCalledWith({ artifactId: "a1", editorId: "author", actor: "agent", harness: { harness: "codex", label: null } });
   });
 
   it("should record no harness when a person attaches files in the browser", async () => {
-    store.countArtifactFiles.mockResolvedValue(0);
+    store.countArtifactFiles.mockResolvedValue({ plain: 0, inline: 0 });
     store.attachFileRows.mockResolvedValue(1);
     await attachFiles("author", "a1", [upload], "person");
     expect(versions.recordArtifactChange).toHaveBeenCalledWith(expect.objectContaining({ harness: null }));
