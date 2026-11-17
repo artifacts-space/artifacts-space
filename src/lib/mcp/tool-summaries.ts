@@ -36,6 +36,8 @@ export const toolSummaries = {
   files_attach: "Add uploaded files to an artifact you can edit.",
   files_replace: "Replace a file with a new upload, keeping the old one in History.",
   files_delete: "Delete an upload, or a file on an artifact you can edit.",
+  page_files_request_uploads: "Start the uploads of all the files a web page loads, in one call.",
+  page_files_publish: "Add, replace, and remove a web page's files together, as one version.",
   inbox_list: "List unread @mentions with the thread around them.",
   comments_list: "Read the comment thread on an artifact.",
   inbox_mark_read: "Mark mentions read once handled.",

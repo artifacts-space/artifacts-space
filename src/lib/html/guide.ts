@@ -1,9 +1,14 @@
 import { artifactSizeLimits } from "@/lib/artifact-limits";
 import { fileLimits, formatBytes } from "@/lib/files/config";
+import { pageBatchLimits } from "@/lib/page-files/publish-rules";
 import { pageFileLimits, pageFileTypesHint } from "@/lib/page-files/rules";
+import { pageTokenLimits } from "@/lib/page-files/token";
 import { pageScriptHosts } from "@/lib/page-host/rules";
 
 const hostNames = pageScriptHosts.map((host) => host.replace("https://", ""));
+
+/** "10 to 15 minutes": how long a page's files address works, from the token's own limits. */
+const addressLife = `${String((pageTokenLimits.lifeSeconds - pageTokenLimits.stepSeconds) / 60)} to ${String(pageTokenLimits.lifeSeconds / 60)} minutes`;
 
 /**
  * The guide agents read before they write an HTML artifact
@@ -32,11 +37,24 @@ export function buildHtmlGuide(): string {
     '- A page can have its own files and load them by relative path, as on any website: <link rel="stylesheet" href="css/site.css">, <script type="module" src="js/app.js"> (and its own import "./chart.js"), <img src="img/logo.png">, url(../img/bg.png) in a stylesheet, fetch("data.json").',
     '- Paths are relative to the page, which is index.html. Do not start a path with / and do not use "..": write css/site.css, never /css/site.css.',
     "- A path is matched exactly, letter case included: a link to Css/Site.css does not find css/site.css, and the page gets a 404 for it. Use lowercase paths, and write each link exactly as the file's pagePath.",
-    `- To add one: files_request_upload with pagePath (for example "css/site.css") and the exact size, PUT the bytes, files_finalize, then files_attach to the artifact. The page loads it at once; the document does not need to be saved again.`,
-    "- To change one: upload again with the same pagePath, then files_replace with the file's id. To remove one: files_delete.",
+    `- To add or change many at once, such as a whole site: page_files_request_uploads with the artifact and every file's path and exact size (up to ${String(pageBatchLimits.maxUploadsPerRequest)} in a call; for more, call again for the rest). It checks the whole set first, and its result gives each file's path, fileId, PUT url, and headers. PUT each file, then page_files_publish once with all the fileIds (up to ${String(pageBatchLimits.maxFilesPerPublish)}). The files go in together as one version, or not at all: if any file is at fault, nothing changes and the error names every file to fix.`,
+    "- One page_files_publish call can bring the page's files to a new state: an upload at a new path is added, an upload at a path the page already has replaces that file, and each path in remove is deleted. The page loads the new files at once; the document does not need to be saved again.",
+    `- For one or two files, the single-file tools work too: files_request_upload with pagePath (for example "css/site.css") and the exact size, PUT the bytes, files_finalize, then files_attach to the artifact. To change one: upload again with the same pagePath, then files_replace with the file's id. To remove one: files_delete.`,
     `- A page file may be ${pageFileTypesHint}. Its type comes from its extension. A second HTML document is refused: one artifact is one page.`,
     `- At most ${String(pageFileLimits.maxFiles)} page files and ${formatBytes(pageFileLimits.maxTotalBytes)} in all per artifact, and ${formatBytes(fileLimits.maxBytes)} per file.`,
-    "- Load what the page needs when it starts. A file asked for more than about ten minutes after the page opened may be refused until the reader loads the page again.",
+    "",
+    "What goes in the document, and what goes in files",
+    "- Keep in the document: the markup, and the CSS and JavaScript of a small page. A page with no files saves in one call and is easy to read and change.",
+    `- Put in page files: images, fonts, data, libraries you bundled, and any stylesheet or script too long to resend. Every change to the document sends the whole document again (artifacts_update), and the document is at most ${artifactSizeLimits.maxContentBytes.toLocaleString("en-US")} bytes. A page file changes by itself.`,
+    "- A good split for a site: index markup in the document, css/site.css, js/app.js as a module that imports its parts, img/ for pictures, data/ for JSON the page fetches.",
+    "",
+    "A page that stays open",
+    `- A page's files load under an address that ends after ${addressLife}. While the page's tab is visible it gets the next address before that, without loading again, so a page left open keeps working.`,
+    '- What follows the new address: fetch("data.json"), elements the page adds later (an <img>, a <script>, a <link>), and anything resolved against the document, such as new URL("js/chart.js", document.baseURI).',
+    "- What does not: a module that already loaded keeps the address it loaded from for its own later relative import() and for import.meta.url, and a stylesheet file keeps it for its own url(...). After the first address ended, those are refused until the reader loads the page again.",
+    '- So import what a module needs when it starts. For a part you load later, resolve it from the document: import(new URL("js/chart.js", document.baseURI)).',
+    "- A tab that was hidden gets its next address when it is shown again. A file asked for while it was hidden past the end of its address is refused; ask again once the tab is visible.",
+    "- Files a publish removed stop loading for every reader at once.",
     "- Readers of a shared page see the files that were approved with it, like the page itself.",
     "",
     "What the page cannot do",

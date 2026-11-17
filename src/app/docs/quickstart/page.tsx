@@ -103,6 +103,9 @@ export default function QuickstartPage() {
         <p>
           The page runs in a sandbox on the artifact&apos;s page, apart from your account, and Full screen gives it the whole window. It cannot call your API or any other site, so the agent puts the data in the page. See <Link href={docsHref("formats", "html")}>Formats</Link> for what a page may load.
         </p>
+        <p>
+          A larger page can be a small site: the agent keeps its stylesheets, scripts, images, and data in <Link href={docsHref("formats", "page-files")}>page files</Link> that the page loads by relative path, and uploads them all in two calls.
+        </p>
       </Prose>
 
       <DocsH page={page} id="troubleshooting" />

@@ -110,21 +110,29 @@ interface Swap {
   actor: SharingActor;
 }
 
+/** A files change that files its own version in one statement: its approval plan, the artifact, and who makes it. */
+export interface VersionedFileChange {
+  approval: VersionedChangeApproval;
+  artifactId: string;
+  editorId: string;
+}
+
 /**
  * The approval outcome's writes, as CTEs after `version` in the swap: they
  * run in the same statement, so the version and its approval stand
  * together. "apply" makes the version the approved one (in `stamped`),
  * cancels open edit requests, and files an approver's audit row; "pending"
- * opens the edit request or points the open one at the version.
+ * opens the edit request or points the open one at the version. Publishing
+ * page files writes the same outcome (src/lib/page-files/publish.ts).
  */
-function approvalCtes({ approval, target, editorId }: Swap) {
+export function approvalCtes({ approval, artifactId, editorId }: VersionedFileChange) {
   // The replace's own time, from the database clock (the version's saved_at).
   const at = sql`version.saved_at`;
   if (approval.outcome === "pending") {
     return sql`,
     request as (
       insert into ${sharingRequest} (id, kind, artifact_id, team_id, requested_by, visibility, version_id, status, created_at)
-      select ${randomUUID()}, 'edit', ${target.artifactId}, ${approval.teamId}, ${editorId}, ${approval.requestVisibility}, version.id, 'pending', ${at}
+      select ${randomUUID()}, 'edit', ${artifactId}, ${approval.teamId}, ${editorId}, ${approval.requestVisibility}, version.id, 'pending', ${at}
       from version
       on conflict (artifact_id, kind) where status = 'pending'
       do update set version_id = excluded.version_id, team_id = excluded.team_id, visibility = excluded.visibility, requested_by = excluded.requested_by, created_at = excluded.created_at
@@ -135,7 +143,7 @@ function approvalCtes({ approval, target, editorId }: Swap) {
   const audit = approval.auditTeamId === null ? sql`` : sql`,
     audit as (
       insert into ${sharingRequest} (id, kind, artifact_id, team_id, requested_by, visibility, version_id, status, decided_by, decided_at)
-      select ${randomUUID()}, 'edit', ${target.artifactId}, ${approval.auditTeamId}, ${editorId}, ${approval.requestVisibility}, version.id, 'approved', ${editorId}, ${at}
+      select ${randomUUID()}, 'edit', ${artifactId}, ${approval.auditTeamId}, ${editorId}, ${approval.requestVisibility}, version.id, 'approved', ${editorId}, ${at}
       from version
       returning id
     )`;
@@ -143,7 +151,7 @@ function approvalCtes({ approval, target, editorId }: Swap) {
     canceled as (
       update ${sharingRequest} r set status = 'canceled', decided_by = ${editorId}, decided_at = ${at}
       from version
-      where r.artifact_id = ${target.artifactId} and r.kind = 'edit' and r.status = 'pending'
+      where r.artifact_id = ${artifactId} and r.kind = 'edit' and r.status = 'pending'
       returning r.id
     )${audit}`;
 }
@@ -155,7 +163,7 @@ function approvalCtes({ approval, target, editorId }: Swap) {
  * the plan is refused instead of applying unreviewed. The query is
  * uncorrelated with qualified columns (see the tripwire in AGENTS.md).
  */
-function roleGuard({ approval, editorId }: Swap) {
+export function roleGuard({ approval, editorId }: Pick<VersionedFileChange, "approval" | "editorId">) {
   if (approval.outcome !== "apply" || approval.auditTeamId === null) return sql``;
   return sql`
         and a.team_id in (${capabilityHolderTeamQuery(getDb(), editorId, approval.auditTeamId, "approve.edits")})`;
@@ -228,7 +236,7 @@ async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | nul
         octet_length(t.content) + octet_length(t.metadata::text), ${harnessId}, ${actor === "agent"}, ${editorId}, 'replace', copy.replaced_at, copy.replaced_at
       from target t, copy
       returning id, saved_at
-    )${approvalCtes(swap)},
+    )${approvalCtes({ approval, artifactId: target.artifactId, editorId })},
     stamped as (
       update ${artifact} a set updated_by = ${editorId}, updated_at = copy.replaced_at, person_saved_at = ${personSaved}, harness = coalesce(${harnessId}::text, a.harness), approved_version_id = ${approved}
       from version, copy
@@ -305,7 +313,7 @@ export async function replaceFile(editorId: string, request: ReplaceRequest, act
  * old versions. None of it can undo the replace; pruning is housekeeping
  * the cleanup job retries.
  */
-async function afterSwap(artifactId: string, openedRequestId: string | null) {
+export async function afterSwap(artifactId: string, openedRequestId: string | null) {
   forgetArtifactCache(artifactId);
   if (openedRequestId) notifySharingRequest(openedRequestId);
   await pruneArtifactVersions(artifactId).catch((error: unknown) => {

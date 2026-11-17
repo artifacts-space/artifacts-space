@@ -123,3 +123,141 @@ test("should keep a page without page files at the page host's root, as before",
   await expect(page.locator(`${frameSelector}[data-page-shown]`)).toBeVisible();
   expect((await frameAddress(page)).pathname).toBe("/");
 });
+
+/*
+ * A page that stays open past its files address. The fixture's first
+ * address ends within seconds (`?pass=`, fixtureShortPassAction); the site
+ * gets the next one and hands it to the frame document, which moves its own
+ * address without loading again (page-renewal.ts, frame-document.ts).
+ */
+
+interface PageState {
+  /** What a relative fetch of the page's data file answers. */
+  status: number;
+  /** The frame document's own address now. */
+  path: string;
+  /** A mark left in the page's window when it first loaded: gone if the page loaded again. */
+  kept: string | undefined;
+}
+
+type MarkedWindow = Window & { kept?: string; setTabShown?: (shown: boolean) => void };
+
+/**
+ * Opens the files page with a first address that ends within seconds, leaves
+ * a mark in its window, and counts the site's address requests. `loaded` is
+ * how many the load itself made (development mode runs each effect twice,
+ * so more than one): every later one is a renewal.
+ */
+async function openShortPassPage(page: Page, mode: "short" | "refused") {
+  const asks = { count: 0 };
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.headers()["next-action"] !== undefined) asks.count += 1;
+  });
+  allowPageError("Failed to load resource: the server responded with a status of 404", "The page asks for a file after its address ended, on purpose.");
+  allowPageError(/violates the following Content Security Policy directive|violates the document's Content Security Policy/, "The page asks for the site, which its policy refuses, on purpose.");
+  await page.goto(`/dev/page-frame?page=files&pass=${mode}&run=${crypto.randomUUID()}`);
+  await expect(page.locator(`${frameSelector}[data-page-shown]`)).toBeVisible();
+  const frame = page.frameLocator(frameSelector);
+  await expect(frame.locator("#data")).toHaveText("answer 42");
+  await frame.locator("body").evaluate(() => { (window as MarkedWindow).kept = "since the first load"; });
+  return { frame, asks, loaded: asks.count, first: await frameAddress(page) };
+}
+
+/** Asked inside the page: a relative fetch, the document's address, and the mark. */
+function pageState(frame: ReturnType<Page["frameLocator"]>): Promise<PageState> {
+  return frame.locator("body").evaluate(async () => {
+    const response = await fetch("data.json", { cache: "no-store" });
+    return { status: response.status, path: location.pathname, kept: (window as MarkedWindow).kept };
+  });
+}
+
+/** Waits until the page host refuses the address the frame first loaded under: it has ended. */
+async function firstAddressEnded(request: APIRequestContext, baseURL: string | undefined, first: URL) {
+  const file = `${first.pathname.replace(/index\.html$/, "")}data.json`;
+  await expect.poll(async () => (await askHost(request, baseURL, first.host, file)).status(), { timeout: 30_000 }).toBe(404);
+}
+
+test("should keep an open page loading its files after its first address ended, without loading the page again", async ({ page, request, baseURL }) => {
+  const { frame, asks, loaded, first } = await openShortPassPage(page, "short");
+  await firstAddressEnded(request, baseURL, first);
+
+  const state = await pageState(frame);
+  expect(state.status, "a relative fetch after the first address ended").toBe(200);
+  expect(state.path).toMatch(/^\/f\/[A-Za-z0-9_-]{60,400}\/index\.html$/);
+  expect(state.path, "the frame document moved to the next address").not.toBe(first.pathname);
+  expect(state.kept, "the page was loaded again").toBe("since the first load");
+  // The frame itself was never pointed anywhere new, and the site asked once more: no interval.
+  expect((await frameAddress(page)).pathname).toBe(first.pathname);
+  expect(asks.count - loaded).toBe(1);
+  // An element the page adds later loads by relative path under the new address.
+  const drawn = await frame.locator("body").evaluate(() => new Promise<number>((resolve) => {
+    const image = new Image();
+    image.onload = () => { resolve(image.naturalWidth); };
+    image.onerror = () => { resolve(0); };
+    image.src = "img/dot.svg?later";
+  }));
+  expect(drawn).toBe(24);
+});
+
+test("should ask for nothing while the tab is hidden, and renew at once when it is shown again with an address that ended", async ({ page, request, baseURL }) => {
+  await page.addInitScript(() => {
+    let state: DocumentVisibilityState = "visible";
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+    (window as MarkedWindow).setTabShown = (shown) => {
+      state = shown ? "visible" : "hidden";
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+  });
+  const { frame, asks, loaded, first } = await openShortPassPage(page, "short");
+  await page.evaluate(() => { (window as MarkedWindow).setTabShown?.(false); });
+  await firstAddressEnded(request, baseURL, first);
+
+  // Hidden past the end of its address: nothing was asked, and the page's files are out of reach.
+  const hidden = await pageState(frame);
+  expect(asks.count - loaded, "the site asked for an address while the tab was hidden").toBe(0);
+  expect(hidden).toEqual({ status: 404, path: first.pathname, kept: "since the first load" });
+
+  await page.evaluate(() => { (window as MarkedWindow).setTabShown?.(true); });
+  await expect.poll(async () => (await pageState(frame)).status).toBe(200);
+  const shown = await pageState(frame);
+  expect(shown.path).not.toBe(first.pathname);
+  expect(shown.kept).toBe("since the first load");
+  expect(asks.count - loaded).toBe(1);
+});
+
+test("should give a reader who lost access no new address, and keep the page running without its files", async ({ page, request, baseURL }) => {
+  const { frame, asks, loaded, first } = await openShortPassPage(page, "refused");
+  await firstAddressEnded(request, baseURL, first);
+  await expect.poll(() => asks.count - loaded).toBe(1);
+
+  const state = await pageState(frame);
+  expect(state).toEqual({ status: 404, path: first.pathname, kept: "since the first load" });
+  // The page is still there: not closed, not loaded again, and what it drew stays.
+  await expect(page.locator(`${frameSelector}[data-page-shown]`)).toBeVisible();
+  await expect(page.locator("[data-slot=page-frame-left]")).toHaveCount(0);
+  await expect(frame.locator("#module")).toHaveText("Module imported its sibling");
+  // A refusal is final for this load: showing the tab again asks nothing more.
+  await page.evaluate(() => { document.dispatchEvent(new Event("visibilitychange")); });
+  expect((await pageState(frame)).status).toBe(404);
+  expect(asks.count - loaded).toBe(1);
+});
+
+test("should not let the page move its own files address with a message of its own, while the site's message does", async ({ page }) => {
+  const frame = await openFilesPage(page);
+  const first = await frameAddress(page);
+  const other = `/f/${"A".repeat(120)}/index.html`;
+
+  // The page posts the renewal message to itself and waits until a later message of its own arrived.
+  const after = await frame.locator("body").evaluate((_body, path) => new Promise<string>((resolve) => {
+    window.addEventListener("message", (event) => { if (event.data === "after") resolve(location.pathname); });
+    window.postMessage({ type: "artifact-page:renew", path }, "*");
+    window.postMessage("after", "*");
+  }), other);
+  expect(after).toBe(first.pathname);
+
+  // The same message from the site, in the framing window, moves it: the listener is there, and it chose not to act above.
+  await page.locator(frameSelector).evaluate((element, path) => {
+    (element as HTMLIFrameElement).contentWindow?.postMessage({ type: "artifact-page:renew", path }, "*");
+  }, other);
+  await expect.poll(() => frame.locator("body").evaluate(() => location.pathname)).toBe(other);
+});

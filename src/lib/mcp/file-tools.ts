@@ -34,7 +34,7 @@ const artifactIdField = (userId: string) => artifactRefField(userId, `An artifac
 const flow = `Upload flow: 1) files_request_upload with the filename, type, and exact byte size. 2) PUT the bytes to upload.url with exactly upload.headers, for example: curl -X PUT -H "Content-Type: <type>" --data-binary @<path> "<url>" (curl sets Content-Length). The URL works for ${String(fileLimits.uploadUrlSeconds / 60)} minutes. 3) files_finalize with the file id. 4) files_create_artifact, files_attach, or files_replace, within a day, or the upload is deleted.`;
 
 /** Runs a tool and returns JSON text. Errors written for the caller pass through; others are logged and replaced. */
-async function respond(run: () => Promise<unknown>) {
+export async function respond(run: () => Promise<unknown>) {
   try {
     const value = await run();
     return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -46,7 +46,7 @@ async function respond(run: () => Promise<unknown>) {
 }
 
 /** The artifact after a file change, with the baseVersion for the agent's next update. */
-async function artifactResult(userId: string, record: ArtifactRecord) {
+export async function artifactResult(userId: string, record: ArtifactRecord) {
   const [[dto], teams, base] = await Promise.all([toArtifactDtos([record], userId), listTeamsForUser(userId), baseVersionOf(record.id, record.updatedAt.toISOString())]);
   if (!dto) throw new UserFacingError("Artifact not found.");
   return { ...toMcpArtifact(dto, { viewerId: userId, teamSlugs: new Map(teams.map((team) => [team.id, team.slug])), urlFor: (publicId) => siteUrl(`/artifact/${publicId}`) }, { canEdit: true }), ...base };
@@ -57,7 +57,7 @@ async function artifactResult(userId: string, record: ArtifactRecord) {
  * its own version, so when someone saved after it, that version holds what
  * the replace saw; the result shows it, with the replace's save time.
  */
-async function asReplaced(current: ArtifactRecord, replaced: { savedAt: Date; versionId: string }): Promise<ArtifactRecord> {
+export async function asReplaced(current: ArtifactRecord, replaced: { savedAt: Date; versionId: string }): Promise<ArtifactRecord> {
   if (current.updatedAt.getTime() === replaced.savedAt.getTime()) return current;
   const version = await getVersionOf(current.id, replaced.versionId);
   if (!version) return { ...current, updatedAt: replaced.savedAt };
@@ -71,18 +71,21 @@ async function ownArtifact(userId: string, publicId: string) {
   return record;
 }
 
-async function editableArtifact(userId: string, publicId: string) {
+export async function editableArtifact(userId: string, publicId: string) {
   const record = await getEditableArtifact(userId, { publicId });
   if (!record) throw new UserFacingError("Artifact not found, or you cannot edit it.");
   return record;
 }
+
+/** Where the upload tool sends an agent that has many page files: the two tools that take a whole set (page-file-tools.ts). */
+const manyPageFilesNote = "For more than one or two page files, use page_files_request_uploads and page_files_publish instead: one call starts every upload, and one call publishes the whole set.";
 
 function registerUploadTools(server: ToolServer, userId: string) {
   server.registerTool(
     "files_request_upload",
     {
       title: "Request a file upload",
-      description: `Starts a file upload and returns a presigned PUT URL. Up to ${formatBytes(fileLimits.maxBytes)} per file. Allowed: ${allowedTypesHint}. ${flow} ${pageFilesNote}`,
+      description: `Starts a file upload and returns a presigned PUT URL. Up to ${formatBytes(fileLimits.maxBytes)} per file. Allowed: ${allowedTypesHint}. ${flow} ${pageFilesNote} ${manyPageFilesNote}`,
       inputSchema: {
         filename: z.string().min(1).max(255).optional().describe("File name with its extension, such as report.pdf. Not needed with pagePath, whose last part is the name."),
         contentType: z.string().max(255).optional().describe("MIME type, such as application/pdf. Omit to use the extension. Not read with pagePath: a page file's type comes from its path."),

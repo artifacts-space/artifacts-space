@@ -13,7 +13,10 @@ import { allowPageError, expect, test } from "./support/test";
  * two modules, a picture, and data with a page path over MCP (request, PUT
  * to file storage, finalize, attach), and the page then loads each by its
  * relative path, streamed from storage through the page host. Readers of
- * the approved version get that version's files and no later one. These
+ * the approved version get that version's files and no later one. A second
+ * test puts the same site in with the two tools for many files, then
+ * brings it to a new state (one file replaced, one removed, one added) in
+ * one more publish. These
  * need a local throwaway Postgres (E2E_LOCAL_DB=1) and a local
  * S3-compatible store (E2E_LOCAL_R2=1, R2_ENDPOINT on this machine), and
  * skip without them. The fixture checks (page-files.spec.ts) run everywhere,
@@ -127,6 +130,33 @@ async function uploadPageFile(request: APIRequestContext, token: string, pagePat
   return started.file.id;
 }
 
+const startedSetAnswer = z.object({
+  uploads: z.array(z.object({ path: z.string(), fileId: z.string(), url: z.string(), headers: z.record(z.string(), z.string()) })),
+  fileIds: z.array(z.string()),
+});
+const publishedAnswer = z.object({
+  published: z.object({ status: z.string(), added: z.array(z.string()), replaced: z.array(z.string()), removed: z.array(z.string()) }),
+  files: z.array(fileAnswer),
+  baseVersion: z.string(),
+});
+
+/** Starts the uploads of a whole set in one call and PUTs each file with exactly the headers the answer gives. Returns the file ids. */
+async function uploadSet(request: APIRequestContext, token: string, artifact: string, files: Record<string, Buffer>): Promise<string[]> {
+  const set = Object.entries(files).map(([path, bytes]) => ({ path, size: bytes.length }));
+  const started = startedSetAnswer.parse(answerOf(await callTool(request, token, "page_files_request_uploads", { artifact, files: set })));
+  expect(started.uploads.map((upload) => upload.path)).toEqual(Object.keys(files));
+  for (const upload of started.uploads) {
+    const put = await fetch(upload.url, { method: "PUT", headers: upload.headers, body: new Uint8Array(files[upload.path] ?? Buffer.alloc(0)) });
+    expect(put.ok, `storage took ${upload.path}`).toBe(true);
+  }
+  return started.fileIds;
+}
+
+async function versionCount(publicId: string): Promise<number> {
+  const result = await db().query<{ n: string }>(`select count(*) as n from artifact_version where artifact_id = (select id from artifact where public_id = $1)`, [publicId]);
+  return Number(result.rows[0]?.n ?? 0);
+}
+
 async function signIn(page: Page) {
   await page.goto("/api/dev/sign-in");
   await page.waitForURL(/\/app/);
@@ -215,5 +245,54 @@ test.describe("page files with a database and file storage", () => {
     expect(data.headers()["cache-control"]).toMatch(/^private, max-age=\d+$/);
     expect(data.headers().location).toBeUndefined();
     expect(await data.text()).toBe(`{"answer": 42}\n`);
+  });
+
+  test("should put a whole site in with two calls and the PUTs, then bring it to a new state with one more publish", async ({ page, request }, testInfo) => {
+    test.slow();
+    allowPageError("Failed to load resource: the server responded with a status of 404", "The page asks for a file that is added only by the second publish, on purpose.");
+    const userId = await signIn(page);
+    const token = await agentTokenFor(userId);
+    const publicId = await createTestArtifact({ userId, title: `Page file set ${testInfo.project.name} ${String(Date.now())}`, content: pageHtml, visibility: "private", theme: null, kind: "html" });
+    created.push(publicId);
+
+    // A set with one file at fault starts nothing, and the one refusal names it.
+    const refused = await callTool(request, token, "page_files_request_uploads", { artifact: publicId, files: [{ path: "css/site.css", size: 10 }, { path: "pages/about.html", size: 10 }] });
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0]?.text).toContain("pages/about.html");
+    expect(refused.content[0]?.text).not.toContain("css/site.css:");
+
+    // One call starts every upload; one call publishes them together, as one version.
+    const before = await versionCount(publicId);
+    const ids = await uploadSet(request, token, publicId, pageFiles);
+    const first = publishedAnswer.parse(answerOf(await callTool(request, token, "page_files_publish", { artifact: publicId, uploads: ids })));
+    expect(first.published).toEqual({ status: "applied", added: Object.keys(pageFiles), replaced: [], removed: [] });
+    expect(first.files.map((file) => file.pagePath).sort()).toEqual(Object.keys(pageFiles).sort());
+    expect((await versionCount(publicId)) - before).toBeLessThanOrEqual(2);
+
+    const shown = await runningPage(page, publicId);
+    await expect(shown.locator("#styled")).toHaveCSS("color", "rgb(0, 128, 0)");
+    await expect(shown.locator("#module")).toHaveText("Module imported its sibling");
+    await expect(shown.locator("#data")).toHaveText("answer 42");
+    await expect(shown.locator("#picture")).toHaveText("picture 1");
+    await expect(shown.locator("#later")).toHaveText("later 404");
+
+    // A new state in one step: the stylesheet replaced, the picture removed, later.json added.
+    const next = { "css/site.css": Buffer.from("#styled { color: rgb(0, 0, 255); }\n"), "later.json": Buffer.from(`{"later": true}\n`) };
+    const nextIds = await uploadSet(request, token, publicId, next);
+    const versionsBefore = await versionCount(publicId);
+    const second = publishedAnswer.parse(answerOf(await callTool(request, token, "page_files_publish", { artifact: publicId, uploads: nextIds, remove: ["img/dot.png"], baseVersion: first.baseVersion })));
+    expect(second.published).toEqual({ status: "applied", added: ["later.json"], replaced: ["css/site.css"], removed: ["img/dot.png"] });
+    expect(await versionCount(publicId)).toBe(versionsBefore + 1);
+
+    // A publish built on the older save is refused, and changes nothing.
+    const stale = await callTool(request, token, "page_files_publish", { artifact: publicId, remove: ["data.json"], baseVersion: first.baseVersion });
+    expect(stale.isError).toBe(true);
+
+    allowPageError("Failed to load resource: the server responded with a status of 404", "The picture was removed by the publish, on purpose.");
+    const after = await runningPage(page, publicId);
+    await expect(after.locator("#styled")).toHaveCSS("color", "rgb(0, 0, 255)");
+    await expect(after.locator("#later")).toHaveText("later 200");
+    await expect(after.locator("#data")).toHaveText("answer 42");
+    await expect(after.locator("#picture")).toHaveText("No picture");
   });
 });
