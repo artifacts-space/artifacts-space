@@ -1,7 +1,20 @@
 import { formatInfo } from "@/lib/artifact-formats";
 import { updateCheckOptions, validateArtifactContent } from "@/lib/artifact-content";
+import { kinds } from "@/lib/artifact-kinds";
 import type { ArtifactKind } from "@/lib/artifact-types";
 import { htmlStarter } from "@/lib/html/rules";
+
+/**
+ * The formats the Format dialog offers for an artifact whose format is
+ * `current`. Files is not one a person picks on the web: a file dropped on
+ * a page goes into the document's text, or is attached beside any other
+ * format. An artifact that is a Files artifact already (made by an agent
+ * with files_create_artifact, or before this rule) keeps its format in the
+ * list, so the dialog shows what it is and can leave it alone.
+ */
+export function offeredFormats(current: ArtifactKind): ArtifactKind[] {
+  return kinds.filter((kind) => kind !== "file" || current === "file");
+}
 
 /**
  * Why the artifact's content cannot switch to `kind`, or null when it can.

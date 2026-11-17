@@ -22,10 +22,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatInfo } from "@/lib/artifact-formats";
-import { kinds } from "@/lib/artifact-kinds";
 import type { ArtifactKind } from "@/lib/artifact-types";
 
-import { contentForSwitch, formatSwitchProblem } from "./format-choice-rules";
+import { contentForSwitch, formatSwitchProblem, offeredFormats } from "./format-choice-rules";
 
 interface FormatDialogProps {
   open: boolean;
@@ -76,7 +75,7 @@ function FormatForm({ kind, language, content, storedContent, blank, onApply, on
             <SelectValue>{(value: ArtifactKind) => formatInfo[value].label}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {kinds.map((value) => <SelectItem key={value} value={value}>{formatInfo[value].label}</SelectItem>)}
+            {offeredFormats(kind).map((value) => <SelectItem key={value} value={value}>{formatInfo[value].label}</SelectItem>)}
           </SelectContent>
         </Select>
         <p id="format-choice-help" className="text-sm leading-5 text-muted-foreground">{formatInfo[nextKind].helper}</p>

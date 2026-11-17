@@ -3,7 +3,7 @@ import { switchBlankPageTo } from "./support/new-page";
 import { allowPageError, expect, test } from "./support/test";
 
 /**
- * Replace on a file's row (a Files artifact's section here; the quiet list
+ * Replace on a file's row (the Files section of an interface here; the quiet list
  * of attached files has the same rows): a new upload takes a file's place
  * under the same entry, so its name, place, and id stay, and a refused replace leaves
  * the file as it was and discards the upload. Checked on /dev/workspace,
@@ -32,9 +32,10 @@ async function openNewArtifact(page: Page) {
   await expect(body(page).locator('[contenteditable="true"]')).toBeVisible();
 }
 
-/** Makes the blank page a Files page and drops PDFs on it, which stores a Files artifact with them. */
+/** Makes the blank page an interface, which is stored at once and keeps its Files section, and drops PDFs on it, which attaches them. */
 async function dropFiles(page: Page, names: readonly string[]) {
-  await switchBlankPageTo(page, "Files");
+  await switchBlankPageTo(page, "Interface");
+  await expect(filesSection(page)).toContainText("None yet");
   await body(page).evaluate((element, files) => {
     const data = new DataTransfer();
     for (const name of files) data.items.add(new File(["%PDF-1.4"], name, { type: "application/pdf" }));

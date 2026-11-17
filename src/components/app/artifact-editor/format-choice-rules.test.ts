@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contentForSwitch, formatSwitchProblem } from "./format-choice-rules";
+import { contentForSwitch, formatSwitchProblem, offeredFormats } from "./format-choice-rules";
 
 describe("formatSwitchProblem", () => {
   it("should refuse JSON when the content does not parse", () => {
@@ -59,5 +59,19 @@ describe("contentForSwitch", () => {
 
   it("should leave an empty page empty when the format can start empty", () => {
     expect(contentForSwitch("text", "")).toBe("");
+  });
+});
+
+describe("offeredFormats", () => {
+  it("should not offer Files for a new page or an artifact of any other format", () => {
+    for (const kind of ["markdown", "text", "code", "csv", "json", "html", "svg", "mermaid", "ui", "canvas"] as const) {
+      expect(offeredFormats(kind)).not.toContain("file");
+      expect(offeredFormats(kind)).toContain(kind);
+    }
+  });
+
+  it("should keep Files in the list for an artifact that is a Files artifact already", () => {
+    expect(offeredFormats("file")).toContain("file");
+    expect(offeredFormats("file")).toContain("markdown");
   });
 });

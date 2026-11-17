@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expectNoAxeViolations } from "./support/a11y";
-import { attachedList, switchBlankPageTo } from "./support/new-page";
+import { attachedList, blankTextPage, switchBlankPageTo, uploadsReady, writeTextBody } from "./support/new-page";
 import { allowPageError, expect, test } from "./support/test";
 
 /**
@@ -192,20 +192,6 @@ test("should put a file dropped on the blank page into the document, and keep th
   await expect(page.getByText("Drop files here, or")).toHaveCount(0);
 });
 
-test("should make a Files artifact named after its file when a file is dropped on a page switched to Files", async ({ page }) => {
-  await openNewArtifact(page);
-  await switchBlankPageTo(page, "Files");
-  await body(page).evaluate((element) => {
-    const data = new DataTransfer();
-    data.items.add(new File(["%PDF-1.4"], "Quarterly report.pdf", { type: "application/pdf" }));
-    element.dispatchEvent(new DragEvent("drop", { dataTransfer: data, bubbles: true, cancelable: true }));
-  });
-  await expect(cards(page, "Quarterly report")).toHaveCount(1);
-  await expect(page.getByRole("region", { name: "Files" })).toContainText("1 attached");
-  await expect.poll(async () => (await storedNew(page))[0]?.kind).toBe("file");
-  expect(await creates(page)).toBe(1);
-});
-
 /** Holds a file over an element, as a person dragging it from the desktop would. */
 async function dragOver(target: ReturnType<Page["locator"]>) {
   await target.evaluate((element) => {
@@ -224,17 +210,19 @@ async function dropFiles(target: ReturnType<Page["locator"]>, names: readonly st
   }, [...names]);
 }
 
-test("should add later files through a Files artifact's own section once a drop made it", async ({ page }) => {
+test("should add files through the Files section of an interface, by a drop on the page, on its drop box, and on its heading", async ({ page }) => {
   await openNewArtifact(page);
-  await switchBlankPageTo(page, "Files");
+  // An interface starts with a small page of its own, so it is stored at once, and it keeps its Files section.
+  await switchBlankPageTo(page, "Interface");
+  await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("ui");
+  const files = page.getByRole("region", { name: "Files", exact: true });
+  await expect(files).toContainText("None yet");
   await dropFiles(body(page), ["First.pdf"]);
-  const files = page.getByRole("region", { name: "Files" });
   await expect(files).toContainText("1 attached");
-  // The blank page's own uploader is gone: the Files section is the one place to add files now.
+  // The Files section is the one place with a drop box.
   await expect(page.getByText("Drop files here, or")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Upload files" })).toHaveCount(0);
 
-  // Held while it uploads: the Files section shows it, and the blank page's own uploader stays gone.
+  // Held while it uploads: the Files section shows it.
   await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-uploads", "1"); });
   await dropFiles(files.getByText("Drop files here, or"), ["Second.pdf"]);
   await expect(files.getByText("Second.pdf")).toBeVisible();
@@ -246,13 +234,13 @@ test("should add later files through a Files artifact's own section once a drop 
   await dropFiles(files.getByRole("heading", { name: "Files" }), ["Third.pdf"]);
   await expect(files).toContainText("3 attached");
   await expect.poll(async () => (await storedNew(page))[0]?.files.length).toBe(3);
-  expect((await storedNew(page))[0]?.kind).toBe("file");
+  expect((await storedNew(page))[0]?.kind).toBe("ui");
   expect(await creates(page)).toBe(1);
 });
 
-test("should take a drop on a blank Files page's own drop box while files upload", async ({ page }) => {
+test("should take a drop on a blank page's own drop box while files upload, and store them with the page once something is written", async ({ page }) => {
   await openNewArtifact(page);
-  await switchBlankPageTo(page, "Files");
+  await blankTextPage(page);
   await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-uploads", "1"); });
   await dropFiles(body(page), ["First.pdf"]);
   const box = blankPage(page).getByText("Drop files here, or");
@@ -265,8 +253,12 @@ test("should take a drop on a blank Files page's own drop box while files upload
   await expect(page.locator("[data-slot=drop-hint]")).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Uploads" }).getByRole("listitem")).toHaveCount(2);
   await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-uploads"); window.dispatchEvent(new Event("fixture:release-uploads")); });
+  // Files alone store nothing: the page is stored when something is written, and the create carries both.
+  await uploadsReady(page, 2);
+  expect(await creates(page)).toBe(0);
+  await writeTextBody(page, "Notes on both files");
   await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(2);
-  expect((await storedNew(page))[0]?.kind).toBe("file");
+  expect((await storedNew(page))[0]?.kind).toBe("text");
   expect(await creates(page)).toBe(1);
 });
 
