@@ -56,6 +56,11 @@ describe("parseArtifactRef", () => {
     expect(problemOf(`http://localhost:4000/artifact/${id}`, "http://localhost:3000")).toBe("other-site");
   });
 
+  it("should read this site's host and port without a scheme as this site, never as a scheme", () => {
+    expect(parseArtifactRef(`localhost:3000/artifact/${id}`, "http://localhost:3000")).toEqual(publicRef);
+    expect(parseArtifactRef(`localhost:3000/app?artifact=${id}`, "http://localhost:3000")).toEqual(publicRef);
+  });
+
   it("should read an internal id as one, in lower case, when a UUID is given", () => {
     expect(parseArtifactRef(uuid.toUpperCase(), origin)).toEqual({ ok: true, ref: { kind: "internalId", id: uuid } });
     expect(isUuid(uuid)).toBe(true);
@@ -72,7 +77,7 @@ describe("parseArtifactRef", () => {
     ["a look-alike host that ends with ours", `https://evil-artifacts.example/artifact/${id}`],
     ["a host that starts with ours", `https://artifacts.example.evil.test/artifact/${id}`],
     ["our host as the user part of another site's address", `https://artifacts.example@evil.test/artifact/${id}`],
-    ["another scheme", `javascript:alert(1)//artifacts.example/artifact/${id}`],
+    ["another scheme", `ftp://artifacts.example/artifact/${id}`],
     ["a file address", `file:///artifact/${id}`],
   ])("should refuse %s as another site, and never as an artifact", (_name, link) => {
     expect(problemOf(link)).toBe("other-site");
@@ -85,6 +90,7 @@ describe("parseArtifactRef", () => {
     ["an artifact link with a malformed id", `${origin}/artifact/not-an-id`],
     ["a file link", `${origin}/api/files/0b8f6a52-6d0e-4f0e-9b1a-3f1e2d4c5b6a`],
     ["a share link with a malformed id", `${origin}/share/xyz`],
+    ["a path that starts with another host", `//other.example/artifact/${id}`],
   ])("should refuse %s as a link that names no artifact", (_name, link) => {
     expect(problemOf(link)).toBe("link-without-artifact");
   });
@@ -95,6 +101,10 @@ describe("parseArtifactRef", () => {
     ["23 characters", `${id}x`],
     ["a character base58 leaves out", `0${id.slice(1)}`],
     ["a UUID without its dashes", uuid.replaceAll("-", "")],
+    ["words that hold a colon", "TODO: fix the export"],
+    ["a script address that holds our link", `javascript:alert(1)//artifacts.example/artifact/${id}`],
+    ["a mail address", "mailto:someone@example.com"],
+    ["another host and port without a scheme", `localhost:4000/artifact/${id}`],
   ])("should refuse %s as not an id", (_name, value) => {
     expect(problemOf(value)).toBe("not-an-id");
   });

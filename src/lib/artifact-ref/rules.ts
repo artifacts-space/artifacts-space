@@ -34,7 +34,8 @@ export const ARTIFACT_REF_MAX_CHARS = 2048;
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const shareIdPattern = /^[0-9a-f]{32}$/;
-const schemePattern = /^[a-z][a-z0-9+.-]*:/i;
+/** A value written as a link with a scheme: "https://…", or any other "<scheme>://". Words with a colon ("TODO: fix it") and "host:port/…" are not. */
+const schemePattern = /^[a-z][a-z0-9+.-]*:\/\//i;
 /** What people wrap a pasted link in: angle brackets, quotes, backticks, and the brackets of a Markdown link. */
 const wrapping = /^[\s<>"'`([]+|[\s<>"'`)\].,;]+$/g;
 
@@ -58,16 +59,24 @@ function hostOf(origin: string): string | null {
 }
 
 /**
- * The value as a URL when it is written as a link: with a scheme, as this
- * site's host followed by a path ("artifacts.space/artifact/…"), or as a
- * path on this site ("/artifact/…"). Null for anything else.
+ * The value written out as a full link, or null when it is not written as
+ * one. This site's host followed by a path ("artifacts.space/artifact/…",
+ * "localhost:3000/artifact/…") is read first, so a host with a port is not
+ * taken for a scheme; then a path on this site ("/artifact/…"); then a
+ * value with a scheme and "//". Anything else is not a link: words that
+ * hold a colon are refused as words, never as a link to another site.
  */
+function writtenLink(value: string, host: string): string | null {
+  const lower = value.toLowerCase();
+  if (lower.startsWith(`${host}/`) || lower.startsWith(`${host}?`)) return `https://${value}`;
+  if (value.startsWith("/")) return `https://${host}${value}`;
+  return schemePattern.test(value) ? value : null;
+}
+
+/** The value as a URL when it is written as a link (see writtenLink). Null for anything else. */
 function asLink(value: string, origin: string): URL | null {
   const host = hostOf(origin);
-  if (!host) return null;
-  const lower = value.toLowerCase();
-  const hostFirst = lower.startsWith(`${host}/`) || lower.startsWith(`${host}?`);
-  const written = schemePattern.test(value) ? value : hostFirst ? `https://${value}` : value.startsWith("/") ? `https://${host}${value}` : null;
+  const written = host ? writtenLink(value, host) : null;
   if (written === null) return null;
   try {
     return new URL(written);

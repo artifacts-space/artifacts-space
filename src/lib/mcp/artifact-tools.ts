@@ -34,7 +34,7 @@ import { EditConflictError } from "@/lib/edits/conflict-error";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { artifactRefField } from "./artifact-ref-field";
-import { referencedListItem, withReferenced } from "./artifact-ref-search";
+import { SEARCH_QUERY_MAX_CHARS, SEARCH_TEXT_MAX_CHARS, searchWithReferenced } from "./artifact-ref-search";
 import { toMcpArtifact, toMcpListItem, type McpViewContext } from "./artifact-view";
 import { asSaved, baseVersionField, baseVersionOf, editConflictResult } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
@@ -263,7 +263,7 @@ function registerReadTools(server: ToolServer, userId: string) {
     {
       ...artifactToolCopy.artifacts_list,
       inputSchema: {
-        query: z.string().max(300).optional().describe("Text to find in artifacts, or one artifact's id or link"),
+        query: z.string().max(SEARCH_QUERY_MAX_CHARS).optional().describe(`Text to find in artifacts (at most ${String(SEARCH_TEXT_MAX_CHARS)} characters), or one artifact's id or link`),
         project: z.string().max(projectLimits.maxNameChars * 2).optional().describe("Only artifacts in this project (name, any case)"),
         tags: tagFilterField,
         scope: z.string().max(39).optional().default("mine").describe("\"mine\" or a team slug from teams_list"),
@@ -274,11 +274,8 @@ function registerReadTools(server: ToolServer, userId: string) {
       const { teams, view } = await loadContext(userId);
       // A query that is an artifact's id or link names that artifact, wherever it lives: it comes first when no filter narrows the list.
       const filtered = project !== undefined || (tags?.length ?? 0) > 0;
-      const [named, artifacts] = await Promise.all([
-        filtered ? null : referencedListItem(userId, query),
-        listArtifacts(userId, { scope: scopeFor(teams, scope), query, project: projectFilterFor(project), tags: tagFilterFor(tags), limit }),
-      ]);
-      return withReferenced(named, artifacts, limit).map((item) => toMcpListItem(item, view));
+      const search = (text: string | undefined) => listArtifacts(userId, { scope: scopeFor(teams, scope), query: text, project: projectFilterFor(project), tags: tagFilterFor(tags), limit });
+      return (await searchWithReferenced({ userId, query, filtered, limit, search })).map((item) => toMcpListItem(item, view));
     }),
   );
 

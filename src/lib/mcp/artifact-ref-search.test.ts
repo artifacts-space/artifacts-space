@@ -7,7 +7,7 @@ const loadArtifactForViewer = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/artifact-ref/resolve", () => ({ publicIdForRef }));
 vi.mock("@/lib/artifact-read", () => ({ loadArtifactForViewer }));
 
-import { referencedListItem, withReferenced } from "./artifact-ref-search";
+import { LONG_QUERY_MESSAGE, referencedListItem, SEARCH_QUERY_MAX_CHARS, SEARCH_TEXT_MAX_CHARS, searchWithReferenced, withReferenced } from "./artifact-ref-search";
 
 const origin = "https://artifacts.example";
 const id = "4fXkP9qR2sT7vW1yZ3aB5c";
@@ -85,5 +85,57 @@ describe("withReferenced", () => {
 
   it("should leave the list as it is when the query names no artifact", () => {
     expect(withReferenced(null, [item("a"), item("b")], 25).map((entry) => entry.publicId)).toEqual(["a", "b"]);
+  });
+});
+
+describe("searchWithReferenced", () => {
+  const search = vi.fn();
+  const input = (query: string | undefined, filtered = false) => ({ userId: "user-1", query, filtered, limit: 25, search });
+  /** A link to one block: the artifact's link with the block's quoted words, longer than search text may be. */
+  const blockLink = `${origin}/artifact/${id}#block=${"word%20".repeat(60)}:~:text=${"word%20".repeat(60)}`;
+
+  beforeEach(() => {
+    search.mockReset();
+    search.mockResolvedValue([item("a"), item("b")]);
+    loadArtifactForViewer.mockResolvedValue(loaded({}, false));
+  });
+
+  it("should search the text and put the artifact a short query names first", async () => {
+    const found = await searchWithReferenced(input(`${origin}/artifact/${id}`));
+    expect(found.map((entry) => entry.publicId)).toEqual([id, "a", "b"]);
+    expect(search).toHaveBeenCalledWith(`${origin}/artifact/${id}`);
+  });
+
+  it("should leave the artifact a query names to the filters when a project or tags narrow the list", async () => {
+    const found = await searchWithReferenced(input(id, true));
+    expect(found.map((entry) => entry.publicId)).toEqual(["a", "b"]);
+    expect(loadArtifactForViewer).not.toHaveBeenCalled();
+  });
+
+  it("should return the artifact alone, and search no text, when the query is a link longer than search text may be", async () => {
+    expect(blockLink.length).toBeGreaterThan(SEARCH_TEXT_MAX_CHARS);
+    expect(blockLink.length).toBeLessThanOrEqual(SEARCH_QUERY_MAX_CHARS);
+    const found = await searchWithReferenced(input(blockLink));
+    expect(found.map((entry) => entry.publicId)).toEqual([id]);
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  it("should return nothing for a long link to an artifact the caller cannot read", async () => {
+    loadArtifactForViewer.mockResolvedValue(null);
+    expect(await searchWithReferenced(input(blockLink))).toEqual([]);
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  it("should refuse text longer than search text may be, with what to do, and search nothing", async () => {
+    await expect(searchWithReferenced(input("word ".repeat(80)))).rejects.toThrow(LONG_QUERY_MESSAGE);
+    expect(LONG_QUERY_MESSAGE).toContain("artifacts_get");
+    expect(search).not.toHaveBeenCalled();
+    expect(loadArtifactForViewer).not.toHaveBeenCalled();
+  });
+
+  it("should search as before when there is no query", async () => {
+    const found = await searchWithReferenced(input(undefined));
+    expect(found.map((entry) => entry.publicId)).toEqual(["a", "b"]);
+    expect(search).toHaveBeenCalledWith(undefined);
   });
 });
