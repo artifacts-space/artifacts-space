@@ -32,9 +32,9 @@ const serverApi: AttachFilesApi = {
   discard: discardUploadAction,
 };
 
-/** The line under a file's name: its type and size, or how far its replacement got. */
+/** The line under a file's name: its type and size (and that the page loads it, for a page file), or how far its replacement got. */
 function rowFacts(file: FileDto, replacing: Replacing | null): string {
-  if (!replacing) return `${fileTypeLabel(file.contentType)} · ${formatBytes(file.size)}`;
+  if (!replacing) return `${file.pagePath === undefined ? "" : "Page file · "}${fileTypeLabel(file.contentType)} · ${formatBytes(file.size)}`;
   return replacing.checking ? "Checking the new file…" : `Uploading the new file · ${String(replacing.progress)}%`;
 }
 
@@ -55,7 +55,8 @@ function AttachedRow({ file, showId, removing, replacing, busy, onRemove, onRepl
     <li className="card-nested flex min-w-0 items-center gap-3 bg-card px-3 py-2" data-replacing={replacing ? "" : undefined}>
       <IconFile aria-hidden className="size-4 shrink-0 text-muted-foreground" />
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm">{file.filename}</span>
+        {/* A page file shows the path its page loads it by. */}
+        <span className="truncate text-sm">{file.pagePath ?? file.filename}</span>
         <span className="text-xs text-muted-foreground" aria-live="polite">{rowFacts(file, replacing)}</span>
       </span>
       {showId ? <CopyButton value={file.id} label="Copy id" variant="ghost" size="xs" /> : null}

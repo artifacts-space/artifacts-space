@@ -4,7 +4,10 @@ import { pageHostPattern } from "@/lib/security-header-rules";
 
 import { frameDocument } from "./frame-document";
 import { framingSite, pageHostResponse } from "./respond";
-import { hostName, hostPort, isUnderPageDomain, looksLikePageHost, pageDomainRewrites, pageContentPolicy, pageHostBase, pageLabelFor, pageLabelOf, pageOrigin, pageSandbox, pageScriptHosts } from "./rules";
+import { hostName, hostPort, isUnderPageDomain, looksLikePageHost, pageDomainRewrites, pageDomainRewriteSource, pageContentPolicy, pageFramePath, pageHostBase, pageHostPath, pageLabelFor, pageLabelOf, pageOrigin, pageSandbox, pageScriptHosts } from "./rules";
+
+/** A stand-in for a page files token: the shape of one, opened by nothing. */
+const token = "t".repeat(120);
 
 const label = "0123456789abcdef0123456789abcdef";
 const production = { NODE_ENV: "production", PAGE_HOST: "artifacts.link", BETTER_AUTH_URL: "https://artifacts.space" } as NodeJS.ProcessEnv;
@@ -86,18 +89,28 @@ describe("pageContentPolicy", () => {
     expect(directive("frame-ancestors")).toBe("frame-ancestors https://artifacts.space");
   });
 
-  it("should let inline scripts run and load scripts from the public package hosts only", () => {
+  it("should let inline scripts run and load scripts from the page's own host and the public package hosts only", () => {
     expect(directive("script-src")).toContain("'unsafe-inline'");
     expect(directive("script-src")).toContain("https://cdn.jsdelivr.net");
-    expect(directive("script-src")).not.toMatch(/\*|https:(\s|$)|'self'/);
+    expect(directive("script-src")).not.toMatch(/\*|https:(\s|$)|artifacts/);
+    expect(directive("script-src").split(" ").slice(1)).toEqual(["'self'", "'unsafe-inline'", "'unsafe-eval'", "blob:", ...pageScriptHosts]);
   });
 
-  it("should allow no request to this site, to the page host, or to any host but the listed package hosts", () => {
-    expect(directive("connect-src")).not.toMatch(/\*|https:(\s|$)|'self'|artifacts/);
-    expect(directive("img-src")).not.toMatch(/\*|https:(\s|$)|'self'/);
+  it("should allow no request to this site or to any host but the page's own and the listed package hosts", () => {
+    expect(directive("connect-src")).not.toMatch(/\*|https:(\s|$)|artifacts/);
+    expect(directive("img-src")).not.toMatch(/\*|https:(\s|$)|artifacts/);
     // The listed hosts stay reachable without a click: a known limit, stated on pageContentPolicy.
-    expect(directive("connect-src").split(" ").slice(1)).toEqual([...pageScriptHosts]);
-    expect(directive("img-src").split(" ").slice(1)).toEqual(["data:", "blob:", ...pageScriptHosts]);
+    expect(directive("connect-src").split(" ").slice(1)).toEqual(["'self'", ...pageScriptHosts]);
+    expect(directive("img-src").split(" ").slice(1)).toEqual(["'self'", "data:", "blob:", ...pageScriptHosts]);
+  });
+
+  it("should let the page load its own files of every kind, and nothing else of its host's", () => {
+    for (const name of ["script-src", "style-src", "font-src", "img-src", "media-src", "connect-src", "worker-src"]) {
+      expect(directive(name).split(" "), name).toContain("'self'");
+    }
+    for (const name of ["frame-src", "object-src", "base-uri", "form-action"]) {
+      expect(directive(name), name).toBe(`${name} 'none'`);
+    }
   });
 
   it("should forbid forms, frames, plugins, and a base address", () => {
@@ -156,7 +169,13 @@ describe("framingSite", () => {
 });
 
 describe("pageHostResponse", () => {
-  const ask = (pathname: string, method = "GET", host = `${label}.artifacts.link`) => pageHostResponse({ method, pathname, host }, production);
+  const answer = (pathname: string, method = "GET", host = `${label}.artifacts.link`) => pageHostResponse({ method, pathname, host }, production);
+  /** The answer, for a request the proxy answers itself. */
+  const ask = (pathname: string, method = "GET", host = `${label}.artifacts.link`) => {
+    const response = answer(pathname, method, host);
+    if (!response) throw new Error(`${pathname} was let through to the page file route.`);
+    return response;
+  };
 
   it("should serve the frame document at the root, cacheable, with no cookie", async () => {
     const response = ask("/");
@@ -174,8 +193,41 @@ describe("pageHostResponse", () => {
     expect(await response.text()).toBe("");
   });
 
-  it.each(["/app", "/index.html", "/api/files/1", "//", "/a/b"])("should answer 404 for %s", (pathname) => {
+  it.each(["/app", "/index.html", "/api/files/1", "//", "/a/b", "/f", "/f/", `/f/${token}`, `/f/${token}/`, "/f/short/site.css", `/f/${token}x!/site.css`, `/page-file/${token}/site.css`])("should answer 404 for %s", (pathname) => {
     expect(ask(pathname).status).toBe(404);
+  });
+
+  it("should serve the same frame document as the page's name under a files address, so the page's files are its siblings", async () => {
+    const response = ask(`/f/${token}/index.html`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-security-policy")).toBe(ask("/").headers.get("content-security-policy"));
+    expect(await response.text()).toBe(await ask("/").text());
+    expect(pageFramePath(token)).toBe(`/f/${token}/index.html`);
+    expect(pageFramePath(null)).toBe("/");
+  });
+
+  it("should let a GET or HEAD of a page file through to its route, and nothing else", () => {
+    for (const pathname of [`/f/${token}/site.css`, `/f/${token}/js/app.js`, `/f/${token}/img/a/b/logo.png`]) {
+      expect(answer(pathname), pathname).toBeNull();
+      expect(answer(pathname, "HEAD"), pathname).toBeNull();
+      expect(ask(pathname, "POST").status, pathname).toBe(405);
+      expect(ask(pathname, "DELETE").status, pathname).toBe(405);
+    }
+  });
+
+  it("should never let a page file's path through on a host that is not a page host of this deployment", () => {
+    for (const host of ["www.artifacts.link", "artifacts.space", `${label}.example.com`, `${label}.x.artifacts.link`]) {
+      expect(ask(`/f/${token}/site.css`, "GET", host).status, host).toBe(404);
+    }
+    expect(pageHostResponse({ method: "GET", pathname: `/f/${token}/site.css`, host: `${label}.artifacts.link` }, { NODE_ENV: "production" })?.status).toBe(404);
+  });
+
+  it("should read a path as the frame document, a page file, or nothing", () => {
+    expect(pageHostPath("/")).toBe("frame");
+    expect(pageHostPath(`/f/${token}/index.html`)).toBe("frame");
+    expect(pageHostPath(`/f/${token}/css/site.css`)).toBe("file");
+    expect(pageHostPath(`/f/${token}/css/index.html`)).toBe("file");
+    for (const pathname of ["", "/f", `/f/${token}`, `/f/${token}/`, "/index.html", `/F/${token}/site.css`, `/x/f/${token}/site.css`]) expect(pageHostPath(pathname), pathname).toBe("none");
   });
 
   it("should refuse every method but GET and HEAD", () => {
@@ -202,10 +254,18 @@ describe("hosts under the page domain that are not page hosts", () => {
   it("should send every path of every host under the page domain to the refusal", () => {
     const rules = pageDomainRewrites({ NODE_ENV: "production", PAGE_HOST: "artifacts.link" });
     expect(rules).toHaveLength(1);
-    expect(rules[0]).toMatchObject({ source: "/:path*", destination: "/page-host-refusal" });
+    expect(rules[0]).toMatchObject({ source: pageDomainRewriteSource, destination: "/page-host-refusal" });
     for (const host of ["www.artifacts.link", "app.artifacts.link", "a.b.artifacts.link", `${label}.x.artifacts.link`, `${label}.artifacts.link`]) {
       expect(ruleMatches(host, { PAGE_HOST: "artifacts.link" }), host).toBe(true);
     }
+  });
+
+  it("should leave out only a page file's path, which its own route refuses on every host but a page host", () => {
+    // Next compiles the source with path-to-regexp; the group is the pattern between the parentheses, tried against the path after its first slash.
+    const group = /^\/:path\((.*)\)$/.exec(pageDomainRewriteSource)?.[1] ?? "";
+    const caught = (pathname: string) => new RegExp(`^${group}$`).test(pathname.slice(1));
+    for (const pathname of ["/", "/app", "/sign-in", "/api/auth/get-session", "/f", "/f/", `/f/${token}`, `/f/${token}/`, "/files/x/y", `/x/f/${token}/site.css`, "/_next/static/chunk.js"]) expect(caught(pathname), pathname).toBe(true);
+    for (const pathname of [`/f/${token}/site.css`, `/f/${token}/js/app.js`, `/f/${token}/index.html`]) expect(caught(pathname), pathname).toBe(false);
   });
 
   it("should hold for a host in capitals and for one that ends with a dot, as the proxy's check does", () => {

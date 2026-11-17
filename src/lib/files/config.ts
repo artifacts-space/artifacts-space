@@ -1,3 +1,5 @@
+import { pageFileLabel } from "../page-files/rules";
+
 /**
  * File upload rules: the size cap, the allowed types, and how each type is
  * shown. Client-safe (no server imports), so the uploader shows the same
@@ -161,9 +163,9 @@ export function fileCategory(contentType: string): FileCategory {
   return isAllowedFileType(contentType) ? allowedFileTypes[contentType].category : "document";
 }
 
-/** A short type name for people, such as "PDF". */
+/** A short type name for people, such as "PDF", or "Stylesheet" for a type only a page file may be. */
 export function fileTypeLabel(contentType: string): string {
-  return isAllowedFileType(contentType) ? allowedFileTypes[contentType].label : "File";
+  return isAllowedFileType(contentType) ? allowedFileTypes[contentType].label : pageFileLabel(contentType);
 }
 
 /** Types a browser may show in the page. Everything else downloads. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { storedObjectProblem } from "./uploads";
+import { storedObjectProblem, uploadRequestSchema } from "./uploads";
 
 describe("storedObjectProblem", () => {
   const row = { size: 100, contentType: "image/png" };
@@ -14,5 +14,18 @@ describe("storedObjectProblem", () => {
     expect(storedObjectProblem(row, { size: 99, contentType: "image/png" })).toContain("99 bytes");
     expect(storedObjectProblem(row, { size: 100, contentType: "text/html" })).toContain("text/html");
     expect(storedObjectProblem(row, { size: 100, contentType: "" })).toContain("untyped");
+  });
+});
+
+describe("uploadRequestSchema", () => {
+  it("should take a page file's path in place of a name", () => {
+    expect(uploadRequestSchema.safeParse({ pagePath: "css/site.css", size: 10 }).success).toBe(true);
+    expect(uploadRequestSchema.safeParse({ filename: "report.pdf", size: 10 }).success).toBe(true);
+  });
+
+  it("should refuse an empty name and a size that is not a positive whole number", () => {
+    expect(uploadRequestSchema.safeParse({ filename: " ", size: 10 }).success).toBe(false);
+    expect(uploadRequestSchema.safeParse({ pagePath: "css/site.css", size: 0 }).success).toBe(false);
+    expect(uploadRequestSchema.safeParse({ pagePath: "css/site.css", size: 1.5 }).success).toBe(false);
   });
 });

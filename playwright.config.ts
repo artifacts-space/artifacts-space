@@ -77,7 +77,8 @@ export default defineConfig({
       // Both database URLs are always set, so next dev never fills them from .env.local:
       // empty for the fixture pages, or the local test database with E2E_LOCAL_DB=1.
       // Google sign-in and the OpenAI domain-check token are pinned off too.
-      env: { ...e2eDevServerDatabaseEnv(process.env), ...googleSignInOff, ...openAiChallengeOff },
+      // A secret of its own unless the shell has one, so the page files fixture can make a token with no .env.local (CI has none).
+      env: { ...e2eDevServerDatabaseEnv(process.env), ...googleSignInOff, ...openAiChallengeOff, BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? productionTestEnv.BETTER_AUTH_SECRET },
     },
     {
       // `next build` writes .next/ and `next dev` writes .next/dev/, so both can run at once.

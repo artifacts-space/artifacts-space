@@ -1,0 +1,2 @@
+ALTER TABLE "artifact_file" ADD COLUMN "page_path" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "artifact_file_page_path_idx" ON "artifact_file" USING btree ("artifact_id",lower("page_path")) WHERE "artifact_file"."page_path" is not null;

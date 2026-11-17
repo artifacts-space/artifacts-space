@@ -52,8 +52,8 @@ export async function filesForViewer(viewable: Pick<ArtifactAccess, "record" | "
 }
 
 /** A file as readers get it: what it is, without the editing flags (embedded, pictured) only the Files section uses. */
-function forReaders({ id, filename, contentType, size, createdAt, replacedAt }: FileDto): FileDto {
-  return { id, filename, contentType, size, createdAt, replacedAt };
+function forReaders({ id, filename, contentType, size, createdAt, replacedAt, pagePath }: FileDto): FileDto {
+  return { id, filename, contentType, size, createdAt, replacedAt, ...(pagePath === undefined ? {} : { pagePath }) };
 }
 
 /**
@@ -74,7 +74,7 @@ async function asServedAt(files: readonly FileDto[], servedAt: Date): Promise<Fi
 }
 
 /** One file as a reader of the version saved at `servedAt` gets it (see asServedAt), or null when its copy from then is gone. */
-async function fileServedAt(file: ArtifactFileRecord, servedAt: Date | null): Promise<ArtifactFileRecord | null> {
+export async function fileServedAt(file: ArtifactFileRecord, servedAt: Date | null): Promise<ArtifactFileRecord | null> {
   if (!servedAt || !replacedSince(file, servedAt)) return file;
   const copy = (await copiesCurrentAt([file.id], servedAt)).get(file.id);
   if (!copy) return null;

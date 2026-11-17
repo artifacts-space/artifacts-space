@@ -7,6 +7,8 @@ import { canEditRecord } from "@/lib/access";
 import type { HarnessStamp } from "@/lib/harness/harness-rules";
 import type { SharingActor } from "@/lib/sharing/rules";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
+import { attachPageUploads, pageUploadsAmong } from "@/lib/page-files/attach";
+import { detachPageFileRows } from "@/lib/page-files/store";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { recordArtifactChange } from "@/lib/versions/save-write";
 
@@ -55,6 +57,24 @@ async function hasRoomFor(artifactId: string | null, adding: number): Promise<bo
   return existing - (await countHistoryOnlyFiles(artifactId)) + adding <= fileLimits.maxFilesPerArtifact;
 }
 
+/**
+ * Attaches the plain files of a call that already attached page files. The
+ * two attaches are two statements, so when this one fails the page files
+ * are taken back out: a call that fails attaches nothing, and no file is in
+ * the artifact without the version that records it.
+ */
+async function attachPlainOrUndo(editorId: string, artifactId: string, plainIds: readonly string[], attachedPages: readonly string[]): Promise<number> {
+  try {
+    return await attachFileRows(editorId, artifactId, plainIds);
+  } catch (error) {
+    await detachPageFileRows(artifactId, attachedPages).catch((undo: unknown) => {
+      // The page files stay in the artifact with no version that records them; this line is how an operator finds out.
+      console.error("[files] Page files could not be taken back out after a failed attach.", undo instanceof Error ? undo.name : "unknown error");
+    });
+    throw error;
+  }
+}
+
 /** No harness: a change in the web app. An agent passes its harness, looked up only when the change files a version. */
 const noStamp = () => Promise.resolve(null);
 
@@ -63,13 +83,20 @@ const noStamp = () => Promise.resolve(null);
  * version. For a link or public artifact the change goes through edit review
  * (recordArtifactChange), so readers outside the team see new files only
  * once they are approved. Counts against the per-editor edit limit.
+ * Uploads that were requested as page files attach as the page files of an
+ * HTML artifact, under their own rules and limits
+ * (src/lib/page-files/attach.ts); the others attach as plain files.
  * Returns the artifact as this change saved it, or null when nothing was
  * attached (every file was in it already) and so nothing saved.
  */
 export async function attachFiles(editorId: string, artifactId: string, fileIds: readonly string[], actor: SharingActor, harness: () => Promise<HarnessStamp | null> = noStamp): Promise<ArtifactRecord | null> {
-  await assertUsableFiles(editorId, artifactId, fileIds);
+  const pageUploads = await pageUploadsAmong(editorId, fileIds);
+  const pageIds = new Set(pageUploads.map((upload) => upload.id));
+  const plainIds = fileIds.filter((id) => !pageIds.has(id.toLowerCase()));
+  await assertUsableFiles(editorId, artifactId, plainIds);
   await enforceRateLimit("artifactUpdate", editorId);
-  const attached = await attachFileRows(editorId, artifactId, fileIds);
+  const attachedPages = await attachPageUploads(editorId, artifactId, pageUploads);
+  const attached = attachedPages.length + (await attachPlainOrUndo(editorId, artifactId, plainIds, attachedPages));
   if (attached === 0) return null;
   return (await recordArtifactChange({ artifactId, editorId, actor, harness: await harness() })).record;
 }

@@ -7,12 +7,13 @@ import { getDb } from "@/db";
 import { artifactFile, type ArtifactFileRecord } from "@/db/schema";
 import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { assertFileFits } from "@/lib/quota/usage";
+import { checkPagePath, pageFileName, type PageUploadCheck } from "@/lib/page-files/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
 
-import { checkUpload, fileLimits, isAllowedFileType } from "./config";
+import { checkUpload, fileLimits, formatBytes, isAllowedFileType } from "./config";
 import { fileObjectKey, sanitizeFilename } from "./names";
 import { headObject, presignUpload, r2ConfigFromEnv, readObjectStart, type PresignedUpload } from "./r2";
-import { matchesFileSignature, signatureBytes } from "./signature";
+import { matchesFileSignature, matchesPageFileSignature, signatureBytes } from "./signature";
 import { countPendingUploads, getFileRow, removeFiles, toFileDto } from "./store";
 import type { FileDto } from "./types";
 
@@ -21,12 +22,18 @@ import type { FileDto } from "./types";
  * pending row, and returns a presigned PUT. 2: the client or agent PUTs the
  * bytes straight to R2 with exactly the returned headers. 3: finalizeUpload
  * checks the stored object's size, type, and first bytes, and marks it ready.
+ *
+ * An upload requested with `pagePath` is a page file of an HTML artifact
+ * (src/lib/page-files/rules.ts): its type comes from the path, it may be a
+ * type plain attachments refuse (a stylesheet, a script, a font), and it
+ * keeps the path for good, so it can only ever be attached as a page file.
  */
 
 export const uploadRequestSchema = z.object({
-  filename: z.string().trim().min(1, "Give the file a name.").max(255),
+  filename: z.string().trim().min(1, "Give the file a name.").max(255).optional(),
   contentType: z.string().trim().max(255).optional(),
   size: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  pagePath: z.string().max(1000).optional(),
 });
 
 export type UploadRequest = z.input<typeof uploadRequestSchema>;
@@ -45,7 +52,10 @@ export interface StartedUpload {
  */
 export async function requestUpload(uploaderId: string, input: UploadRequest): Promise<StartedUpload> {
   const parsed = uploadRequestSchema.parse(input);
-  const check = checkUpload(parsed);
+  const pagePath = parsed.pagePath ?? null;
+  const name = pagePath === null ? parsed.filename : pageFileName(pagePath);
+  if (!name) throw new UserFacingError("Give the file a name.");
+  const check = pagePath === null ? checkUpload({ ...parsed, filename: name }) : checkPageUpload(pagePath, parsed.size);
   if (!check.ok) throw new UserFacingError(check.error);
   if ((await countPendingUploads(uploaderId)) >= fileLimits.maxPendingPerUser) {
     throw new UserFacingError("You have many unfinished uploads. Finish or remove them, then try again.");
@@ -53,15 +63,27 @@ export async function requestUpload(uploaderId: string, input: UploadRequest): P
   await enforceRateLimit("fileUpload", uploaderId);
   await assertFileFits(uploaderId, parsed.size);
   const id = randomUUID();
-  const filename = sanitizeFilename(parsed.filename);
+  const filename = sanitizeFilename(name);
   const key = fileObjectKey(id, filename);
   const upload = await presignUpload(r2ConfigFromEnv(), { key, contentType: check.contentType, size: parsed.size, expiresIn: fileLimits.uploadUrlSeconds });
   const [row] = await getDb()
     .insert(artifactFile)
-    .values({ id, uploaderId, key, filename, contentType: check.contentType, size: parsed.size, status: "pending" })
+    .values({ id, uploaderId, key, filename, contentType: check.contentType, size: parsed.size, status: "pending", pagePath })
     .returning();
   if (!row) throw new Error("The upload could not be started.");
   return { file: toFileDto(row), upload };
+}
+
+/** Checks a page file's upload before any URL is signed: a size within the cap, and a path that names a page file (its type follows from the path). */
+function checkPageUpload(pagePath: string, size: number): PageUploadCheck {
+  if (size > fileLimits.maxBytes) return { ok: false, error: `The file is ${formatBytes(size)}. The limit is ${formatBytes(fileLimits.maxBytes)}.` };
+  return checkPagePath(pagePath);
+}
+
+/** Whether a finished upload's first bytes look like its type: a page file by the page file types, any other by the attachment types. */
+function looksLikeItsType(row: Pick<ArtifactFileRecord, "contentType" | "pagePath">, start: Uint8Array): boolean {
+  if (row.pagePath !== null) return matchesPageFileSignature(row.contentType, start);
+  return isAllowedFileType(row.contentType) && matchesFileSignature(row.contentType, start);
 }
 
 /** Why a stored object does not match its upload request, or null when it does. */
@@ -97,9 +119,9 @@ export async function finalizeUpload(uploaderId: string, fileId: string): Promis
   if (!stored) throw new UserFacingError("The file has not arrived yet. PUT it to the upload URL with the returned headers, then finalize again.");
   const problem = storedObjectProblem(row, stored);
   if (problem) return rejectUpload(row, problem);
-  if (!isAllowedFileType(row.contentType)) return rejectUpload(row, "This file type is not supported.");
+  if (row.pagePath === null && !isAllowedFileType(row.contentType)) return rejectUpload(row, "This file type is not supported.");
   const start = await readObjectStart(config, row.key, signatureBytes);
-  if (!matchesFileSignature(row.contentType, start)) return rejectUpload(row, `The file's content does not look like ${row.contentType}.`);
+  if (!looksLikeItsType(row, start)) return rejectUpload(row, `The file's content does not look like ${row.contentType}.`);
   const [ready] = await getDb()
     .update(artifactFile)
     .set({ status: "ready" })

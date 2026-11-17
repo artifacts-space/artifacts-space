@@ -1,4 +1,6 @@
-import type { AllowedFileType } from "./config";
+import { pageFileTypeOfStored, type PageFileCheck } from "../page-files/rules";
+
+import { isAllowedFileType, type AllowedFileType } from "./config";
 
 /** How many leading bytes the finalize step reads to check a file's type. */
 export const signatureBytes = 16;
@@ -53,4 +55,28 @@ const matchers: Record<AllowedFileType, Matcher> = {
  */
 export function matchesFileSignature(contentType: AllowedFileType, bytes: Uint8Array): boolean {
   return matchers[contentType](bytes);
+}
+
+/** The leading-bytes checks of the types only a page file may be (src/lib/page-files/rules.ts). */
+const pageMatchers: Record<Exclude<PageFileCheck, "stored">, Matcher> = {
+  text,
+  woff2: (bytes) => startsWith(bytes, ascii("wOF2")),
+  woff: (bytes) => startsWith(bytes, ascii("wOFF")),
+  ttf: (bytes) => startsWith(bytes, [0x00, 0x01, 0x00, 0x00]) || startsWith(bytes, ascii("true")),
+  otf: (bytes) => startsWith(bytes, ascii("OTTO")),
+  wasm: (bytes) => startsWith(bytes, [0x00, 0x61, 0x73, 0x6d]),
+};
+
+/**
+ * True when the first bytes of a page file look like the type its path
+ * gave it: a font or a WebAssembly module by its marker, a stylesheet, a
+ * script, or an SVG as text (no NUL bytes), and every type a plain
+ * attachment may be as that type is checked. False for a type no page file
+ * is stored as.
+ */
+export function matchesPageFileSignature(contentType: string, bytes: Uint8Array): boolean {
+  const type = pageFileTypeOfStored(contentType);
+  if (!type) return false;
+  if (type.check === "stored") return isAllowedFileType(contentType) && matchesFileSignature(contentType, bytes);
+  return pageMatchers[type.check](bytes);
 }

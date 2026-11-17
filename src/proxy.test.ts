@@ -273,8 +273,25 @@ describe("proxy on a page host", () => {
     expect(mocks.checkArtifactPage).not.toHaveBeenCalled();
   });
 
+  it("should let a page file's path through to its route on a page host, and answer every other method there itself", async () => {
+    const path = `/f/${"t".repeat(120)}/css/site.css`;
+    for (const method of ["GET", "HEAD"]) {
+      const response = await proxy(onHost(`${label}.artifacts.link`, path, method));
+      expect(response.headers.get("x-middleware-next"), method).toBe("1");
+    }
+    expect((await proxy(onHost(`${label}.artifacts.link`, path, "POST"))).status).toBe(405);
+    expect(mocks.getSession).not.toHaveBeenCalled();
+    expect(mocks.checkArtifactPage).not.toHaveBeenCalled();
+  });
+
+  it("should serve the frame document as the page's name under a files address", async () => {
+    const response = await proxy(onHost(`${label}.artifacts.link`, `/f/${"t".repeat(120)}/index.html`));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("artifact-page:ready");
+  });
+
   it.each(["www.artifacts.link", "app.artifacts.link", `${label}.x.artifacts.link`])("should answer 404 on %s, a host under the page domain that is no page host, and never run the site's checks", async (host) => {
-    for (const path of ["/", "/app", "/sign-in", "/artifact/abc"]) {
+    for (const path of ["/", "/app", "/sign-in", "/artifact/abc", `/f/${"t".repeat(120)}/css/site.css`]) {
       const response = await proxy(onHost(host, path));
       expect(response.status, path).toBe(404);
       expect(response.headers.get("set-cookie")).toBeNull();
