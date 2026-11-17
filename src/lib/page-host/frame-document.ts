@@ -30,6 +30,16 @@ import { pageFramePathPattern, pageMessages } from "./rules";
  * a files address serves only that page's own files.
  */
 export function frameDocument(siteOrigin: string): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Page</title></head><body><script>${frameScript(siteOrigin)}</script></body></html>`;
+}
+
+/**
+ * The frame document's one script, as it stands between its script tags.
+ * It holds no "<": the site's origin is the only value written into it,
+ * and every "<" is written as an escape, so nothing in it can end the
+ * script element or start markup.
+ */
+export function frameScript(siteOrigin: string): string {
   const script = `(function () {
   var site = ${JSON.stringify(siteOrigin)};
   var host = window.parent;
@@ -66,6 +76,5 @@ export function frameDocument(siteOrigin: string): string {
   window.addEventListener("message", onMessage);
   host.postMessage({ type: ${JSON.stringify(pageMessages.ready)} }, site);
 })();`;
-  // "<" never appears in the script as markup: the origin is the only value in it, and JSON.stringify of an origin has none.
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Page</title></head><body><script>${script.replaceAll("<", "\\u003c")}</script></body></html>`;
+  return script.replaceAll("<", "\\u003c");
 }

@@ -2,7 +2,7 @@ import { runInNewContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
-import { frameDocument } from "./frame-document";
+import { frameDocument, frameScript } from "./frame-document";
 import { pageMessages } from "./rules";
 
 /*
@@ -48,8 +48,7 @@ function loadFrame(pathname: string) {
       location.pathname = path;
     },
   };
-  const script = /<script>([\s\S]*)<\/script>/.exec(frameDocument(site))?.[1] ?? "";
-  runInNewContext(script, { window: frame, document, history, location, RegExp, JSON });
+  runInNewContext(frameScript(site), { window: frame, document, history, location, RegExp, JSON });
   const deliver = (message: Message) => { for (const listener of [...listeners]) listener(message); };
   return { frame, host, posted, moves, written, location, deliver, fromSite: (data: unknown) => { deliver({ origin: site, source: host, data }); } };
 }
@@ -115,10 +114,9 @@ describe("the frame document's renewal", () => {
   });
 
   it("should keep running when the browser refuses the move", () => {
-    const refusing = /<script>([\s\S]*)<\/script>/.exec(frameDocument(site))?.[1] ?? "";
     const listeners: ((event: Message) => void)[] = [];
     const host = { postMessage: () => undefined };
-    runInNewContext(refusing, {
+    runInNewContext(frameScript(site), {
       window: { parent: host, addEventListener: (_type: string, listener: (event: Message) => void) => { listeners.push(listener); }, removeEventListener: () => undefined },
       document: {},
       history: { state: null, replaceState: () => { throw new Error("SecurityError"); } },
@@ -136,16 +134,25 @@ describe("the frame document", () => {
     const loaded = loadFrame("/");
     expect(loaded.posted).toEqual([{ message: { type: pageMessages.ready }, target: site }]);
 
-    const script = /<script>([\s\S]*)<\/script>/.exec(frameDocument(site))?.[1] ?? "";
     const added: string[] = [];
     const alone: { parent?: unknown; addEventListener: (type: string) => void } = { addEventListener: (type) => { added.push(type); } };
     alone.parent = alone;
-    runInNewContext(script, { window: alone, document: {}, history: {}, location: { pathname: "/" }, RegExp, JSON });
+    runInNewContext(frameScript(site), { window: alone, document: {}, history: {}, location: { pathname: "/" }, RegExp, JSON });
     expect(added).toEqual([]);
   });
 
   it("should hold no markup of its own in the script", () => {
-    const script = /<script>([\s\S]*)<\/script>/.exec(frameDocument(site))?.[1] ?? "";
-    expect(script).not.toContain("<");
+    expect(frameScript(site)).not.toContain("<");
+    // Not even for an origin that could never be one: whatever is written in is escaped.
+    expect(frameScript("https://a.test</script><script>alert(1)")).not.toContain("<");
+  });
+
+  it("should be one document whose only script is the one these tests run", () => {
+    const html = frameDocument(site);
+    const opening = "<script>";
+    const closing = "</script>";
+    expect(html.split(opening)).toHaveLength(2);
+    expect(html.split(closing)).toHaveLength(2);
+    expect(html.slice(html.indexOf(opening) + opening.length, html.indexOf(closing))).toBe(frameScript(site));
   });
 });

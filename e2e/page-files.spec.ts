@@ -247,9 +247,13 @@ test("should not let the page move its own files address with a message of its o
   const first = await frameAddress(page);
   const other = `/f/${"A".repeat(120)}/index.html`;
 
-  // The page posts the renewal message to itself and waits until a later message of its own arrived.
+  // The page posts the renewal message to itself and waits until a later message of its own arrived:
+  // one from this window, at this origin, and no other.
   const after = await frame.locator("body").evaluate((_body, path) => new Promise<string>((resolve) => {
-    window.addEventListener("message", (event) => { if (event.data === "after") resolve(location.pathname); });
+    window.addEventListener("message", (event) => {
+      if (event.origin !== window.origin || event.source !== window) return;
+      if (event.data === "after") resolve(location.pathname);
+    });
     window.postMessage({ type: "artifact-page:renew", path }, "*");
     window.postMessage("after", "*");
   }), other);
