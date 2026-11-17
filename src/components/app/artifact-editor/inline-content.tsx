@@ -10,6 +10,7 @@ import { ChangedFramesContext } from "@/components/artifact-view/canvas/changed-
 import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { ContentStatus } from "@/components/editor/content-status";
 import { DocumentEditor, isDocumentKind, type DocumentKind } from "@/components/editor/document-editor";
+import { useSourceFileDrop } from "@/components/editor/source-file-drop";
 import { InlineCommentSurface } from "@/components/inline-comments/inline-comment-surface";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -238,9 +239,13 @@ interface SourceEditorProps {
 /** The raw content, for View source and for code. Spell check only for prose. */
 function SourceEditor({ kind, content, label, place, onChange, hide }: SourceEditorProps) {
   const above = hide ? <SourceSwitch open handoff={hide.handoff} onPress={hide.onHide} className={switchPlace(place.surface)} /> : undefined;
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+  // A document's source takes dropped and pasted files as the document does: each uploads, then its line of Markdown goes into the text.
+  const files = useSourceFileDrop(fieldRef, kind === "markdown");
   return (
     <SourceFrame place={place} above={above}>
       <Textarea
+        ref={fieldRef}
         value={content}
         onChange={(event) => { onChange(event.target.value); }}
         aria-label={label}
@@ -249,6 +254,7 @@ function SourceEditor({ kind, content, label, place, onChange, hide }: SourceEdi
         autoCorrect="off"
         className={cn(sourceField, sourcePadding(place.surface, hide !== undefined), place.surface === "pane" ? surfaceClass(place.theme) : "bg-card")}
       />
+      <div className={cn(statusPadding(place.surface), "pb-3 empty:hidden")} data-slot="source-uploads">{files.list}</div>
       <ContentStatus kind={kind} content={content} className={statusPadding(place.surface)} />
     </SourceFrame>
   );
