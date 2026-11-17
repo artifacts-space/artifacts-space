@@ -135,7 +135,7 @@ test("should resize an image from its toolbar and write the width into the Markd
   await openFixture(page);
   await editor(page).getByRole("img", { name: "Dusk over the hills" }).click();
   const toolbar = editor(page).getByRole("toolbar", { name: "Media options" });
-  await toolbar.getByRole("button", { name: "Large" }).click();
+  await toolbar.getByRole("button", { name: "Large", exact: true }).click();
   await expect(savedMarkdown(page)).toContainText(`#width=75 "A preset caption")`);
 
   await toolbar.getByRole("button", { name: "Alt text" }).click();

@@ -1181,6 +1181,64 @@ them. A ui artifact's Markdown block is text only
 (`media={false}`). Images from other sites never load. Add each new block
 to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
 
+### Images in a document
+
+- **An image opens larger in place** (`src/components/artifact-view/image-viewer/`,
+  `useImageViewer`). A reader's click on an image, or Enter on its "Open
+  larger" control, opens it. In the editor a click still selects the block;
+  a double-click or the toolbar's "Open larger" opens it, and "Open in a new
+  tab" stays. The viewer is one top-layer dialog (Base UI `Dialog`) over the
+  whole window that draws the picture the page already loaded: caption,
+  alt text as its title, Download, Close, Previous and Next through the
+  document's images in order ("2 of 5", arrow keys, no wrap), Escape. It
+  carries `data-comment-skip`, reads the page's theme through
+  `ThemeSourceContext`, never animates, and never blocks pinch zoom. The
+  step buttons stay focusable when disabled (`focusableWhenDisabled`): a
+  button that drops the focus as it turns off takes the arrow keys with it.
+  Focus returns to the image's control, or to the image the viewer ended on.
+- **The viewer has a link of its own, and Back closes it**
+  (`src/lib/block-links/image-view-rules.ts`, `image-view-history.ts`):
+  `#block-file=<file id>&view=1`. A click adds one history entry; Previous
+  and Next replace it, so one Back closes the viewer however far someone
+  stepped; Close and Escape go back over the entry the page added, or
+  replace the address with `#block-file=<file id>` when someone arrived on
+  the link. A link with `&view=1` opens the viewer on arrival; a link to the
+  block alone (`#block-file=<file id>`) lands on the block and highlights
+  it, as before. There is no route for the viewer: it shows only images the
+  page drew, so a reader of the approved version sees that version's files
+  and nothing else.
+- **An image keeps its place before it loads.** `finalizeUpload` reads the
+  pixel size from the stored file's first bytes (`image-dimensions.ts`: PNG,
+  GIF, WebP, JPEG with its camera orientation, AVIF with its turn) and keeps
+  it in `artifact_file.width` and `height`; each side is 1 to 65,535 or
+  nothing is kept (`keptDimensions`), so bytes that lie cannot reserve an
+  absurd box. A page's own files (`pagePath`) and other types store none.
+  Replace moves the new size onto the row and the old one onto the copy;
+  `FileDto.width` and `height` carry it, and `MediaBlock` puts it on the
+  `<img>` as `width` and `height`. Files from before the columns keep the
+  fixed placeholder. A stored size that is not the loaded picture's own is
+  dropped once it loads (`useImageShape`): never trust it over the picture.
+- **Resize handles** (`media-resize.tsx`, `media-resize-rules.ts`): both
+  edges and all four corners change `width=<percent>` (10 to 100, whole
+  numbers). The edge handles are sliders named "Resize from the left edge"
+  and "Resize from the right edge", tab stops while the block is selected:
+  arrows move 5, Home and End go to the ends. The corners are for the
+  pointer only. Handles are hidden on a phone.
+- **The file card in the editor shows the type and the size**, from the
+  document's files (`ArtifactFilesProvider` around the editor in
+  `inline-content.tsx`) or, before any save, from what this tab's upload
+  answered (`uploadedFacts`).
+- **Cancel stops the request** (`putFile`'s `signal`, one `AbortController`
+  per upload in `media-uploads.ts`), then discards the pending upload.
+- **Every still image is redrawn in the browser before it uploads**
+  (`documentPrepareProfile`): at most 2400 px on its long side, upright,
+  camera data such as the place it was taken removed. A GIF, an animated
+  WebP, and an animated PNG upload as they are (`isAnimatedImage`): a
+  redraw would keep one frame. Never loosen this to "small pictures upload untouched": that would
+  put a phone photo's location into a shared page.
+- The fixture is `/dev/editor?kind=media&doc=gallery` (add `&as=reader` for
+  the read view); `e2e/document-images.spec.ts` covers all of the above.
+
 ### Files in a document
 
 Decided by the owner on 17 Nov 2026: "the base panel file upload UI needs

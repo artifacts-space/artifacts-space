@@ -11,6 +11,10 @@ export interface FileDto {
   embedded?: boolean;
   /** True for an image a version of the artifact shows as its icon or cover: it changes through those pickers, so it is never replaced. Set by the server. */
   pictured?: boolean;
+  /** An image's pixel width as browsers draw it, when the server could read it (src/lib/files/image-dimensions.ts). Always with `height`. */
+  width?: number;
+  /** An image's pixel height. Always with `width`. */
+  height?: number;
   /** Set for a page file of an HTML artifact: the relative path the page loads it by, such as css/site.css (src/lib/page-files/rules.ts). */
   pagePath?: string;
 }
@@ -25,6 +29,9 @@ export interface OldFileDto {
   size: number;
   /** When a newer upload replaced it. */
   replacedAt: string;
+  /** An image copy's pixel size, when it was stored. */
+  width?: number;
+  height?: number;
 }
 
 /**

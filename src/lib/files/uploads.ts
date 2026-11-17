@@ -11,6 +11,7 @@ import { checkPagePath, pageFileName, type PageUploadCheck } from "@/lib/page-fi
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { checkUpload, fileLimits, formatBytes, isAllowedFileType } from "./config";
+import { hasReadableDimensions, imageDimensionBytes, readImageDimensions, type ImageDimensions } from "./image-dimensions";
 import { fileObjectKey, sanitizeFilename } from "./names";
 import { headObject, presignUpload, r2ConfigFromEnv, readObjectStart, type PresignedUpload } from "./r2";
 import { matchesFileSignature, matchesPageFileSignature, signatureBytes } from "./signature";
@@ -86,6 +87,21 @@ function looksLikeItsType(row: Pick<ArtifactFileRecord, "contentType" | "pagePat
   return isAllowedFileType(row.contentType) && matchesFileSignature(row.contentType, start);
 }
 
+/** Whether the page keeps a place of this file's shape before it loads: an image that is no page file (a page lays its own files out). */
+function keepsDimensions(row: Pick<ArtifactFileRecord, "contentType" | "pagePath">): boolean {
+  return row.pagePath === null && hasReadableDimensions(row.contentType);
+}
+
+/** How many leading bytes finishing an upload reads: the signature, and for an image enough to find its pixel size. */
+export function startBytesFor(row: Pick<ArtifactFileRecord, "contentType" | "pagePath">): number {
+  return keepsDimensions(row) ? imageDimensionBytes : signatureBytes;
+}
+
+/** The pixel size to store with a finished upload, read from its first bytes, or nothing when it is no image or states none this can read. */
+export function storedDimensions(row: Pick<ArtifactFileRecord, "contentType" | "pagePath">, start: Uint8Array): ImageDimensions | Record<string, never> {
+  return (keepsDimensions(row) ? readImageDimensions(row.contentType, start) : null) ?? {};
+}
+
 /** Why a stored object does not match its upload request, or null when it does. */
 export function storedObjectProblem(row: Pick<ArtifactFileRecord, "size" | "contentType">, stored: { size: number; contentType: string }): string | null {
   if (stored.size !== row.size) return `The stored file is ${String(stored.size)} bytes, but the upload said ${String(row.size)}.`;
@@ -131,11 +147,11 @@ export async function finalizeUpload(uploaderId: string, fileId: string): Promis
   const problem = storedObjectProblem(row, stored);
   if (problem) return rejectUpload(row, problem);
   if (row.pagePath === null && !isAllowedFileType(row.contentType)) return rejectUpload(row, "This file type is not supported.");
-  const start = await readObjectStart(config, row.key, signatureBytes);
+  const start = await readObjectStart(config, row.key, startBytesFor(row));
   if (!looksLikeItsType(row, start)) return rejectUpload(row, `The file's content does not look like ${row.contentType}.`);
   const [ready] = await getDb()
     .update(artifactFile)
-    .set({ status: "ready" })
+    .set({ status: "ready", ...storedDimensions(row, start) })
     .where(and(eq(artifactFile.id, row.id), eq(artifactFile.uploaderId, uploaderId)))
     .returning();
   if (!ready) throw new UserFacingError("File not found.");

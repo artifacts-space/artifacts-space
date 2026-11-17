@@ -7,6 +7,7 @@ import { IconCode, IconCodeOff } from "@tabler/icons-react";
 import { CsvContentEditor } from "@/components/artifact-page/csv-content-editor";
 import { ArtifactView } from "@/components/artifact-view/artifact-view";
 import { ChangedFramesContext } from "@/components/artifact-view/canvas/changed-frames";
+import { ArtifactFilesProvider } from "@/components/artifact-view/files-context";
 import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { ContentStatus } from "@/components/editor/content-status";
 import { DocumentEditor, isDocumentKind, type DocumentKind } from "@/components/editor/document-editor";
@@ -292,7 +293,14 @@ function Content({ handoff, ...props }: InlineContentProps & { handoff: FocusHan
   const hide = hideFor(kind, handoff, onHideSource);
   if (sourceOpen) return <SourceEditor kind={kind} content={content} label="Artifact source" place={place} onChange={onChange} hide={hide} />;
   if (kind === "code") return <SourceEditor kind={kind} content={content} label="Artifact content" place={place} onChange={onChange} />;
-  if (isDocumentKind(kind)) return <DocumentContent kind={kind} content={content} revision={revision} place={place} onChange={onChange} onShowSource={onShowSource} />;
+  if (isDocumentKind(kind)) {
+    // The document's blocks read their files' details here: a file's type and size on its card, and an image's shape before it loads.
+    return (
+      <ArtifactFilesProvider files={files}>
+        <DocumentContent kind={kind} content={content} revision={revision} place={place} onChange={onChange} onShowSource={onShowSource} />
+      </ArtifactFilesProvider>
+    );
+  }
   if (kind === "csv") {
     return (
       <ContentFrame place={place}>

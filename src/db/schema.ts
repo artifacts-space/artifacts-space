@@ -371,6 +371,10 @@ export const artifactFile = pgTable(
     // Set for a page file: the relative path an HTML artifact's page loads it by, such as css/site.css (src/lib/page-files/rules.ts).
     // Chosen when the upload is requested and never changed. A row with a path attaches only as a page file of an html artifact.
     pagePath: text("page_path"),
+    // An image's pixel size as browsers draw it, read from its first bytes when the upload is finished (src/lib/files/image-dimensions.ts), so a page
+    // keeps the image's place before it loads. Null for other files, for older images, and when the header could not be read. A replace takes the new upload's.
+    width: integer("width"),
+    height: integer("height"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

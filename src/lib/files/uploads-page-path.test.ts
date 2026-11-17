@@ -113,3 +113,47 @@ describe("finalizeUpload for a page file", () => {
     expect(db.updated).toHaveLength(0);
   });
 });
+
+describe("finalizeUpload for an image", () => {
+  const id = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
+  const be32 = (value: number) => [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255];
+  /** A PNG's signature and header chunk, stating the size given. */
+  const png = (width: number, height: number) => new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...be32(13), 0x49, 0x48, 0x44, 0x52, ...be32(width), ...be32(height), 8, 6, 0, 0, 0]);
+  /** The pending upload the store answers with, and the stored bytes it finds. */
+  const stored = (bytes: Uint8Array, over: { contentType?: string; filename?: string; key?: string; pagePath?: string } = {}) => {
+    db.row = { id, uploaderId: "author", artifactId: null, key: "files/x/photo.png", filename: "photo.png", contentType: "image/png", size: bytes.length, status: "pending", pagePath: null, width: null, height: null, replacedAt: null, createdAt: new Date(), ...over };
+    store.getFileRow.mockResolvedValue(db.row);
+    r2.headObject.mockResolvedValue({ size: bytes.length, contentType: over.contentType ?? "image/png" });
+    r2.readObjectStart.mockResolvedValue(bytes);
+  };
+
+  it("should store the picture's pixel size from its first bytes, and give it with the file", async () => {
+    stored(png(1600, 900));
+    const file = await finalizeUpload("author", id);
+    expect(db.updated).toEqual([{ status: "ready", width: 1600, height: 900 }]);
+    expect(file).toMatchObject({ width: 1600, height: 900 });
+    expect(r2.readObjectStart.mock.lastCall?.[2]).toBe(262_144);
+  });
+
+  it.each([[0xffffffff, 0xffffffff], [70_000, 10], [0, 900]])("should make the image ready with no size when its header states %s by %s", async (width, height) => {
+    stored(png(width, height));
+    const file = await finalizeUpload("author", id);
+    expect(db.updated).toEqual([{ status: "ready" }]);
+    expect(file).not.toHaveProperty("width");
+    expect(file).not.toHaveProperty("height");
+  });
+
+  it("should store no size for an image that is a page's own file: the page lays it out", async () => {
+    stored(png(1600, 900), { pagePath: "img/photo.png" });
+    await finalizeUpload("author", id);
+    expect(db.updated).toEqual([{ status: "ready" }]);
+    expect(r2.readObjectStart.mock.lastCall?.[2]).toBeLessThan(1024);
+  });
+
+  it("should store no size for a file that is no image, and read only its signature", async () => {
+    stored(new TextEncoder().encode("%PDF-1.7\n"), { contentType: "application/pdf", filename: "a.pdf", key: "files/x/a.pdf" });
+    await finalizeUpload("author", id);
+    expect(db.updated).toEqual([{ status: "ready" }]);
+    expect(r2.readObjectStart.mock.lastCall?.[2]).toBeLessThan(1024);
+  });
+});

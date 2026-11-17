@@ -28,6 +28,9 @@ export const artifactFileCopy = pgTable(
     filename: text("filename").notNull(),
     contentType: text("content_type").notNull(),
     size: integer("size").notNull(),
+    // The copy's own pixel size when it is an image (artifact_file.width and height), or null.
+    width: integer("width"),
+    height: integer("height"),
     // Who uploaded this copy. It counts toward their account's file storage quota.
     uploaderId: text("uploader_id").references(() => user.id, { onDelete: "set null" }),
     // When this copy became the current file: the replace before it, or null for the file as first attached.
