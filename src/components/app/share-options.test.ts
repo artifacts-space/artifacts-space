@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultTeamId, outcomeText, ruleTeamFor, selectedTeamLabel, shareChoiceBasis, teamsFor } from "./share-options";
+import { choiceOutcome, defaultTeamId, outcomeText, ruleTeamFor, selectedTeamLabel, shareChoiceBasis, teamsFor, undoApplies } from "./share-options";
 import type { ShareTeam } from "./share-teams-context";
 import { defaultActor } from "@/lib/teams/capability-rules";
 
@@ -51,6 +51,39 @@ describe("selectedTeamLabel", () => {
   it("should ask for a team when no known team is chosen", () => {
     expect(selectedTeamLabel("", teams)).toBe("Choose a team");
     expect(selectedTeamLabel(null, teams)).toBe("Choose a team");
+  });
+});
+
+describe("choiceOutcome", () => {
+  const open: ShareTeam = { ...strict, id: "o", slug: "open", name: "Open", teamSharingNeedsApproval: false };
+
+  it("should apply at once for private, for the personal team, and for a team whose sharing needs no approval", () => {
+    expect(choiceOutcome("private", undefined)).toBe("apply");
+    expect(choiceOutcome("public", personal)).toBe("apply");
+    expect(choiceOutcome("team", open)).toBe("apply");
+  });
+
+  it("should wait when a member shares in a team that needs an approval, and for a link in any shared team", () => {
+    expect(choiceOutcome("team", strict)).toBe("pending");
+    expect(choiceOutcome("link", open)).toBe("pending");
+  });
+});
+
+describe("undoApplies", () => {
+  const open: ShareTeam = { ...strict, id: "o", slug: "open", name: "Open", teamSharingNeedsApproval: false };
+
+  it("should offer Undo when the artifact was private before, since making it private always applies", () => {
+    expect(undoApplies({ visibility: "private", teamId: null }, teams)).toBe(true);
+  });
+
+  it("should offer Undo when sharing it with its team again needs no approval", () => {
+    expect(undoApplies({ visibility: "team", teamId: "o" }, [personal, open])).toBe(true);
+  });
+
+  it("should offer no Undo when putting it back would only file a request, or its team is not the viewer's", () => {
+    expect(undoApplies({ visibility: "team", teamId: "s" }, teams)).toBe(false);
+    expect(undoApplies({ visibility: "link", teamId: "o" }, [personal, open])).toBe(false);
+    expect(undoApplies({ visibility: "team", teamId: "gone" }, teams)).toBe(false);
   });
 });
 

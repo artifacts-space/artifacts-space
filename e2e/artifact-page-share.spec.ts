@@ -39,11 +39,13 @@ test("should move a personal artifact into a team from the page's Share when the
   await expect(dialog).toBeVisible();
 
   await dialog.getByRole("radiogroup", { name: "Who can read it" }).getByRole("radio", { name: /^Team/ }).click();
-  await expect(dialog.getByRole("combobox", { name: "Share with" }), "the first shared team is picked").toContainText("Platform");
-  await dialog.getByRole("button", { name: "Save" }).click();
+  // The team becomes the artifact's home, so the control and the button say "Move", and the dialog says what it leaves.
+  await expect(dialog.getByRole("combobox", { name: "Move to" }), "the first shared team is picked").toContainText("Platform");
+  await expect(dialog.locator("[data-slot=share-outcome]")).toContainText("It applies as soon as you save. It moves to Platform and leaves your personal artifacts.");
+  await dialog.getByRole("button", { name: "Move to Platform" }).click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByText("Sharing saved.")).toBeVisible();
+  await expect(page.getByText("Moved “Launch checklist” to Platform.")).toBeVisible();
   const moved = header(page).getByRole("button", { name: "Team. Share settings" });
   await expect(moved).toBeVisible();
   await expect(moved).toHaveAttribute("data-visibility", "team");
@@ -54,7 +56,16 @@ test("should move a personal artifact into a team from the page's Share when the
   await moved.click();
   const reopened = page.getByRole("dialog");
   await expect(reopened.getByRole("radio", { name: /^Team/ })).toHaveAttribute("aria-checked", "true");
-  await expect(reopened.getByRole("combobox", { name: "Share with" })).toContainText("Platform");
+  // It is there now: nothing moves, so the picker names the team and the button saves.
+  await expect(reopened.getByRole("combobox", { name: "Team" })).toContainText("Platform");
+  await expect(reopened.getByRole("button", { name: "Save" })).toBeVisible();
+
+  // Private again reads as the move back.
+  await reopened.getByRole("radio", { name: /^Private/ }).click();
+  await expect(reopened.locator("[data-slot=share-outcome]")).toHaveText("Only you can read it. Any open request is canceled. It moves back to your personal artifacts and leaves Platform.");
+  await reopened.getByRole("button", { name: "Move to Personal" }).click();
+  await expect(page.getByText("Moved “Launch checklist” back to Personal.")).toBeVisible();
+  await expect(page.locator("[data-fixture-sharing]")).toHaveText("private:none");
 });
 
 test("should say Pending in the header when the team's sharing waits for approval", async ({ page }) => {
@@ -62,9 +73,11 @@ test("should say Pending in the header when the team's sharing waits for approva
   await share.click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("radio", { name: /^Team/ }).click();
-  await dialog.getByRole("combobox", { name: "Share with" }).click();
+  await dialog.getByRole("combobox", { name: "Move to" }).click();
   await page.getByRole("option", { name: "Design" }).click();
-  await dialog.getByRole("button", { name: "Save" }).click();
+  // Design's rule needs an approval: nothing moves yet, and the button only asks.
+  await expect(dialog.locator("[data-slot=share-outcome]")).toContainText("Someone in Design who approves sharing approves it first. Until then, it stays as it is. Once approved, it moves to Design and leaves your personal artifacts.");
+  await dialog.getByRole("button", { name: "Ask to move to Design" }).click();
 
   await expect(page.getByText("Request sent. An owner or admin will review it.")).toBeVisible();
   const pending = header(page).getByRole("button", { name: "Pending. Share settings" });
@@ -77,7 +90,7 @@ test("should say Pending in the header when the team's sharing waits for approva
   await expect(reopened.getByText(/Waiting for approval: team in Design/)).toBeVisible();
   // The picks start from the level that still applies, not the one waiting, so Save never re-sends the request.
   await expect(reopened.getByRole("radio", { name: /^Private/ })).toHaveAttribute("aria-checked", "true");
-  await expect(reopened.getByRole("combobox", { name: "Share with" })).toHaveCount(0);
+  await expect(reopened.getByRole("combobox", { name: /^(Move to|Team)$/ })).toHaveCount(0);
   await expect(reopened.locator("[data-slot=share-outcome]")).toHaveText("Only you can read it. Any open request is canceled.");
 });
 

@@ -74,7 +74,7 @@ test("should state the team's rule in the outcome line when the artifact is shar
 
   // Making it private leaves the team, so the rule goes.
   await dialog.getByRole("radiogroup", { name: "Who can read it" }).getByRole("radio", { name: /Private/ }).click();
-  await expect(outcome).toHaveText("Only you can read it. Any open request is canceled.");
+  await expect(outcome).toHaveText("Only you can read it. Any open request is canceled. It moves back to your personal artifacts and leaves Design.");
 });
 
 test("should state the team's rule when a personal artifact moves into a shared team, and none while it stays personal", async ({ page }) => {
@@ -86,9 +86,9 @@ test("should state the team's rule when a personal artifact moves into a shared 
 
   // Moving it into Design is the moment the person decides, so the rule shows.
   await readers.getByRole("radio", { name: /Team/ }).click();
-  await expect(dialog.getByRole("combobox", { name: "Share with" })).toContainText("Design");
+  await expect(dialog.getByRole("combobox", { name: "Move to" })).toContainText("Design");
   await expect(outcome).toHaveText(
-    "It applies as soon as you save. Everyone in Design can edit it directly, with no approval. Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default).",
+    "It applies as soon as you save. It moves to Design and leaves your personal artifacts. Everyone in Design can edit it directly, with no approval. Sharing by link or in public needs approval from someone who can approve sharing (owners and admins by default).",
   );
 
   // A link through Design keeps Design's rule after what saving will do.
@@ -96,6 +96,8 @@ test("should state the team's rule when a personal artifact moves into a shared 
   const approver = dialog.getByRole("combobox", { name: "Approved by" });
   await expect(approver).toContainText("Design");
   await expect(outcome).toContainText("Someone in Design who approves sharing approves it first.");
+  // A link approved by a shared team makes that team its home too, once approved.
+  await expect(outcome).toContainText("Once approved, it moves to Design and leaves your personal artifacts.");
   await expect(outcome).toContainText("Everyone in Design can edit it directly, with no approval.");
 
   // A link approved by the personal team keeps it personal: no team rule.

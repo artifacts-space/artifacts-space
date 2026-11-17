@@ -45,7 +45,7 @@ export function useWithdrawSharing(artifactId: string, onWithdrawn: (id: string)
         toast.error(result.error);
         return;
       }
-      toast.success("Sharing withdrawn. Only the author can read it now.");
+      toast.success("Sharing withdrawn. It is back in its author's personal artifacts, and only they can read it.");
       onWithdrawn(artifactId);
     } catch {
       toast.error("Something went wrong. Check your connection and try again.");

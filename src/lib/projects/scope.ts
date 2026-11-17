@@ -1,7 +1,7 @@
-import { and, eq, inArray, or, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, or, type SQL } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { project, team, teamMember } from "@/db/schema";
+import { artifact, project, team, teamMember } from "@/db/schema";
 
 import { artifactHomeScope, type HomeScopeSubject, type ProjectScope } from "./rules";
 
@@ -53,6 +53,21 @@ export function usableBy(viewerId: string, teamIds: ReadonlySet<string>): SQL {
   const combined = or(own, inArray(project.teamId, [...teamIds]));
   if (!combined) throw new Error("The project scope could not be built.");
   return combined;
+}
+
+/**
+ * SQL for "this artifact's home is not one of these teams": it is private,
+ * or names no team, or names another team (artifactHomeScope, for the
+ * viewer's shared teams). Null when there are no teams, so there is nothing
+ * to leave out. Each branch is spelled out because `team_id not in (...)`
+ * alone is unknown, not true, for an artifact that names no team, and would
+ * drop it.
+ */
+export function homeOutsideTeams(teamIds: ReadonlySet<string>): SQL | null {
+  if (teamIds.size === 0) return null;
+  const condition = or(eq(artifact.visibility, "private"), isNull(artifact.teamId), notInArray(artifact.teamId, [...teamIds]));
+  if (!condition) throw new Error("The home condition could not be built.");
+  return condition;
 }
 
 /** The artifact's home scope, reading whether its team is personal. */

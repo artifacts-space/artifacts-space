@@ -1,11 +1,11 @@
 import type { ArtifactVisibility, ShareableArtifactDto } from "@/lib/artifact-types";
-import { decideSharing } from "@/lib/sharing/rules";
+import { decideSharing, type SharingOutcome } from "@/lib/sharing/rules";
 
 import type { ShareTeam } from "./share-teams-context";
 
 export const visibilityOptions: { value: ArtifactVisibility; title: string; detail: string }[] = [
   { value: "private", title: "Private", detail: "Only you." },
-  { value: "team", title: "Team", detail: "Signed-in members of a team." },
+  { value: "team", title: "Team", detail: "Members of a team. It moves to the team's workspace." },
   { value: "link", title: "Link", detail: "Anyone with the link." },
   { value: "public", title: "Public", detail: "Anyone who has or finds the link." },
 ];
@@ -50,13 +50,29 @@ export function ruleTeamFor(visibility: ArtifactVisibility, team: ShareTeam | un
   return team;
 }
 
+/** Whether saving this choice applies at once or waits for an approval, by the team's rule and the viewer's role. Private always applies. */
+export function choiceOutcome(visibility: ArtifactVisibility, team: ShareTeam | undefined): SharingOutcome {
+  if (visibility === "private" || !team) return "apply";
+  return decideSharing({ level: visibility, team, member: team, actor: "person" });
+}
+
 /** What will happen when the viewer saves this choice, in one sentence. */
 export function outcomeText(visibility: ArtifactVisibility, team: ShareTeam | undefined) {
   if (visibility === "private") return "Only you can read it. Any open request is canceled.";
-  if (!team) return visibility === "team" ? "Join or create a team to share with one." : "Choose a team.";
-  const outcome = decideSharing({ level: visibility, team, member: team, actor: "person" });
-  if (outcome === "apply") return "It applies as soon as you save.";
+  if (!team) return visibility === "team" ? "Join or create a team to move it to one." : "Choose a team.";
+  if (choiceOutcome(visibility, team) === "apply") return "It applies as soon as you save.";
   return `Someone in ${team.name} who approves sharing approves it first. Until then, it stays as it is.`;
+}
+
+/**
+ * Whether Undo can put an artifact's sharing back at once: making it private
+ * always can; sharing it again can only where that needs no approval, since
+ * an Undo that files a request would undo nothing.
+ */
+export function undoApplies(before: { visibility: ArtifactVisibility; teamId: string | null }, teams: readonly ShareTeam[]): boolean {
+  if (before.visibility === "private") return true;
+  const team = teams.find((item) => item.id === before.teamId);
+  return team !== undefined && choiceOutcome(before.visibility, team) === "apply";
 }
 
 /**

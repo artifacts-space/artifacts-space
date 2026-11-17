@@ -4,7 +4,6 @@ import { IconClock, IconLink, IconLoader2, IconLock, IconUsersGroup, IconWorld }
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { setCommentsAction, setShowInSearchAction, shareArtifactAction } from "@/app/(workspace)/app/sharing-actions";
 import { ArtifactIcon } from "@/components/artifact-icon/artifact-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,14 +17,17 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ValueField } from "@/components/value-field";
 import type { ActionResult, ArtifactDto, ArtifactVisibility, CommentSetting, ShareableArtifactDto } from "@/lib/artifact-types";
+import { homeMove, movedMessage, moveSentence, saveLabel, teamPickerLabel, type HomeMove } from "@/lib/sharing/home-move-rules";
 import { shareRuleLine } from "@/lib/teams/team-rule-copy";
 import { cn } from "@/lib/utils";
 
 import { commentLabel, commentsWaitForApproval } from "./comment-options";
 import { CommentsPicker } from "./comments-picker";
+import { useWorkspaceHome } from "./home-moves";
 import { SearchEnginesPicker } from "./search-engines-picker";
 import { searchChangeAfterSave, searchSwitchState, type SearchSwitchState } from "./search-options";
-import { outcomeText, ruleTeamFor, selectedTeamLabel, teamLabel, teamsFor, visibilityLabel, visibilityOptions } from "./share-options";
+import { useShareActions, type ShareActions } from "./share-actions";
+import { choiceOutcome, outcomeText, ruleTeamFor, selectedTeamLabel, teamLabel, teamsFor, visibilityLabel, visibilityOptions } from "./share-options";
 import { useShareTeams, type ShareTeam } from "./share-teams-context";
 import { useShareChoice } from "./use-share-choice";
 
@@ -58,12 +60,13 @@ function LevelPicker({ value, onChange }: { value: ArtifactVisibility; onChange:
   );
 }
 
-function TeamPicker({ visibility, teams, value, onChange }: { visibility: ArtifactVisibility; teams: readonly ShareTeam[]; value: string | null; onChange: (id: string) => void }) {
+/** The team the level goes through. For team sharing its label names the move ("Move to"), since the team becomes the artifact's home. */
+function TeamPicker({ visibility, teams, value, move, onChange }: { visibility: ArtifactVisibility; teams: readonly ShareTeam[]; value: string | null; move: HomeMove | null; onChange: (id: string) => void }) {
   const options = teamsFor(visibility, teams);
   if (visibility === "private" || options.length === 0) return null;
   return (
     <label className="flex flex-col gap-2 text-sm text-muted-foreground">
-      {visibility === "team" ? "Share with" : "Approved by"}
+      {visibility === "team" ? teamPickerLabel(move) : "Approved by"}
       <Select value={value ?? ""} onValueChange={(id) => { if (id) onChange(id); }}>
         <SelectTrigger className="h-9 w-full text-sm text-foreground">
           <SelectValue>{(id: string) => selectedTeamLabel(id, options)}</SelectValue>
@@ -119,15 +122,16 @@ function teamRuleText(props: { visibility: ArtifactVisibility; team: ShareTeam |
   return shareRuleLine(ruleTeam.name, ruleTeam, props.visibility);
 }
 
-/** What saving will do: now or after approval, for the level and for comments, then the team's rule when it lands in a shared team. */
-function ShareOutcome(props: { artifact: ShareableArtifactDto; visibility: ArtifactVisibility; team: ShareTeam | undefined; comments: CommentSetting }) {
-  const { artifact, visibility, team, comments } = props;
+/** What saving will do: now or after approval, for the level and for comments, then where the artifact moves when its home changes, then the team's rule when it lands in a shared team. */
+function ShareOutcome(props: { artifact: ShareableArtifactDto; visibility: ArtifactVisibility; team: ShareTeam | undefined; comments: CommentSetting; move: HomeMove | null }) {
+  const { artifact, visibility, team, comments, move } = props;
   const note = commentsApprovalNote(props);
   const onlyComments = visibility === artifact.visibility && (visibility === "private" || team?.id === artifact.teamId) && comments !== artifact.comments;
   // Only the comments change: sharing stays as it is, so only the comments rule applies.
   const commentsText = note ? `${note} Until then, comments stay as they are.` : "It applies as soon as you save.";
   const outcome = onlyComments ? commentsText : [outcomeText(visibility, team), note].filter(Boolean).join(" ");
-  const text = [outcome, teamRuleText(props)].filter(Boolean).join(" ");
+  const moves = move ? moveSentence(move, choiceOutcome(visibility, team)) : null;
+  const text = [outcome, moves, teamRuleText(props)].filter(Boolean).join(" ");
   return <p data-slot="share-outcome" className="text-sm leading-5 text-muted-foreground">{text}</p>;
 }
 
@@ -141,18 +145,7 @@ function shareTriggerText(waiting: boolean, visibility: ArtifactVisibility) {
 /** The saved artifact, or null when nothing needed saving. */
 type SaveResult = ActionResult<{ status: "applied" | "pending"; artifact: ArtifactDto | null }>;
 
-/**
- * The server actions the dialog saves through. Every surface passes the
- * workspace's own (the default), so the auth, approval, and team checks stay
- * in one place; only the /dev fixtures hand in-memory stand-ins.
- */
-export interface ShareActions {
-  share: typeof shareArtifactAction;
-  comments: typeof setCommentsAction;
-  search: typeof setShowInSearchAction;
-}
-
-const serverShareActions: ShareActions = { share: shareArtifactAction, comments: setCommentsAction, search: setShowInSearchAction };
+export type { ShareActions };
 
 interface SaveChoice {
   visibility: ArtifactVisibility;
@@ -206,8 +199,18 @@ interface ShareControlProps {
   onUpdated: (artifact: ArtifactDto) => void;
   /** The button that opens the dialog; the workspace's Share button when left out. The artifact page passes its visibility status. */
   renderTrigger?: (props: ShareTriggerProps) => React.ReactNode;
-  /** Where saves go: the workspace's server actions unless a /dev fixture hands its own. */
+  /** Where saves go: the workspace's server actions unless a /dev fixture hands its own, here or through ShareActionsProvider. */
   actions?: ShareActions;
+}
+
+/** The move saving the choice makes: the artifact's home now, against the home the picked level and team give it. */
+function choiceMove(artifact: ShareableArtifactDto, visibility: ArtifactVisibility, teamId: string | null, teams: readonly ShareTeam[]): HomeMove | null {
+  return homeMove(artifact, { visibility, teamId: visibility === "private" ? null : teamId }, teams);
+}
+
+/** The toast after a save that moved nothing: sent for approval, or saved. */
+function savedText(status: "applied" | "pending"): string {
+  return status === "pending" ? "Request sent. An owner or admin will review it." : "Sharing saved.";
 }
 
 /** The workspace's Share button: the level's icon (a clock while a change waits) and "Share" or "Pending". */
@@ -225,8 +228,11 @@ function WorkspaceShareButton({ visibility, waiting, onOpen }: ShareTriggerProps
  * The editor's share button and dialog. Every change goes through the
  * server's sharing rule, which applies it now or files it for approval.
  */
-export function ShareControl({ artifact, shareUrl, onUpdated, renderTrigger = WorkspaceShareButton, actions = serverShareActions }: ShareControlProps) {
+export function ShareControl({ artifact, shareUrl, onUpdated, renderTrigger = WorkspaceShareButton, actions: ownActions }: ShareControlProps) {
   const teams = useShareTeams();
+  const provided = useShareActions();
+  const actions = ownActions ?? provided;
+  const workspace = useWorkspaceHome();
   const [open, setOpen] = useState(false);
   const choice = useShareChoice(artifact, teams);
   const { visibility, teamId, team, comments, showInSearch } = choice;
@@ -234,6 +240,20 @@ export function ShareControl({ artifact, shareUrl, onUpdated, renderTrigger = Wo
   const [saving, setSaving] = useState(false);
   const waiting = artifact.pendingSharing !== null || artifact.pendingEdit !== null || artifact.pendingComments !== null;
   const live = artifact.visibility === "link" || artifact.visibility === "public";
+  const move = choiceMove(artifact, visibility, teamId, teams);
+
+  /** Says what a save did. A save that moved the artifact says where it went; in a workspace, the workspace says it, with Open and Undo. */
+  function announce(status: "applied" | "pending", saved: ArtifactDto | null) {
+    const made = saved ? homeMove(artifact, saved, teams) : null;
+    if (!saved || !made) {
+      toast.success(savedText(status));
+      return;
+    }
+    if (workspace) workspace.moved(artifact, saved, made);
+    else toast.success(movedMessage(saved.title, made));
+    // The move applied, and opening its comments to anyone signed in still waits.
+    if (status === "pending") toast.success(savedText("pending"));
+  }
 
   async function save() {
     setSaving(true);
@@ -244,7 +264,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated, renderTrigger = Wo
         return;
       }
       if (result.data.artifact) onUpdated(result.data.artifact);
-      toast.success(result.data.status === "pending" ? "Request sent. An owner or admin will review it." : "Sharing saved.");
+      announce(result.data.status, result.data.artifact);
       setOpen(false);
     } catch {
       toast.error("Something went wrong. Check your connection and try again.");
@@ -269,10 +289,10 @@ export function ShareControl({ artifact, shareUrl, onUpdated, renderTrigger = Wo
             <PendingNotice artifact={artifact} teams={teams} />
             <PendingEditNotice artifact={artifact} />
             <LevelPicker value={visibility} onChange={choice.changeLevel} />
-            <TeamPicker visibility={visibility} teams={teams} value={teamId} onChange={choice.changeTeam} />
+            <TeamPicker visibility={visibility} teams={teams} value={teamId} move={move} onChange={choice.changeTeam} />
             <SearchEnginesPicker state={searchState} checked={showInSearch} onChange={choice.chooseShowInSearch} />
             <CommentsPicker visibility={visibility} team={team} value={comments} onChange={choice.chooseComments} />
-            <ShareOutcome artifact={artifact} visibility={visibility} team={team} comments={comments} />
+            <ShareOutcome artifact={artifact} visibility={visibility} team={team} comments={comments} move={move} />
             {live ? (
               <ValueField value={shareUrl} copyLabel="Copy link" />
             ) : null}
@@ -280,7 +300,7 @@ export function ShareControl({ artifact, shareUrl, onUpdated, renderTrigger = Wo
           <DialogFooter>
             <Button variant="ghost" onClick={() => { setOpen(false); }}>Cancel</Button>
             <Button onClick={() => void save()} disabled={saving || (visibility !== "private" && !teamId)}>
-              {saving ? <IconLoader2 className="animate-spin" /> : null} Save
+              {saving ? <IconLoader2 className="animate-spin" /> : null} {saveLabel(move, choiceOutcome(visibility, team))}
             </Button>
           </DialogFooter>
         </DialogContent>

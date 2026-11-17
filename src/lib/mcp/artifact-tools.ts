@@ -46,13 +46,13 @@ const visibilityField = z
   .enum(artifactVisibilities)
   .optional()
   .describe(
-    "Who can read it. private: only you (default). team: members of `team`. link: anyone with the URL. public: anyone. Sharing follows the team's rule and may wait for an owner or admin to approve; agents cannot approve.",
+    "Who can read it. private: only you (default). team: members of `team`; this moves the artifact to that team's workspace, and it leaves its author's personal artifacts (private moves it back). link: anyone with the URL. public: anyone. A change follows the team's rule and may wait for an owner or admin to approve; agents cannot approve.",
   );
 const teamField = z
   .string()
   .max(39)
   .optional()
-  .describe("Team slug from teams_list. For team sharing, the team to share with; for link or public, the team whose admins approve it. Left out: the team the artifact is already shared through, else your personal team, else your only team.");
+  .describe("Team slug from teams_list. For visibility team, the team the artifact moves to; for link or public, the team whose admins approve it (a shared team becomes its home too). Left out: the team the artifact is already shared through, else your personal team, else your only team.");
 
 const commentsField = z
   .enum(commentSettings)

@@ -1,11 +1,12 @@
 "use client";
 
 import { IconInfoCircle, IconLoader2, IconPlus, IconX } from "@tabler/icons-react";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import { artifactListState } from "@/components/app/artifact-list-state";
+import { useHomeMoves, WorkspaceHomeProvider } from "@/components/app/home-moves";
 import { serverProjectsApi, type ProjectsApi } from "@/components/app/projects-api";
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
@@ -29,6 +30,7 @@ import { toArtifactListItem } from "@/lib/artifact-preview";
 import type { ArtifactDto, ArtifactListItemDto } from "@/lib/artifact-types";
 import { sidebarColumns } from "@/lib/panel-size-rules";
 import type { ProjectFacets } from "@/lib/projects/queries";
+import { listAfterSave, listWithReturned } from "@/lib/sharing/home-move-rules";
 import type { ProjectFilter as ProjectFilterValue } from "@/lib/projects/rules";
 import type { SidebarProjectRow } from "@/lib/projects/sidebar-rules";
 import type { TagFacet } from "@/lib/tags/queries";
@@ -47,6 +49,8 @@ interface DetailPaneProps {
   save: SaveArtifact | undefined;
   /** This tab's own saves of the artifacts blank pages became, which may land after the pane took one over. */
   ownSaves: readonly ArtifactDto[];
+  /** Artifacts an undone move brought back to this workspace, as the server answered them (useHomeMoves). */
+  returned: ReadonlyMap<string, ArtifactDto>;
 }
 
 /** Shown while the selected artifact's content loads, or when it could not. */
@@ -71,10 +75,15 @@ function withListProject(full: ArtifactDto | null, selected: ArtifactListItemDto
   return { ...full, project: selected.project };
 }
 
+/** The copy Undo brought back when there is one: the pane's own copy is from before, when the artifact was in the other workspace. */
+function newestCopy(loaded: ArtifactDto | null, selected: ArtifactListItemDto | null, returned: ReadonlyMap<string, ArtifactDto>): ArtifactDto | null {
+  return (selected ? returned.get(selected.id) : undefined) ?? loaded;
+}
+
 /** The editor for an artifact the viewer may edit, a read-only view for a teammate's, or the empty state. */
-function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact, save, ownSaves }: DetailPaneProps) {
+function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact, save, ownSaves, returned }: DetailPaneProps) {
   const { full: loaded, failure, remember, retry } = useFullArtifact(selected, initialFull, loadArtifact, ownSaves);
-  const full = withListProject(loaded, selected);
+  const full = withListProject(newestCopy(loaded, selected, returned), selected);
   const access = useEditAccess(full, viewerId);
   const withdrawal = useWithdrawSharing(full?.id ?? "", onDeleted);
   const handleUpdated = (artifact: ArtifactDto) => {
@@ -189,7 +198,7 @@ interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate" | "save" |
 }
 
 /** The artifact pane: the blank page while New artifact has one open, else the selected artifact. */
-function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpdated, onDeleted, initialFull, loadArtifact }: WorkspacePaneProps) {
+function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpdated, onDeleted, initialFull, loadArtifact, returned }: WorkspacePaneProps) {
   // Memoized so the stored copies are merged into the seed only when they or the seed change, not on every render.
   const { withStored } = fresh;
   const full = useMemo(() => withStored(initialFull), [withStored, initialFull]);
@@ -208,7 +217,7 @@ function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpda
       />
     );
   }
-  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={full} loadArtifact={loadArtifact} save={api.update} ownSaves={fresh.stored} />;
+  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={full} loadArtifact={loadArtifact} save={api.update} ownSaves={fresh.stored} returned={returned} />;
 }
 
 /** The card marked as open: the blank page's artifact once stored (none before), else the selected one. */
@@ -251,15 +260,24 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   useLinkLeavesNewArtifact(opened, fresh.leave);
   const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath, viewerId });
   const entryKeys = useMemo(() => sidebar.projects.entries.map((entry) => entry.key), [sidebar.projects.entries]);
-  const { counts, partial, filtered, groups, narrowed } = useWorkspaceList({ artifacts, filters: listFilters, projectFilter, tagFilter, teamId: scopeTeam?.id ?? null, viewerId, entryKeys, totals: facets });
+  const { counts, partial, filtered, groups, narrowed } = useWorkspaceList({ artifacts, filters: listFilters, projectFilter, tagFilter, teamId: scopeTeam?.id ?? null, teams, viewerId, entryKeys, totals: facets });
 
   const selected = pickSelected(artifacts, filtered, selectedId);
   useSelectionInUrl(selected, urlSync);
   const fullInHand = useMemo(() => withHeld(initialFull, held), [initialFull, held]);
 
+  // An artifact Undo moved back: in the list again, first, and open.
+  const comeBack = useCallback((artifact: ArtifactDto) => {
+    setArtifacts((current) => listWithReturned(current, toArtifactListItem(artifact)));
+    pick(artifact.id);
+  }, [setArtifacts, pick]);
+  const moves = useHomeMoves({ teams, scopeTeam, viewerId, listPath, onReturned: comeBack });
+
   function updated(artifact: ArtifactDto) {
     fresh.refresh(artifact);
-    setArtifacts((current) => current.map((item) => (item.id === artifact.id ? toArtifactListItem(artifact) : item)));
+    moves.settle(artifact.id);
+    // A sharing change that moved it to another workspace takes it out of this one's list at once (home-move-rules.ts).
+    setArtifacts((current) => listAfterSave(current, toArtifactListItem(artifact), teams, scopeTeam?.id ?? null));
   }
 
   function deleted(id: string) {
@@ -273,6 +291,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
 
   return (
     <ShareTeamsProvider teams={teams}>
+      <WorkspaceHomeProvider home={moves.home}>
       <LinkedCommentsProvider link={opened} selectedPublicId={selected?.publicId ?? null}>
       <SidebarVisibilityProvider value={visibility}>
       {/* An app shell from md up: the frame is the viewport (workspace-frame), and only the sidebar's tree and the artifact scroll. */}
@@ -324,12 +343,14 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             onDeleted={deleted}
             initialFull={fullInHand}
             loadArtifact={loadArtifact}
+            returned={moves.returned}
           />
           </div>
         </div>
       </main>
       </SidebarVisibilityProvider>
       </LinkedCommentsProvider>
+      </WorkspaceHomeProvider>
     </ShareTeamsProvider>
   );
 }

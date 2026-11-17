@@ -123,8 +123,9 @@ export async function loadArtifactAction(publicId: string): Promise<ActionResult
 
 /**
  * Searches titles, summaries, content, and project names on the server, in
- * the viewer's own artifacts or one team's (membership is checked in the
- * query), within the project filter when one is set.
+ * one workspace: Personal or one team's (membership is checked in the
+ * query), within the project filter when one is set. A search never crosses
+ * into another workspace.
  * The workspace list only holds previews, so content search happens here.
  */
 export async function searchArtifactsAction(input: z.input<typeof searchSchema>): Promise<ActionResult<ArtifactListItemDto[]>> {
@@ -132,7 +133,7 @@ export async function searchArtifactsAction(input: z.input<typeof searchSchema>)
     const userId = await requireUserId();
     const { query, teamId, project, tags } = searchSchema.parse(input);
     await enforceRateLimit("readByUser", userId);
-    const items = await listArtifacts(userId, { query, project: project ?? undefined, tags: tags?.map(normalizeTag), scope: teamId ? { kind: "team", teamId } : { kind: "mine" } });
+    const items = await listArtifacts(userId, { query, project: project ?? undefined, tags: tags?.map(normalizeTag), scope: teamId ? { kind: "team", teamId } : { kind: "personal" } });
     return { success: true, data: items };
   } catch (error) {
     return { success: false, error: actionErrorMessage(error, "Search did not work. Please try again.") };

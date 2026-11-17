@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { AppHeader } from "@/components/app/app-header";
 import { Dashboard } from "@/components/app/dashboard";
+import { ShareActionsProvider } from "@/components/app/share-actions";
 import type { ShareTeam } from "@/components/app/share-teams-context";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import { defaultRoleCapabilities } from "@/lib/teams/capability-rules";
@@ -14,10 +15,12 @@ import { projectFilterId } from "@/lib/projects/filter-params";
 import { listLimit } from "@/lib/projects/sidebar-count-rules";
 import type { ProjectFilter } from "@/lib/projects/rules";
 import { matchesProjectFilter } from "@/lib/projects/sidebar-rules";
+import { listedInWorkspace } from "@/lib/sharing/home-move-rules";
 
 import { fixtureArtifact, longCsv, longJson, longMarkdown, longUi } from "./fixture-content";
 import { fixtureNewArtifactApi, storedFixtureArtifacts } from "./fixture-new-artifacts";
 import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects } from "./fixture-projects";
+import { asTeamArtifacts, createFixtureShareStore, withSharing } from "./fixture-sharing";
 import { useFixtureControls } from "./fixture-controls";
 import { fixtureFeedbackSend } from "./feedback-fixture";
 import { fixtureNotifications, LINK_ONLY_PUBLIC_ID } from "./notification-fixture";
@@ -28,10 +31,12 @@ const fixtureTeams: ShareTeam[] = [{ id: "fixture-team", slug: "fixture", name: 
 /**
  * Shared teams for `?scopes=1`, with long names for the workspace switcher.
  * Platform engineering has an uploaded icon (a static image standing in for
- * the members-only route); the others show their pixel avatars.
+ * the members-only route); the others show their pixel avatars. In Customer
+ * research, sharing with the team waits for an approval; in the others it
+ * applies at once (e2e/workspace-home.spec.ts).
  */
 const fixtureSharedTeams: ShareTeam[] = ["Design", "Platform engineering", "Customer research"].map((name, index) => ({
-  id: `fixture-shared-${String(index)}`, slug: `fixture-shared-${String(index)}`, name, personal: false, role: "member", roleKey: "member", kind: "person", capabilities: [...defaultRoleCapabilities.member], teamSharingNeedsApproval: false,
+  id: `fixture-shared-${String(index)}`, slug: `fixture-shared-${String(index)}`, name, personal: false, role: "member", roleKey: "member", kind: "person", capabilities: [...defaultRoleCapabilities.member], teamSharingNeedsApproval: index === 2,
   iconUrl: index === 1 ? "/artifacts-space-icon.png" : null,
 }));
 
@@ -118,7 +123,14 @@ function useFixtureList(artifacts: readonly ArtifactDto[], projectFilter: Projec
 
 const noTags: string[] = [];
 
-/** Under `scopes`, Note 6 is the viewer's artifact shared with Design, so its Share dialog states Design's rule (e2e/share-search-engines.spec.ts). */
+/** The fixture's sharing in memory, and a stand-in for the sharing server actions over it. */
+function useFixtureSharing(teams: readonly ShareTeam[]) {
+  const [store] = useState(() => createFixtureShareStore(teams));
+  const state = useSyncExternalStore(store.subscribe, store.read, store.read);
+  return { state, store };
+}
+
+/** Under `scopes`, Note 6 is the viewer's artifact shared with Design: Design's workspace lists it, Personal does not, and its Share dialog states Design's rule (e2e/share-search-engines.spec.ts). */
 function withTeamArtifact(artifacts: ArtifactDto[], scopes: boolean): ArtifactDto[] {
   if (!scopes) return artifacts;
   return artifacts.map((artifact) => (artifact.id === "fixture-note-5" ? { ...artifact, visibility: "team", teamId: "fixture-shared-0" } : artifact));
@@ -141,19 +153,23 @@ function dashboardKey(team: string | null, projectFilter: ProjectFilter | null, 
   return `${team ?? "mine"}:${projectFilterId(projectFilter)}:${tags.join(",")}:${String(hasStored)}`;
 }
 
+const withSharedTeams: ShareTeam[] = [...fixtureTeams, ...fixtureSharedTeams];
+
 /** The viewer's teams, with the shared ones under `scopes`, and the one `team` opens as the scope. */
 function fixtureScope(scopes: boolean, team: string | null): { teams: ShareTeam[]; scopeTeam: ShareTeam | null } {
   if (!scopes) return { teams: fixtureTeams, scopeTeam: null };
-  return { teams: [...fixtureTeams, ...fixtureSharedTeams], scopeTeam: fixtureSharedTeams.find((item) => item.slug === team) ?? null };
+  return { teams: withSharedTeams, scopeTeam: fixtureSharedTeams.find((item) => item.slug === team) ?? null };
 }
 
 /**
  * Development only: the real /app workspace (frame, header, list, editor)
  * with long artifacts, a long list, and projects, and no database. Every
  * artifact is handed in full, so none loads. Project changes stay in
- * memory. The app shell and sidebar projects e2e tests use it. With
- * `scopes`, the viewer is also in shared teams, so the workspace switcher lists them, and
- * `team` opens one of them as the scope. `linkFailed` stands in for a link
+ * memory, and so do sharing changes. The app shell and sidebar projects e2e
+ * tests use it. With `scopes`, the viewer is also in shared teams, so the
+ * workspace switcher lists them, and `team` opens one of them as the scope.
+ * Each workspace lists only the artifacts whose home it is, as /app does
+ * (on a team's workspace the private ones stand in for the team's). `linkFailed` stands in for a link
  * the server could not check (a read limit, or a database error). With
  * `slowLoad`, the Long markdown fixture is not handed in full: it loads when
  * opened, and the load waits until a test releases it (`window.fixture`).
@@ -168,14 +184,21 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
   const stored = useMemo(() => (inBrowser ? storedFixtureArtifacts() : []), [inBrowser]);
   // Kept from the first load, as `slowLoad` is: the sidebar's filter links drop `?many=1` from the URL.
   const [manyKept] = useState(many);
-  const base = useMemo(() => [...stored, ...withTeamArtifact(fixtureArtifacts(manyKept), scopes)], [stored, manyKept, scopes]);
+  // Kept from the first load too: "Open in <team>" names the team and the artifact, never `?scopes=1`.
+  const [scopesKept] = useState(scopes);
+  const { teams, scopeTeam } = fixtureScope(scopesKept, team);
+  const base = useMemo(() => [...stored, ...withTeamArtifact(fixtureArtifacts(manyKept), scopesKept)], [stored, manyKept, scopesKept]);
   const { state, api } = useFixtureProjects(base);
-  const artifacts = useMemo(() => withProjects(base, state), [base, state]);
+  const sharing = useFixtureSharing(teams);
+  // Every artifact the viewer can open, wherever its home is; then the ones this workspace lists.
+  const all = useMemo(() => withSharing(asTeamArtifacts(withProjects(base, state), scopeTeam), sharing.state), [base, state, scopeTeam, sharing.state]);
+  useEffect(() => { sharing.store.show(all); }, [sharing.store, all]);
+  const artifacts = useMemo(() => all.filter((artifact) => listedInWorkspace(artifact, teams, scopeTeam?.id ?? null)), [all, teams, scopeTeam]);
   const { items, tagFacets } = useFixtureList(artifacts, projectFilter, tags);
   const facets = useMemo(() => fixtureFacets(artifacts), [artifacts]);
   const notifications = useMemo(() => fixtureNotifications(), []);
   // As on /app: what the link finds, in the list or not (the workspace pins it to the top), or null when it is gone.
-  const full = useMemo(() => [...artifacts, linkOnlyArtifact, ...teammatePages], [artifacts]);
+  const full = useMemo(() => [...all, linkOnlyArtifact, ...teammatePages], [all]);
   // Kept from the first load: a bell link drops `?slowload=1` from the URL, and the slow artifact must stay slow.
   const [slow] = useState(slowLoad);
   const controls = useFixtureControls(slow, full, slowPublicIds);
@@ -186,6 +209,7 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
   }, [full, link, linkFailed]);
   return (
     <ConfirmationsProvider initial={[]}>
+      <ShareActionsProvider actions={sharing.store.actions}>
       <div className="workspace-frame">
         <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" unreadNotifications={4} notificationSeed={notifications} feedbackSend={fixtureFeedbackSend} />
         <Dashboard
@@ -196,7 +220,8 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
           onLinkHandled={controls.onLinkHandled}
           origin="http://localhost"
           viewerId="fixture"
-          {...fixtureScope(scopes, team)}
+          teams={teams}
+          scopeTeam={scopeTeam}
           facets={facets}
           projectRows={state.rows}
           projectFilter={projectFilter}
@@ -211,6 +236,7 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
           dismissWelcome={welcome === "fails" ? fixtureRefusedWelcome : fixtureDismissWelcome}
         />
       </div>
+      </ShareActionsProvider>
     </ConfirmationsProvider>
   );
 }

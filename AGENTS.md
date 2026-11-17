@@ -1353,6 +1353,51 @@ the UPDATE itself, one statement, never a read-then-write:
   is no push channel yet, so a tab that stays in view does not update until
   it is focused again.
 
+### Workspaces and an artifact's home
+
+Decided by the owner on 16 Nov 2026: "if i move it to team - it should no
+longer be in personal." Every artifact has one home: the shared team it is
+shared through (team, link, or public), else its author's Personal
+workspace (`artifactHomeScope` in `src/lib/projects/rules.ts`). A link or
+public artifact approved by the personal team stays Personal.
+
+- Places are exclusive. A workspace's lists, counts, search, and filters
+  hold only the artifacts whose home it is. One condition says so in SQL
+  (`scopeCondition` in `src/lib/artifact-list-scope.ts`: `personal` is what
+  the viewer wrote, less what is shared through one of their shared teams;
+  `team` is what is shared through that team) and one pure rule in the
+  browser (`listedInWorkspace` in `src/lib/sharing/home-move-rules.ts`).
+  Every new list or count of a workspace uses them. `artifact-list-scope.test.ts`
+  reads the SQL, and `artifact-list-scope.db.test.ts` checks that each
+  artifact a person wrote is in exactly one workspace.
+- `mine` is for agents only: MCP `artifacts_list` with scope "mine" lists
+  everything the caller wrote, in every workspace. Do not use it for a web
+  list.
+- An artifact shared through a team its author is no longer in stays in
+  the author's Personal list, so it is never in no list. Leaving a team
+  hands such artifacts to the team's longest-standing owner
+  (`src/lib/sharing/transfer.ts`), so this is only a row left behind. What
+  should happen to an artifact when its author leaves the team that is its
+  home is not decided; do not build a rule for it.
+- Views may cross the line; places may not. The one row that can be from
+  another workspace is an artifact a link opened here: it names its
+  workspace ("In Design", `elsewhereName`), and it is never counted.
+- The verb matches. Sharing with a team is a move, so the Share dialog
+  says "Move to <team>" on the picker and the button, says what the
+  artifact leaves, and says "Ask to move to <team>" while the team's rule
+  needs an approval; private reads as the move back. Link and public keep
+  the word share. The words are pure functions in `home-move-rules.ts`;
+  MCP descriptions for `visibility: "team"` say the same.
+- Nothing seems to vanish. After a move the workspace's toast says where
+  the artifact went, with "Open in <team>" and, where putting the sharing
+  back applies at once, Undo (`useHomeMoves` in
+  `src/components/app/home-moves.tsx`). A request that waits moves
+  nothing and gets no Undo. Undo saves the old sharing through the same
+  action, so the server decides again.
+- `e2e/workspace-home.spec.ts` runs the move, Open in, Undo, the approval
+  case, and the row's label on `/dev/workspace?scopes=1`, whose sharing is
+  an in-memory stand-in (`src/components/dev/fixture-sharing.ts`).
+
 ### Agent harnesses
 
 An artifact records the agent harness it came through ("via Claude Code").

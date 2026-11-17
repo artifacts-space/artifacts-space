@@ -33,11 +33,21 @@ export default function SharingPage() {
         head={["visibility", "Who can read it", "Search engines"]}
         rows={[
           ["private", "Only the author, and for an agent's artifact the person who added the agent.", "Never"],
-          ["team", "Members of the artifact's team. Needs a shared team.", "Never"],
+          ["team", "Members of the artifact's team. Needs a shared team. The artifact moves to that team's workspace.", "Never"],
           ["link", "Anyone with the link, signed in or not.", "Never"],
           ["public", "Anyone. The page says it is user-shared content.", `Only when someone who can share it turns on Show in search engines, and the account is ${String(NEW_ACCOUNT_NOINDEX_DAYS)} days old`],
         ]}
       />
+      <Prose>
+        <p>Every artifact lives in one workspace, and only that workspace lists and counts it. A private artifact lives in your <strong>Personal</strong> workspace. So does one you share by link or in public through your personal team. Sharing with a team is a move:</p>
+        <ul>
+          <li>The Share window says <strong>Move to</strong> and the team&apos;s name, and that the artifact leaves your personal artifacts. Where the team&apos;s rule needs approval, the button says <strong>Ask to move to</strong>, and nothing moves until someone approves.</li>
+          <li>After the move, a notice says where the artifact went. <strong>Open in</strong> takes you to it in the team&apos;s workspace, and <strong>Undo</strong> brings it back.</li>
+          <li>A link or public artifact that a shared team approves lives in that team&apos;s workspace too.</li>
+          <li>Making it private moves it back to your Personal workspace.</li>
+        </ul>
+        <p>A link still opens any artifact you can read from any workspace; its row then names the workspace it lives in. Agents are not affected: <Link href={`${docsHref("mcp")}#artifacts_list`}><code>artifacts_list</code></Link> with scope <code>&quot;mine&quot;</code> lists everything you wrote, in every workspace.</p>
+      </Prose>
       <Prose>
         <p>Public artifacts stay out of search engines until someone who can share them turns on <strong>Show in search engines</strong> in the Share dialog. Only the people who can share the artifact can turn it on: its author, or, while they are still in that agent&apos;s team, the person who added the agent that wrote it. Agents cannot. Making the artifact link, team, or private turns it off again. Only the page itself is listed: its Markdown version, raw content, files, and preview images never are.</p>
       </Prose>
@@ -83,7 +93,7 @@ export default function SharingPage() {
         <p>Inside a team, nobody waits: every member edits the team&apos;s artifacts directly. Approval is about who can read an artifact. In a personal team, sharing applies at once. In a shared team:</p>
         <ul>
           <li><strong>Link and public</strong> sharing needs an owner&apos;s or admin&apos;s approval, unless the person&apos;s role allows it. When an owner or admin shares from the web app, it applies at once.</li>
-          <li><strong>Team</strong> sharing follows the team&apos;s setting. The <strong>Create a team</strong> form starts with no approval, so members share with the team right away; the owner can pick approval there or turn it on later. Teams made before this default keep their setting.</li>
+          <li><strong>Team</strong> sharing follows the team&apos;s setting. The <strong>Create a team</strong> form starts with no approval, so members move artifacts to the team right away; the owner can pick approval there or turn it on later. Teams made before this default keep their setting.</li>
           <li><strong>Agents never approve.</strong> An agent&apos;s request always waits, even when the agent works for an owner. <code>artifacts_create</code> and <code>artifacts_update</code> report <code>&quot;pending&quot;</code>.</li>
         </ul>
         <p>Owners and admins see waiting requests on the team page, under <strong>Shared artifacts</strong> and <strong>Needs approval</strong>, and approve or decline them there. Notifications link straight to that list.</p>
