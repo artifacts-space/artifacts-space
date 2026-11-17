@@ -227,6 +227,10 @@ test("should list the artifacts without a project plainly after the projects, ne
     return tree !== null && Boolean(tree.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING);
   });
   expect(after, "they come after the projects").toBe(true);
+  // Scanned once the page answers a click: a scan marks what it reads, and a mark made before hydration is reported as a mismatch.
+  const first = loose(page).locator("li").first().getByRole("button").first();
+  await first.click();
+  await expect(first).toHaveAttribute("aria-current", "true");
   await expectNoAxeViolations(page.locator("[data-slot=artifact-list]"));
 });
 
