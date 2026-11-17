@@ -12,15 +12,18 @@ import { filenameFromUrl, mediaUploadProblem, uploadMediaKind } from "./media-up
  * media-context.tsx) and writes the file's URL into the block when it ends.
  */
 
-/** A finished upload: what the block needs to show it. */
+/** A finished upload: what the block needs to show it. The size, and an image's pixel size, are there when the file store gave them. */
 export interface UploadedMedia {
   id: string;
   filename: string;
   contentType: string;
+  size?: number;
+  width?: number;
+  height?: number;
 }
 
-/** Sends one file to the file store and returns it once it is ready. */
-export type MediaUploader = (file: File, onProgress: (percent: number) => void) => Promise<UploadedMedia>;
+/** Sends one file to the file store and returns it once it is ready. Aborting `signal` stops the request that carries the bytes. */
+export type MediaUploader = (file: File, onProgress: (percent: number) => void, signal?: AbortSignal) => Promise<UploadedMedia>;
 
 /** Where one upload is. */
 export type UploadState =
@@ -36,10 +39,19 @@ interface Entry {
   preview: string | null;
   state: UploadState;
   started: boolean;
+  /** Stops the request of the run in progress. A retry gets a new one. */
+  stop: AbortController;
   listeners: Set<() => void>;
 }
 
 const entries = new Map<string, Entry>();
+/** The uploads this tab finished, by file id: a block shows its file's type and size before any save lists the file. */
+const finished = new Map<string, UploadedMedia>();
+
+/** What this tab's own upload of `fileId` said about the file, or null when it was uploaded elsewhere. */
+export function uploadedFacts(fileId: string): UploadedMedia | null {
+  return finished.get(fileId.toLowerCase()) ?? null;
+}
 let nextId = 0;
 const missing: UploadState = { status: "failed", message: "This upload was started in another tab or before a reload. Upload the file again." };
 
@@ -55,7 +67,7 @@ export function queueUpload(file: File): string {
   nextId += 1;
   const uploadId = `upload-${String(Date.now())}-${String(nextId)}`;
   const problem = mediaUploadProblem(file);
-  entries.set(uploadId, { file, preview: null, state: problem ? { status: "failed", message: problem } : { status: "waiting" }, started: Boolean(problem), listeners: new Set() });
+  entries.set(uploadId, { file, preview: null, state: problem ? { status: "failed", message: problem } : { status: "waiting" }, started: Boolean(problem), stop: new AbortController(), listeners: new Set() });
   return uploadId;
 }
 
@@ -95,7 +107,8 @@ async function run(uploadId: string, entry: Entry, uploader: MediaUploader) {
     setState(uploadId, { status: "preparing" });
     const ready = await prepared(entry.file);
     setState(uploadId, { status: "uploading", progress: 0 });
-    const file = await uploader(ready, (progress) => { setState(uploadId, { status: "uploading", progress }); });
+    const file = await uploader(ready, (progress) => { setState(uploadId, { status: "uploading", progress }); }, entry.stop.signal);
+    finished.set(file.id.toLowerCase(), file);
     setState(uploadId, { status: "done", file });
   } catch (error) {
     setState(uploadId, { status: "failed", message: error instanceof Error && error.message ? error.message : "The upload failed. Try again." });
@@ -115,15 +128,18 @@ export function retryUpload(uploadId: string, uploader: MediaUploader): void {
   const entry = entries.get(uploadId);
   if (entry?.state.status !== "failed" || mediaUploadProblem(entry.file)) return;
   entry.started = false;
+  entry.stop = new AbortController();
   setState(uploadId, { status: "waiting" });
   startUpload(uploadId, uploader);
 }
 
-/** Forgets an upload whose block is gone. */
+/** Forgets an upload whose block is gone, and stops its request when it is still on its way (Cancel). */
 export function forgetUpload(uploadId: string): void {
-  const preview = entries.get(uploadId)?.preview;
-  if (preview) URL.revokeObjectURL(preview);
+  const entry = entries.get(uploadId);
+  if (!entry) return;
+  if (entry.preview) URL.revokeObjectURL(entry.preview);
   entries.delete(uploadId);
+  entry.stop.abort();
 }
 
 /**

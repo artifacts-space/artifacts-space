@@ -7,6 +7,7 @@ import { FILE_PREFIX } from "@/lib/artifact-icons";
 import { fileLimits } from "./config";
 import { cleanupOrphanCopies, removeArtifactCopies, removeCopiesOf } from "./copies";
 import { imageFileIdsOf } from "./icon-cleanup-rules";
+import { keptDimensions } from "./image-dimensions";
 import { deleteObject, r2ConfigFromEnv } from "./r2";
 import type { FileDto } from "./types";
 
@@ -17,7 +18,7 @@ import type { FileDto } from "./types";
 
 /** Maps a row to the shape the app and agents see. */
 export function toFileDto(row: ArtifactFileRecord): FileDto {
-  const file: FileDto = { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null, embedded: row.attachedByContent };
+  const file: FileDto = { id: row.id, filename: row.filename, contentType: row.contentType, size: row.size, createdAt: row.createdAt.toISOString(), replacedAt: row.replacedAt?.toISOString() ?? null, embedded: row.attachedByContent, ...keptDimensions(row.width, row.height) };
   return row.pagePath === null ? file : { ...file, pagePath: row.pagePath };
 }
 

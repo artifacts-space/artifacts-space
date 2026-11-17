@@ -197,7 +197,7 @@ async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | nul
   const opened = approval.outcome === "pending" ? sql`(select id from request where opened)` : sql`null::text`;
   const result = await getDb().execute<{ id: string; opened_request_id: string | null; saved_at: string | Date }>(sql`
     with target as (
-      select f.id, f.artifact_id, f.key, f.filename, f.content_type, f.size, f.uploader_id, f.replaced_at, a.updated_at as artifact_updated_at,
+      select f.id, f.artifact_id, f.key, f.filename, f.content_type, f.size, f.width, f.height, f.uploader_id, f.replaced_at, a.updated_at as artifact_updated_at,
         a.title, a.icon, a.theme, a.cover, a.summary, a.content, a.kind, a.language, a.project, a.source, a.metadata
       from ${artifactFile} f
       join ${artifact} a on a.id = f.artifact_id
@@ -213,11 +213,11 @@ async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | nul
       where u.id = ${upload.id} and u.uploader_id = ${editorId} and u.artifact_id is null and u.status = 'ready'
         and u.page_path is not distinct from ${target.pagePath}${pageRoom(target)}
         and exists (select 1 from target)
-      returning u.key, u.content_type, u.size, u.uploader_id
+      returning u.key, u.content_type, u.size, u.width, u.height, u.uploader_id
     ),
     copy as (
-      insert into ${artifactFileCopy} (id, file_id, artifact_id, key, filename, content_type, size, uploader_id, current_from, replaced_at, replaced_by, version_id)
-      select ${copyId}, t.id, t.artifact_id, t.key, t.filename, t.content_type, t.size, t.uploader_id, t.replaced_at,
+      insert into ${artifactFileCopy} (id, file_id, artifact_id, key, filename, content_type, size, width, height, uploader_id, current_from, replaced_at, replaced_by, version_id)
+      select ${copyId}, t.id, t.artifact_id, t.key, t.filename, t.content_type, t.size, t.width, t.height, t.uploader_id, t.replaced_at,
         greatest(date_trunc('milliseconds', greatest(now(), t.artifact_updated_at + interval '1 millisecond')), t.replaced_at), ${editorId}, ${versionId}
       from target t, upload
       returning replaced_at
@@ -236,7 +236,7 @@ async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | nul
       returning a.id, a.updated_at
     )
     update ${artifactFile} e
-    set key = upload.key, filename = ${filename}, content_type = upload.content_type, size = upload.size, uploader_id = upload.uploader_id, replaced_at = copy.replaced_at
+    set key = upload.key, filename = ${filename}, content_type = upload.content_type, size = upload.size, width = upload.width, height = upload.height, uploader_id = upload.uploader_id, replaced_at = copy.replaced_at
     from upload, copy, version, stamped
     where e.id = ${target.id}
     returning e.id, ${opened} as opened_request_id, stamped.updated_at as saved_at
