@@ -1,4 +1,4 @@
-import { checkUpload, resolveFileType } from "@/lib/files/config";
+import { checkUpload, fileLimits, resolveFileType } from "@/lib/files/config";
 import { mediaKindForType, type MediaKind } from "@/lib/files/media-rules";
 import { safeHref } from "@/lib/link-policy";
 
@@ -8,8 +8,29 @@ import { safeHref } from "@/lib/link-policy";
  * server checks every upload again: these only give a quick, clear answer.
  */
 
-/** Most files one paste or drop adds at once. */
-export const maxFilesPerInsert = 10;
+/** Most uploads one tab sends at a time. The rest wait their turn in their blocks, so a drop of many files never runs into the limit on unfinished uploads (fileLimits.maxPendingPerUser). */
+export const maxUploadsAtOnce = 3;
+
+/** What a block says when its file would be one more than a document shows. */
+export const documentFullProblem = `A document shows at most ${String(fileLimits.maxInlineFilesPerArtifact)} files. Remove some, then add this one again.`;
+
+/**
+ * Why each file of a paste or drop cannot go into the document, or null
+ * when it can: its own problem (size, type), or that the document already
+ * shows as many files as it may (`shown` counts the blocks it has). Every
+ * file gets an answer and a block, so none goes with no word. The server
+ * decides for real when the document saves: it counts files, and a block
+ * that shows a plain attachment is not one of them.
+ */
+export function insertProblems(files: readonly { name: string; type: string; size: number }[], shown: number): (string | null)[] {
+  let room = fileLimits.maxInlineFilesPerArtifact - shown;
+  return files.map((file) => {
+    const problem = mediaUploadProblem(file);
+    if (problem) return problem;
+    room -= 1;
+    return room < 0 ? documentFullProblem : null;
+  });
+}
 
 /** Why this file cannot go into a document, written for the person, or null when it can. */
 export function mediaUploadProblem(file: { name: string; type: string; size: number }): string | null {
@@ -29,11 +50,6 @@ export function uploadMediaKind(file: { name: string; type: string }): MediaKind
  */
 export function defaultMediaLabel(kind: MediaKind, filename: string): string {
   return kind === "image" || kind === "video" ? "" : filename;
-}
-
-/** The files in a paste or drop that should become media blocks, capped at maxFilesPerInsert. */
-export function insertableFiles(files: readonly File[]): File[] {
-  return files.filter((file) => file.size > 0).slice(0, maxFilesPerInsert);
 }
 
 /** A file name for an image fetched from a link: the last part of its path, or "image". */

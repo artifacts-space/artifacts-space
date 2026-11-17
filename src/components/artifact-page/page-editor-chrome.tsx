@@ -24,7 +24,7 @@ export interface PageConflict {
 /**
  * What the in-place editor on an artifact's page shows outside the
  * artifact itself: the page header's save indicator and More menu (Full
- * width, History, View source, Made with), and the notice about a conflicting save.
+ * width, History, View source, Attach file, Made with), and the notice about a conflicting save.
  */
 export interface PageEditorChrome {
   /** History's dialog, with the restore check for the version the editor sees. */
@@ -42,6 +42,8 @@ export interface PageEditorChrome {
   caughtUp: { words: string; onDismiss: () => void } | null;
   /** "Made with": the agent harness the artifact shows; null while the editable copy loads. */
   harness: HarnessControl | null;
+  /** "Attach file": opens the file picker of the page's list of attached files; null while the editable copy loads, and for a format that has no attachments beside its content. */
+  attach: (() => void) | null;
 }
 
 const ChromeContext = createContext<PageEditorChrome | null>(null);
@@ -144,6 +146,7 @@ export function useWaitingChrome(input: WaitingChromeInput | null, error: string
       agentSaved: null,
       caughtUp: null,
       harness: null,
+      attach: null,
     };
   }, [input, error, refresh, ownSaves]);
 }

@@ -95,7 +95,7 @@ export default function FormatsPage() {
           ["ui spec", size(uiLimits.maxSpecBytes), "ui content and each frame of a canvas, plus element and depth limits."],
           ["Canvas", size(canvasLimits.maxCanvasBytes), `canvas content: up to ${String(canvasLimits.maxFrames)} frames and ${canvasLimits.maxElements.toLocaleString("en-US")} elements across them.`],
           ["Mermaid source", `${maxMermaidLength.toLocaleString("en-US")} characters`, "mermaid content."],
-          ["File", size(fileLimits.maxBytes), `Each upload. Up to ${String(fileLimits.maxFilesPerArtifact)} files per artifact.`],
+          ["File", size(fileLimits.maxBytes), `Each upload. Up to ${String(fileLimits.maxInlineFilesPerArtifact)} files in a document's text, and ${String(fileLimits.maxFilesPerArtifact)} attached files, per artifact.`],
           ["Page files", size(pageFileLimits.maxTotalBytes), `The files an HTML page loads by relative path: up to ${String(pageFileLimits.maxFiles)} per artifact, on top of its other files.`],
         ]}
         mono={[1]}

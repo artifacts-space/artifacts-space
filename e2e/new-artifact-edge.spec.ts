@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { attachedList, pasteTable, switchBlankPageTo } from "./support/new-page";
+import { attachedList, blankTextPage, pasteTable, uploadsReady, writeTextBody } from "./support/new-page";
 import { allowPageError, expect, test } from "./support/test";
 
 /**
@@ -7,7 +7,7 @@ import { allowPageError, expect, test } from "./support/test";
  * kept around a refused create or attach, leaving while files are on their
  * way, a rich paste, and starting a table directly. A document takes
  * dropped files in its text (document-files.spec.ts), so the checks about
- * attached files run on a table or a Files page. The fixture stands in
+ * attached files run on a table or a Text page. The fixture stands in
  * for the server, refuses what it refuses, and records every upload it
  * deletes, so a check can prove that no kept file was deleted.
  */
@@ -86,23 +86,6 @@ test("should create the page without a file that was taken out of the text after
   expect(stored?.files).toHaveLength(0);
   expect(await creates(page)).toBe(1);
   await expect(page.getByText(/files_request_upload|file ids are unknown|could not be added/)).toHaveCount(0);
-});
-
-test("should store nothing when the only file of a blank Files page is removed after a refused create", async ({ page }) => {
-  await openNewArtifact(page);
-  await switchBlankPageTo(page, "Files");
-  await setFlag(page, "fixture:fail-next-create", "always");
-  await dropFiles(body(page), ["Draft.pdf"]);
-  await expect(notSaved(page)).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: "Remove Draft.pdf" }).click();
-  await expect(page.getByRole("list", { name: "Uploads" })).toHaveCount(0);
-  // The title the file gave the page goes with it, so the page is blank again and nothing is stored.
-  await expect(blankPage(page).getByRole("textbox", { name: "Artifact title" })).toHaveValue("");
-  await page.evaluate(() => { window.sessionStorage.removeItem("fixture:fail-next-create"); });
-  await cards(page, "Long ui fixture").click();
-  await expect(page.getByRole("region", { name: "Edit Long ui fixture" })).toBeVisible();
-  expect(await storedNew(page)).toHaveLength(0);
-  expect(await creates(page)).toBe(0);
 });
 
 test("should keep a file whose attach is still on its way when the page is left", async ({ page }) => {
@@ -304,9 +287,9 @@ test("should ask before the tab closes while a file dropped on a document is sti
   await asked.dismiss();
 });
 
-test("should ask before the tab closes while a file dropped on a Files page is still uploading", async ({ page }) => {
+test("should ask before the tab closes while a file dropped on a page that is not stored yet is still uploading", async ({ page }) => {
   await openNewArtifact(page);
-  await switchBlankPageTo(page, "Files");
+  await blankTextPage(page);
   await setFlag(page, "fixture:hold-uploads", "1");
   await dropFiles(body(page), ["Slow.pdf"]);
   await expect(page.getByText("Slow.pdf")).toBeVisible();
@@ -319,21 +302,27 @@ test("should ask before the tab closes while a file dropped on a Files page is s
 
 test("should store the page with its file when the last save on leaving goes through after a refused create", async ({ page }) => {
   await openNewArtifact(page);
-  await switchBlankPageTo(page, "Files");
+  await blankTextPage(page);
   await setFlag(page, "fixture:fail-next-create", "1");
   await dropFiles(body(page), ["Report.pdf"]);
+  await uploadsReady(page, 1);
+  // Writing stores the page; the create carries the file, and is refused once.
+  await writeTextBody(page, "Notes on the report");
   await expect(notSaved(page)).toBeVisible({ timeout: 15_000 });
   await cards(page, "Long ui fixture").click();
   await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(1);
+  expect((await storedNew(page))[0]?.kind).toBe("text");
   expect(await discarded(page)).toEqual([]);
   expect(await creates(page)).toBe(1);
 });
 
 test("should delete the files a refused create carried once the page is left and the last try is refused too", async ({ page }) => {
   await openNewArtifact(page);
-  await switchBlankPageTo(page, "Files");
+  await blankTextPage(page);
   await setFlag(page, "fixture:fail-next-create", "always");
   await dropFiles(body(page), ["Orphan.pdf"]);
+  await uploadsReady(page, 1);
+  await writeTextBody(page, "Notes that are never stored");
   await expect(notSaved(page)).toBeVisible({ timeout: 15_000 });
   await cards(page, "Long ui fixture").click();
   await expect.poll(async () => (await discarded(page)).length, { timeout: 15_000 }).toBe(1);
@@ -374,40 +363,27 @@ test("should start a table directly when an empty page is switched to CSV", asyn
   expect(await creates(page)).toBe(1);
 });
 
-test("should switch an empty page to Files and back to Markdown before it is stored", async ({ page }) => {
+test("should not offer Files as a format, on a blank page or on a stored one", async ({ page }) => {
   await openNewArtifact(page);
-  const toolbar = blankPage(page).getByRole("button", { name: "Format" });
   const dialog = page.getByRole("dialog", { name: "Format and language" });
-  for (const format of ["Files", "Markdown"]) {
-    await toolbar.click();
-    await dialog.getByRole("combobox", { name: "Format" }).click();
-    await page.getByRole("option", { name: format, exact: true }).click();
-    await dialog.getByRole("button", { name: "Apply" }).click();
-    await expect(dialog).toBeHidden();
-  }
-  await expect(body(page).locator('[contenteditable="true"]')).toBeVisible();
-  await page.getByRole("textbox", { name: "Artifact title" }).fill("Back to writing");
-  await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("markdown");
-  expect(await creates(page)).toBe(1);
-});
+  // A blank page: every format but Files.
+  await blankPage(page).getByRole("button", { name: "Format" }).click();
+  await dialog.getByRole("combobox", { name: "Format" }).click();
+  await expect(page.getByRole("option", { name: "Markdown", exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Interface", exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Files", exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
 
-test("should switch a page stored with only a title to Files and back to Markdown", async ({ page }) => {
-  await openNewArtifact(page);
+  // A page stored with only a title: the same list, from its More menu.
+  await page.getByRole("textbox", { name: "Artifact title" }).click();
   await storeWithTitle(page, "Title only");
-  const editor = page.getByRole("region", { name: "Edit Title only" });
-  const dialog = page.getByRole("dialog", { name: "Format and language" });
-  for (const format of ["Files", "Markdown"]) {
-    await editor.getByRole("button", { name: "More actions" }).click();
-    await page.getByRole("menuitem", { name: "Format and language" }).click();
-    await dialog.getByRole("combobox", { name: "Format" }).click();
-    await page.getByRole("option", { name: format, exact: true }).click();
-    await dialog.getByRole("button", { name: "Apply" }).click();
-    await expect(dialog).toBeHidden();
-    await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe(format === "Files" ? "file" : "markdown");
-  }
-  await expect(page.getByRole("status").filter({ hasText: "Not saved" })).toHaveCount(0);
-  expect((await storedNew(page))[0]?.content).toBe("");
-  expect(await creates(page)).toBe(1);
+  await page.getByRole("region", { name: "Edit Title only" }).getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Format and language" }).click();
+  await dialog.getByRole("combobox", { name: "Format" }).click();
+  await expect(page.getByRole("option", { name: "Markdown", exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Files", exact: true })).toHaveCount(0);
 });
 
 /** Waits until the fixture holds a create, so the test can act while it is on its way. */
@@ -425,33 +401,20 @@ async function releaseCreates(page: Page) {
 
 test("should store the page with its file when it is left during a create that is then refused once", async ({ page }) => {
   await openNewArtifact(page);
-  await switchBlankPageTo(page, "Files");
+  await blankTextPage(page);
   await setFlag(page, "fixture:hold-create", "1");
   await setFlag(page, "fixture:fail-next-create", "1");
   await dropFiles(body(page), ["Contract.pdf"]);
+  await uploadsReady(page, 1);
+  await writeTextBody(page, "Notes on the contract");
   await createOnItsWay(page);
   // Leaving queues the editor's last save behind the create on its way; that save is the retry.
   await cards(page, "Long ui fixture").click();
   await expect(page.getByRole("region", { name: "Edit Long ui fixture" })).toBeVisible();
   await releaseCreates(page);
   await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(1);
-  expect((await storedNew(page))[0]?.title).toBe("Contract");
+  expect((await storedNew(page))[0]?.content).toBe("Notes on the contract");
   expect(await discarded(page)).toEqual([]);
-  expect(await creates(page)).toBe(1);
-});
-
-test("should show the stored Files page, not a false failure, when its only file is removed while the create is on its way", async ({ page }) => {
-  await openNewArtifact(page);
-  await switchBlankPageTo(page, "Files");
-  await setFlag(page, "fixture:hold-create", "1");
-  await dropFiles(body(page), ["Only.pdf"]);
-  await createOnItsWay(page);
-  await page.getByRole("button", { name: "Remove Only.pdf" }).click();
-  await releaseCreates(page);
-  await expect(page.getByRole("region", { name: "Edit Only" })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("status").filter({ hasText: /Not saved|Add a title|Add some content/ })).toHaveCount(0);
-  expect((await storedNew(page))[0]?.kind).toBe("file");
   expect(await creates(page)).toBe(1);
 });
 

@@ -132,7 +132,8 @@ export default function LimitsPage() {
         head={["Limit", "Value"]}
         rows={[
           ["File size", size(fileLimits.maxBytes)],
-          ["Files per artifact", String(fileLimits.maxFilesPerArtifact)],
+          ["Files in a document's text, per artifact", String(fileLimits.maxInlineFilesPerArtifact)],
+          ["Attached files per artifact", String(fileLimits.maxFilesPerArtifact)],
           ["Unfinished uploads per person", String(fileLimits.maxPendingPerUser)],
           ["Upload URL lifetime", `${String(fileLimits.uploadUrlSeconds / 60)} minutes`],
           ["Download URL lifetime", `${String(fileLimits.downloadUrlSeconds / 60)} minutes`],

@@ -8,6 +8,7 @@ import { fileLimits } from "./config";
 import { cleanupOrphanCopies, removeArtifactCopies, removeCopiesOf } from "./copies";
 import { imageFileIdsOf } from "./icon-cleanup-rules";
 import { keptDimensions } from "./image-dimensions";
+import type { FileCounts } from "./limit-rules";
 import { deleteObject, r2ConfigFromEnv } from "./r2";
 import type { FileDto } from "./types";
 
@@ -99,10 +100,21 @@ export async function clearIconForFile(artifactId: string, fileId: string): Prom
   await getDb().update(artifact).set({ cover: null }).where(and(eq(artifact.id, artifactId), or(eq(artifact.cover, ref), like(artifact.cover, `${ref}@%`))));
 }
 
-/** How many files an artifact holds, page files aside: those have limits of their own (src/lib/page-files/rules.ts). */
-export async function countArtifactFiles(artifactId: string): Promise<number> {
-  const [row] = await getDb().select({ count: sql<number>`count(*)::int` }).from(artifactFile).where(and(eq(artifactFile.artifactId, artifactId), isNull(artifactFile.pagePath)));
-  return row?.count ?? 0;
+/**
+ * How many files an artifact holds, page files aside (those have limits of
+ * their own, src/lib/page-files/rules.ts): the files a content save
+ * attached (`inline`) and every other attachment (`plain`), counted apart
+ * because each has its own limit (limit-rules.ts).
+ */
+export async function countArtifactFiles(artifactId: string): Promise<FileCounts> {
+  const [row] = await getDb()
+    .select({
+      plain: sql<number>`(count(*) filter (where not ${artifactFile.attachedByContent}))::int`,
+      inline: sql<number>`(count(*) filter (where ${artifactFile.attachedByContent}))::int`,
+    })
+    .from(artifactFile)
+    .where(and(eq(artifactFile.artifactId, artifactId), isNull(artifactFile.pagePath)));
+  return { plain: row?.plain ?? 0, inline: row?.inline ?? 0 };
 }
 
 /** How many uploads a person started within the last hour and has not finished. Older ones are abandoned and wait for cleanup. */

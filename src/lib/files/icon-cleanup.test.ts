@@ -79,24 +79,24 @@ describe("pruneUnusedIconFiles", () => {
 describe("countHistoryOnlyFiles", () => {
   it("should count the attached images only older versions show, not the current cover", async () => {
     stage([[artifact, [[{ ...record, cover: `file:${other}` }]]], [artifactVersion, [[{ icon: null, cover: `file:${cover}@20` }, { icon: null, cover: `file:${other}` }]]], [artifactFile, [[]]]]);
-    await expect(countHistoryOnlyFiles("a1")).resolves.toBe(1);
+    await expect(countHistoryOnlyFiles("a1")).resolves.toEqual({ plain: 1, inline: 0 });
     expect(store.getFileRows).toHaveBeenCalledWith([cover]);
   });
 
   it("should count nothing when every kept image is still shown", async () => {
     stage([[artifact, [[{ ...record, icon: `file:${cover}` }]]], [artifactVersion, [[{ icon: `file:${cover}`, cover: null }]]], [artifactFile, [[]]]]);
-    await expect(countHistoryOnlyFiles("a1")).resolves.toBe(0);
+    await expect(countHistoryOnlyFiles("a1")).resolves.toEqual({ plain: 0, inline: 0 });
   });
 
   it("should count media the document no longer embeds, but not media it still embeds", async () => {
     const shown = "3b241101-e2bb-4255-8caf-4136c566a962";
     stage([[artifact, [[{ ...record, content: `![Now](/api/files/${shown})` }]]], [artifactVersion, [[]]], [artifactFile, [[{ id: cover }, { id: other }, { id: shown }]]]]);
-    await expect(countHistoryOnlyFiles("a1")).resolves.toBe(2);
+    await expect(countHistoryOnlyFiles("a1")).resolves.toEqual({ plain: 0, inline: 2 });
   });
 
-  it("should count a file once when it was both a cover and an embed", async () => {
+  it("should count a file once, as content media, when it was both a cover and an embed", async () => {
     stage([[artifact, [[record]]], [artifactVersion, [[{ icon: null, cover: `file:${cover}` }]]], [artifactFile, [[{ id: cover }]]]]);
-    await expect(countHistoryOnlyFiles("a1")).resolves.toBe(1);
+    await expect(countHistoryOnlyFiles("a1")).resolves.toEqual({ plain: 0, inline: 1 });
   });
 });
 

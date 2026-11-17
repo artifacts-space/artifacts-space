@@ -13,8 +13,8 @@ import { UserFacingError } from "@/lib/user-facing-error";
 import { recordArtifactChange } from "@/lib/versions/save-write";
 
 import { canUseFileInArtifact } from "./access-rules";
-import { fileLimits } from "./config";
 import { countHistoryOnlyFiles } from "./icon-cleanup";
+import { fitsAtOnce, fullMessage, hasRoom, maxMarkdownFileRefs, type FileBucket } from "./limit-rules";
 import { unusableFilesForPeople } from "./person-messages";
 import { fileRefsInContent, maxFileRefs } from "./refs";
 import { removeCopiesOf } from "./copies";
@@ -28,8 +28,13 @@ import { attachFileRows, clearIconForFile, countArtifactFiles, deleteFileRows, g
  * Callers check that the editor may edit the artifact (getEditableArtifact).
  */
 
-/** Throws a UserFacingError, naming the ids for agents, unless every file is usable in this artifact. */
-export async function assertUsableFiles(authorId: string, artifactId: string | null, fileIds: readonly string[]): Promise<void> {
+/**
+ * Throws a UserFacingError, naming the ids for agents, unless every file is
+ * usable in this artifact and it has room for the new ones. `bucket` says
+ * how they are attached: as plain attachments, or as content media by the
+ * save whose content names them, which has a limit of its own.
+ */
+export async function assertUsableFiles(authorId: string, artifactId: string | null, fileIds: readonly string[], bucket: FileBucket = "plain"): Promise<void> {
   if (fileIds.length === 0) return;
   if (fileIds.length > maxFileRefs) throw new UserFacingError(`An artifact can use at most ${String(maxFileRefs)} files.`);
   const rows = new Map((await getFileRows(fileIds)).map((row) => [row.id, row]));
@@ -44,17 +49,20 @@ export async function assertUsableFiles(authorId: string, artifactId: string | n
     );
   }
   const adding = fileIds.filter((id) => rows.get(id)?.artifactId === null).length;
-  if (!(await hasRoomFor(artifactId, adding))) {
-    throw new UserFacingError(`An artifact holds at most ${String(fileLimits.maxFilesPerArtifact)} files. Remove some first.`);
-  }
+  if (!(await hasRoomFor(artifactId, adding, bucket))) throw new UserFacingError(fullMessage(bucket));
 }
 
-/** Whether the artifact (null on create) can take `adding` more files. Old icon and cover images, and removed media, kept only for Restore do not count (see countHistoryOnlyFiles). */
-async function hasRoomFor(artifactId: string | null, adding: number): Promise<boolean> {
-  if (!artifactId) return adding <= fileLimits.maxFilesPerArtifact;
-  const existing = await countArtifactFiles(artifactId);
-  if (existing + adding <= fileLimits.maxFilesPerArtifact) return true;
-  return existing - (await countHistoryOnlyFiles(artifactId)) + adding <= fileLimits.maxFilesPerArtifact;
+/**
+ * Whether the artifact (null on create) can take `adding` more files of one
+ * kind (limit-rules.ts). Old icon and cover images, and removed media, kept
+ * only for Restore do not count (see countHistoryOnlyFiles); they are looked
+ * up only when the artifact would otherwise be full.
+ */
+async function hasRoomFor(artifactId: string | null, adding: number, bucket: FileBucket): Promise<boolean> {
+  if (!artifactId) return fitsAtOnce(0, adding, bucket);
+  const existing = (await countArtifactFiles(artifactId))[bucket];
+  if (fitsAtOnce(existing, adding, bucket)) return true;
+  return hasRoom({ bucket, existing, historyOnly: (await countHistoryOnlyFiles(artifactId))[bucket], adding });
 }
 
 /**
@@ -109,7 +117,8 @@ export async function attachFiles(editorId: string, artifactId: string, fileIds:
 export async function checkContentFiles(authorId: string, artifactId: string | null, kind: string, content: string): Promise<string[]> {
   const ids = fileRefsInContent(kind, content);
   if (kind === "markdown") return attachableMarkdownFiles(authorId, artifactId, ids);
-  await assertUsableFiles(authorId, artifactId, ids);
+  // The save attaches the uploads its content names as content media.
+  await assertUsableFiles(authorId, artifactId, ids, "inline");
   return ids;
 }
 
@@ -127,11 +136,9 @@ async function attachableMarkdownFiles(authorId: string, artifactId: string | nu
   if (fileIds.length === 0) return [];
   const named = new Set(fileIds);
   const usable = (await usableFileRows(authorId, artifactId)).filter((row) => named.has(row.id) && canUseFileInArtifact(row, authorId, artifactId));
-  if (usable.length > maxFileRefs) throw new UserFacingError(`An artifact can use at most ${String(maxFileRefs)} files.`);
+  if (usable.length > maxMarkdownFileRefs) throw new UserFacingError(`A document can use at most ${String(maxMarkdownFileRefs)} files.`);
   const adding = usable.filter((row) => row.artifactId === null).length;
-  if (adding > 0 && !(await hasRoomFor(artifactId, adding))) {
-    throw new UserFacingError(`An artifact holds at most ${String(fileLimits.maxFilesPerArtifact)} files. Remove some first.`);
-  }
+  if (adding > 0 && !(await hasRoomFor(artifactId, adding, "inline"))) throw new UserFacingError(fullMessage("inline"));
   return usable.map((row) => row.id);
 }
 

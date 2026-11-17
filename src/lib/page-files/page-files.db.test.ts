@@ -130,7 +130,7 @@ describe.runIf(Boolean(databaseUrl))("page files, with a database", async () => 
       expect((await row(css)).artifactId).toBe(ids.other);
       expect((await row(pdf)).artifactId).toBe(ids.other);
       // Page files do not use up the plain attachments' limit.
-      expect(await countArtifactFiles(ids.other)).toBe(1);
+      expect(await countArtifactFiles(ids.other)).toEqual({ plain: 1, inline: 0 });
     });
 
     it("should refuse a page file for an artifact that is not HTML, in the check and in the statement", async () => {

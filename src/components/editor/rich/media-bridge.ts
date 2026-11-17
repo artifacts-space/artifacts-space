@@ -45,8 +45,8 @@ export interface AttachedFile {
   contentType: string;
 }
 
-/** What the page asks of the document: put these files in the text (at a point of the window, or at the cursor), or show a file the artifact already has. */
-export type MediaRequest = { files: File[]; point?: Point | undefined } | { attached: AttachedFile };
+/** What the page asks of the document: put these files in the text (at a point of the window, or at the cursor), or show files the artifact already has, in this order. */
+export type MediaRequest = { files: File[]; point?: Point | undefined } | { attached: AttachedFile[] };
 
 /** The event that carries a request to the document's element. The editor cancels it when it took the request. */
 export const addMediaEvent = "artifact:add-media";
@@ -60,11 +60,17 @@ function isPoint(value: unknown): value is Point {
   return typeof value === "object" && value !== null && "x" in value && typeof value.x === "number" && "y" in value && typeof value.y === "number";
 }
 
+/** The files the artifact already has that a request names, or null when it names none. */
+function readAttached(sent: unknown): MediaRequest | null {
+  const attached = Array.isArray(sent) ? sent.filter(isAttachedFile) : [];
+  return attached.length > 0 ? { attached } : null;
+}
+
 /** The request an event carries, or null for any other event or a detail that is not a request. */
 export function readMediaRequest(event: Event): MediaRequest | null {
   const detail: unknown = event instanceof CustomEvent ? event.detail : null;
   if (typeof detail !== "object" || detail === null) return null;
-  if ("attached" in detail) return isAttachedFile(detail.attached) ? { attached: detail.attached } : null;
+  if ("attached" in detail) return readAttached(detail.attached);
   if (!("files" in detail) || !Array.isArray(detail.files)) return null;
   const files = detail.files.filter((file): file is File => file instanceof File);
   const point: unknown = "point" in detail ? detail.point : undefined;

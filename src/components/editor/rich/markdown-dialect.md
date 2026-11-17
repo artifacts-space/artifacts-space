@@ -123,7 +123,9 @@ after it.
 - **Removed media is kept for Restore, then deleted.** A save that drops an
   embedded file always files its own version, so Restore brings it back
   (`dropsShownImage`). While only older versions name content media, it does
-  not count toward the 20-file limit (`countHistoryOnlyFiles`); once no
+  not count toward the limit on files in a document's text
+  (`fileLimits.maxInlineFilesPerArtifact`; `countHistoryOnlyFiles`,
+  `limit-rules.ts`); once no
   version names it, history pruning deletes it (`pruneUnusedContentFiles` in
   `src/lib/files/icon-cleanup.ts`). The row is deleted in one statement that
   checks the artifact's current content, icon, and cover, and every

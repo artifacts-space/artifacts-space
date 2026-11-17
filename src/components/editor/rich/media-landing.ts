@@ -1,4 +1,4 @@
-import type { Node as DocNode } from "@tiptap/pm/model";
+import type { Node as DocNode, ResolvedPos } from "@tiptap/pm/model";
 import type { EditorView } from "@tiptap/pm/view";
 
 /**
@@ -93,6 +93,17 @@ export function fileLanding(view: EditorView, point: Point): Landing {
 /** Where a file added from outside the text goes: the end of the document, in place of an empty last line. */
 export function endLanding(doc: DocNode): number {
   return isEmptyLine(doc.lastChild) ? doc.content.size - 1 : doc.content.size;
+}
+
+/**
+ * Where a file goes when it is added at the cursor: after the block the
+ * cursor is in (the end of the selection), as a block of its own, or in
+ * place of that block when it is an empty line.
+ */
+export function caretLanding(doc: DocNode, $to: ResolvedPos): number {
+  if ($to.depth === 0) return $to.pos;
+  const start = $to.before(1);
+  return isEmptyLine(doc.nodeAt(start)) ? start + 1 : $to.after(1);
 }
 
 /** How long the line stays without a new drag event. Browsers repeat the event several times a second while a file is held. */

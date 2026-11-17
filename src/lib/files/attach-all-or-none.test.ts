@@ -32,7 +32,7 @@ beforeEach(() => {
   pages.attachPageUploads.mockResolvedValue([pageId]);
   pageStore.detachPageFileRows.mockResolvedValue(undefined);
   store.getFileRows.mockResolvedValue([{ id: plainId, status: "ready", uploaderId: "author", artifactId: null, pagePath: null }]);
-  store.countArtifactFiles.mockResolvedValue(0);
+  store.countArtifactFiles.mockResolvedValue({ plain: 0, inline: 0 });
   store.attachFileRows.mockResolvedValue(1);
   versions.recordArtifactChange.mockResolvedValue({ status: "applied", record: { id: "a1" } });
 });

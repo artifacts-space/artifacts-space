@@ -128,7 +128,7 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
   useEffect(() => { draftRef.current = draft; }, [draft]);
 
   const active = options !== undefined;
-  const { uploads, fileIdsForCreate, removeUpload, problem: uploadProblem, tracker } = useBlankUploads({ options, artifact, draftRef, replace, onUpdated });
+  const { uploads, fileIdsForCreate, removeUpload, problem: uploadProblem, tracker } = useBlankUploads({ options, artifact, onUpdated });
   const current = useCallback(() => ({ draft: draftRef.current, fileIds: fileIdsForCreate() }), [fileIdsForCreate]);
   const save = useCreateOnceSave(options?.api, options?.project ?? null, current, tracker);
 

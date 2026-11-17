@@ -7,6 +7,7 @@ import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import { artifactListState } from "@/components/app/artifact-list-state";
 import { useHomeMoves, WorkspaceHomeProvider } from "@/components/app/home-moves";
+import type { AttachFilesApi } from "@/components/files/attached-files";
 import { serverProjectsApi, type ProjectsApi } from "@/components/app/projects-api";
 import { ShareTeamsProvider, type ShareTeam } from "@/components/app/share-teams-context";
 import { SharedArtifactPanel } from "@/components/app/shared-artifact-panel";
@@ -47,6 +48,8 @@ interface DetailPaneProps {
   loadArtifact: ArtifactLoader | undefined;
   /** How the artifact saves: the server action, or the fixture's store for artifacts New artifact made there. */
   save: SaveArtifact | undefined;
+  /** Where the artifact's list of attached files uploads and attaches: the server actions, or the fixture's store. */
+  attachApi: AttachFilesApi | undefined;
   /** This tab's own saves of the artifacts blank pages became, which may land after the pane took one over. */
   ownSaves: readonly ArtifactDto[];
   /** Artifacts an undone move brought back to this workspace, as the server answered them (useHomeMoves). */
@@ -81,7 +84,7 @@ function newestCopy(loaded: ArtifactDto | null, selected: ArtifactListItemDto | 
 }
 
 /** The editor for an artifact the viewer may edit, a read-only view for a teammate's, or the empty state. */
-function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact, save, ownSaves, returned }: DetailPaneProps) {
+function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate, initialFull, loadArtifact, save, attachApi, ownSaves, returned }: DetailPaneProps) {
   const { full: loaded, failure, remember, retry } = useFullArtifact(selected, initialFull, loadArtifact, ownSaves);
   const full = withListProject(newestCopy(loaded, selected, returned), selected);
   const access = useEditAccess(full, viewerId);
@@ -106,6 +109,7 @@ function DetailPane({ selected, viewerId, origin, onUpdated, onDeleted, onCreate
         onUpdated={handleUpdated}
         onDeleted={onDeleted}
         save={save}
+        attachApi={attachApi}
       />
     );
   }
@@ -190,7 +194,7 @@ interface DashboardProps {
   dismissWelcome?: DismissWelcome;
 }
 
-interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate" | "save" | "ownSaves"> {
+interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate" | "save" | "attachApi" | "ownSaves"> {
   fresh: ReturnType<typeof useNewArtifact>;
   api: NewArtifactApi;
   /** The project the list is filtered to, for a new artifact. */
@@ -217,7 +221,7 @@ function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpda
       />
     );
   }
-  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={full} loadArtifact={loadArtifact} save={api.update} ownSaves={fresh.stored} returned={returned} />;
+  return <DetailPane selected={selected} viewerId={viewerId} origin={origin} onUpdated={onUpdated} onDeleted={onDeleted} onCreate={fresh.start} initialFull={full} loadArtifact={loadArtifact} save={api.update} attachApi={api} ownSaves={fresh.stored} returned={returned} />;
 }
 
 /** The card marked as open: the blank page's artifact once stored (none before), else the selected one. */

@@ -5,6 +5,7 @@ import { useCallback, useMemo, useRef } from "react";
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
 import { ArtifactHeaderMenu } from "@/components/artifact-page/artifact-header-menu";
+import { PageAttachedFiles } from "@/components/artifact-page/page-attached-files";
 import { PageConflictNotice, PageEditorChromeProvider } from "@/components/artifact-page/page-editor-chrome";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-page/inline-fields";
@@ -15,9 +16,12 @@ import { SheetFormatProvider, type SheetFormatSaver } from "@/components/artifac
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
 import { dropZoneProps } from "@/components/editor/rich/media-bridge";
 import { EditorMediaProvider } from "@/components/editor/rich/media-context";
+import type { AttachFilesApi } from "@/components/files/attached-files";
 import type { ArtifactDto, ArtifactKind } from "@/lib/artifact-types";
 import { appFlowCanvas } from "@/lib/canvas/fixtures";
 import { bodyFillsColumnClass, pageColumnClass, usesFullWidth } from "@/lib/page-width/rules";
+import { fullMessage } from "@/lib/files/limit-rules";
+import type { FileDto } from "@/lib/files/types";
 import { plainSheetFormat } from "@/lib/sheet-format/rules";
 import { sheetAtLimit } from "@/lib/ui/fixtures/formats";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
@@ -65,6 +69,33 @@ function useMemorySave(initial: ArtifactDto, agentFirst: boolean): SaveArtifact 
   }, []);
 }
 
+/**
+ * Attached files kept in memory, so "Attach file" and a file dropped on
+ * the page run end to end without a database or file storage. A file
+ * named `refused…` is refused by the attach, as the server refuses one
+ * over the artifact's limit.
+ */
+function useMemoryAttach(artifact: ArtifactDto): AttachFilesApi {
+  const uploaded = useRef(new Map<string, FileDto>());
+  const attached = useRef<FileDto[]>([]);
+  return useMemo(() => ({
+    send: (file, report) => {
+      report.progress(100);
+      const stored: FileDto = { id: crypto.randomUUID(), filename: file.name, contentType: file.type || "application/octet-stream", size: file.size, createdAt: new Date().toISOString(), replacedAt: null };
+      uploaded.current.set(stored.id, stored);
+      return Promise.resolve({ success: true, data: stored });
+    },
+    attach: (_artifactId, fileIds) => {
+      const files = fileIds.flatMap((fileId) => uploaded.current.get(fileId) ?? []);
+      if (files.some((file) => file.filename.startsWith("refused"))) return Promise.resolve({ success: false, error: fullMessage("plain") });
+      attached.current = [...attached.current, ...files];
+      return Promise.resolve({ success: true, data: { ...artifact, files: attached.current } });
+    },
+    replace: () => Promise.resolve({ success: false, error: "The fixture does not replace files." }),
+    discard: (fileId) => Promise.resolve(uploaded.current.delete(fileId)),
+  }), [artifact]);
+}
+
 /** "I'm editing" stays in the tab: the fixture has no database. */
 const keepSignalInTab = () => Promise.resolve(null);
 
@@ -81,6 +112,7 @@ export function EditorFixture({ kind, failingSaves = false, agentSaves = false, 
   const artifact = useMemo(() => fixtureArtifact({ id: `fixture-${kind}`, kind: samples[kind].kind, title: `Long ${kind} fixture`, content: samples[kind].content() }), [kind]);
   const save = useMemorySave(artifact, agentSaves);
   const onSaved = useCallback(() => undefined, []);
+  const attachApi = useMemoryAttach(artifact);
   return (
     <div className="min-h-screen">
       <PageEditorChromeProvider>
@@ -106,6 +138,8 @@ export function EditorFixture({ kind, failingSaves = false, agentSaves = false, 
                   </SheetFormatProvider>
                 </SheetFill>
               </article>
+              {/* As on the artifact page: the attached files of a format that keeps them beside its content. */}
+              <PageAttachedFiles api={attachApi} />
             </PageInlineEditor>
             </div>
             </EditorMediaProvider>

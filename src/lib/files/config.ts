@@ -14,8 +14,10 @@ export type FileStatus = (typeof fileStatuses)[number];
 export const fileLimits = {
   /** Largest file, in bytes (25 MB). */
   maxBytes: 25 * 1024 * 1024,
-  /** Most files attached to one artifact. */
+  /** Most plain attachments one artifact holds: files attached beside its content (files_attach, "Attach file"), and its icon and cover images. */
   maxFilesPerArtifact: 20,
+  /** Most files one artifact's content shows: the images, video, audio, and files in a document's text, each attached by the save that named it (limit-rules.ts). */
+  maxInlineFilesPerArtifact: 100,
   /** Most uploads one person may have waiting to finish at once. */
   maxPendingPerUser: 20,
   /** How long a presigned upload URL works, in seconds. */

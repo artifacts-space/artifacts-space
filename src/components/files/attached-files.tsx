@@ -1,7 +1,7 @@
 "use client";
 
-import { IconExternalLink, IconFile, IconLoader2, IconReplace, IconRowInsertBottom, IconTrash } from "@tabler/icons-react";
-import { useRef, useState } from "react";
+import { IconExternalLink, IconFile, IconLoader2, IconPaperclip, IconReplace, IconRowInsertBottom, IconTrash } from "@tabler/icons-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { attachFilesAction, deleteFileAction, discardUploadAction, replaceFileAction } from "@/app/(workspace)/app/file-actions";
@@ -9,12 +9,13 @@ import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
 import { fileInputAccept, formatBytes, fileTypeLabel } from "@/lib/files/config";
-import { looseFilesWords } from "@/lib/files/loose-rules";
+import { ATTACH_FILE_LABEL, looseFilesWords } from "@/lib/files/loose-rules";
 import { offersReplace } from "@/lib/files/replace-rules";
 import { fileUrl, type FileDto } from "@/lib/files/types";
 import { cn } from "@/lib/utils";
 
-import { FileUploader } from "./file-uploader";
+import { attachFilesEvent, readAttachRequest } from "./attach-bridge";
+import { FileUploader, UploadList } from "./file-uploader";
 import { sendToServer, useFileUploads, type SendFile } from "./use-file-uploads";
 import { useReplaceFile, type ReplaceFileApi, type Replacing } from "./use-replace-file";
 
@@ -87,8 +88,17 @@ function AttachedRow({ file, showId, removing, replacing, busy, onRemove, onRepl
 export interface QuietFiles {
   /** The files the page shows nowhere else (looseFiles). */
   files: readonly FileDto[];
-  /** Puts a file into the document's text. Left out where there is no document to put it in. */
-  onAddToDocument?: ((file: FileDto) => void) | undefined;
+  /** Puts files into the document's text, in the order given. Left out where there is no document to put them in. */
+  onAddToDocument?: ((files: readonly FileDto[]) => void) | undefined;
+  /**
+   * True for a format that keeps attachments beside its content
+   * (attachesBeside): the list offers "Attach file", and takes the page's
+   * requests to attach (attach-bridge.ts): "Attach file" in the More menu,
+   * and files dropped anywhere on the page.
+   */
+  attach?: boolean | undefined;
+  /** True while files are held over the page, so the list says what a drop will do. */
+  dragging?: boolean | undefined;
 }
 
 /**
@@ -99,9 +109,13 @@ export interface QuietFiles {
  *
  * With `quiet` it is the list a document and the other text formats show
  * instead (filesPanel): the files that are attached and shown nowhere on
- * the page, each with Open, Replace, and Remove, and in a document "Add to
- * document". It has no upload box, and the page draws it only while it
- * lists a file: a document's files go into its text.
+ * the page, each with Open, Replace, and Remove. In a document each has
+ * "Add to document", and the heading "Add all to document": its files go
+ * into its text, so the list is there to be emptied, and it has no way to
+ * add one. In the other formats the heading has "Attach file", and the
+ * list takes what the page sends it (attach-bridge.ts). It has no upload
+ * box, and it draws nothing while it has no file, no upload on its way,
+ * and no file held over the page.
  */
 interface AttachedFilesProps {
   artifact: ArtifactDto;
@@ -120,26 +134,68 @@ function countWords(files: readonly FileDto[], quiet: boolean): string {
   return files.length === 0 ? "None yet" : `${String(files.length)} attached`;
 }
 
-export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, className, quiet }: AttachedFilesProps) {
-  const files = quiet ? quiet.files : artifact.files;
-  const heading = quiet ? "Attached files" : "Files";
-  const [removing, setRemoving] = useState<string | null>(null);
-  const pickerRef = useRef<HTMLInputElement>(null);
-  const targetRef = useRef<FileDto | null>(null);
-  const { replacing, replace } = useReplaceFile({ artifactId: artifact.id, api, onUpdated });
+/** The heading's controls in the quiet list: "Add all to document" in a document with more than one file, "Attach file" in the other formats. */
+function QuietActions({ quiet, busy, onAttach }: { quiet: QuietFiles; busy: boolean; onAttach: () => void }) {
+  const { files, onAddToDocument, attach } = quiet;
+  return (
+    <>
+      {onAddToDocument && files.length > 1 ? (
+        <Button type="button" variant="ghost" size="xs" disabled={busy} onClick={() => { onAddToDocument(files); }}>
+          <IconRowInsertBottom aria-hidden /> Add all to document
+        </Button>
+      ) : null}
+      {attach ? (
+        <Button type="button" variant="ghost" size="xs" onClick={onAttach}>
+          <IconPaperclip aria-hidden /> {ATTACH_FILE_LABEL}
+        </Button>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Answers the page's requests to attach files to this artifact
+ * (attach-bridge.ts) while `enabled`: with files, they upload and attach;
+ * with none, the file picker opens.
+ */
+function useAttachRequests(artifactId: string, enabled: boolean, onFiles: (files: File[]) => void, onPick: () => void) {
+  const handlers = useRef({ onFiles, onPick });
+  useEffect(() => { handlers.current = { onFiles, onPick }; }, [onFiles, onPick]);
+  useEffect(() => {
+    if (!enabled) return;
+    const take = (event: Event) => {
+      const request = readAttachRequest(event, artifactId);
+      if (!request) return;
+      event.preventDefault();
+      if (request.files) handlers.current.onFiles(request.files);
+      else handlers.current.onPick();
+    };
+    document.addEventListener(attachFilesEvent, take);
+    return () => { document.removeEventListener(attachFilesEvent, take); };
+  }, [artifactId, enabled]);
+}
+
+/** The section's uploads: each file is attached to the artifact as soon as it is ready, and one that is refused says why in its row. */
+function useAttachingUploads(artifactId: string, api: AttachFilesApi, onUpdated: (artifact: ArtifactDto) => void) {
   const uploads = useFileUploads({
     send: api.send,
     onReady: (file, key) => {
-      void api.attach(artifact.id, [file.id])
+      void api.attach(artifactId, [file.id])
         .then((result) => {
-          if (!result.success) { toast.error(result.error); return; }
+          // Refused: the row says why, by the file's name, and its Remove deletes the upload.
+          if (!result.success) { uploads.fail(key, result.error); return; }
           onUpdated(result.data);
           uploads.remove(key, { deleteUpload: false });
         })
-        .catch(() => { toast.error("The file could not be added. Try again."); });
+        .catch(() => { uploads.fail(key, "The file could not be added. Remove it and try again."); });
     },
   });
+  return uploads;
+}
 
+/** Removes an attached file, and says which one is on its way out. */
+function useRemoveFile(onUpdated: (artifact: ArtifactDto) => void) {
+  const [removing, setRemoving] = useState<string | null>(null);
   async function remove(file: FileDto) {
     setRemoving(file.id);
     try {
@@ -153,26 +209,118 @@ export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, cl
       setRemoving(null);
     }
   }
+  return { removing, remove };
+}
 
-  function pickReplacement(file: FileDto) {
-    targetRef.current = file;
-    pickerRef.current?.click();
-  }
+interface PickersProps {
+  /** Takes the file picked to replace the row that asked. */
+  onReplacement: (file: File) => void;
+  /** Takes the files picked to attach; left out where the list does not attach. */
+  onAttach: ((files: File[]) => void) | undefined;
+  replaceRef: React.RefObject<HTMLInputElement | null>;
+  attachRef: React.RefObject<HTMLInputElement | null>;
+}
 
-  function onPicked(event: React.ChangeEvent<HTMLInputElement>) {
-    const picked = event.target.files?.[0];
-    const target = targetRef.current;
-    event.target.value = "";
-    if (picked && target) void replace(target, picked);
-  }
+/** The hidden file pickers: one for Replace, and one for "Attach file" where the list attaches. */
+function Pickers({ onReplacement, onAttach, replaceRef, attachRef }: PickersProps) {
+  return (
+    <>
+      <input
+        ref={replaceRef}
+        type="file"
+        accept={fileInputAccept}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        data-slot="replace-file-input"
+        onChange={(event) => {
+          const [picked] = Array.from(event.target.files ?? []);
+          event.target.value = "";
+          if (picked) onReplacement(picked);
+        }}
+      />
+      {onAttach ? (
+        <input
+          ref={attachRef}
+          type="file"
+          multiple
+          accept={fileInputAccept}
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
+          data-slot="attach-file-input"
+          onChange={(event) => {
+            const picked = Array.from(event.target.files ?? []);
+            event.target.value = "";
+            if (picked.length > 0) onAttach(picked);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
 
+interface FilesFrameProps {
+  quiet: QuietFiles | undefined;
+  column: string | undefined;
+  className: string | undefined;
+  /** How many files the list holds, in words. */
+  count: string;
+  /** The buttons beside the heading. */
+  actions: React.ReactNode;
+  children: React.ReactNode;
+}
+
+/** The section around the rows: its heading, the buttons beside it, the count, and, while files are held over the page, where they will go. */
+function FilesFrame({ quiet, column, className, count, actions, children }: FilesFrameProps) {
+  const heading = quiet ? "Attached files" : "Files";
   return (
     <section aria-label={heading} data-slot="attached-files" data-quiet={quiet ? "" : undefined} className={cn("border-t bg-background/60 py-4", column ? null : "px-5 sm:px-7", className)}>
       <div className={cn(column, "flex flex-col gap-3")}>
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-md font-medium">{heading}</h2>
-        <span className="text-xs text-muted-foreground">{countWords(files, quiet !== undefined)}</span>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 className="text-md font-medium">{heading}</h2>
+          {actions}
+          <span className="ml-auto text-xs text-muted-foreground">{count}</span>
+        </div>
+        {quiet?.dragging ? <p data-slot="attach-drop-hint" className="card-nested border-dashed px-4 py-6 text-center text-md text-muted-foreground">Drop to attach it to this artifact</p> : null}
+        {children}
       </div>
+    </section>
+  );
+}
+
+/** True when the quiet list has nothing to draw: no file, no upload on its way, and no file held over the page. */
+function drawsNothing(quiet: QuietFiles | undefined, uploading: number): boolean {
+  if (!quiet) return false;
+  return quiet.files.length === 0 && uploading === 0 && quiet.dragging !== true;
+}
+
+export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, className, quiet }: AttachedFilesProps) {
+  const files = quiet ? quiet.files : artifact.files;
+  const replaceRef = useRef<HTMLInputElement>(null);
+  const attachRef = useRef<HTMLInputElement>(null);
+  const targetRef = useRef<FileDto | null>(null);
+  const { replacing, replace } = useReplaceFile({ artifactId: artifact.id, api, onUpdated });
+  const uploads = useAttachingUploads(artifact.id, api, onUpdated);
+  const { removing, remove } = useRemoveFile(onUpdated);
+  const attaches = quiet?.attach === true;
+  const pickToAttach = () => { attachRef.current?.click(); };
+  useAttachRequests(artifact.id, attaches, uploads.addFiles, pickToAttach);
+  const removeUpload = (key: string) => { uploads.remove(key); };
+
+  const pickers = (
+    <Pickers
+      replaceRef={replaceRef}
+      attachRef={attachRef}
+      onReplacement={(picked) => { if (targetRef.current) void replace(targetRef.current, picked); }}
+      onAttach={attaches ? uploads.addFiles : undefined}
+    />
+  );
+  // Only the pickers the page's requests open.
+  if (drawsNothing(quiet, uploads.items.length)) return pickers;
+
+  return (
+    <FilesFrame quiet={quiet} column={column} className={className} count={countWords(files, quiet !== undefined)} actions={quiet ? <QuietActions quiet={quiet} busy={replacing !== null} onAttach={pickToAttach} /> : null}>
       {files.length > 0 ? (
         <ul className="flex min-w-0 flex-col gap-2">
           {files.map((file) => (
@@ -184,15 +332,14 @@ export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, cl
               replacing={replacing?.fileId === file.id ? replacing : null}
               busy={replacing !== null}
               onRemove={() => void remove(file)}
-              onReplace={offersReplace(file, artifact) ? () => { pickReplacement(file); } : null}
-              onAdd={quiet?.onAddToDocument ? () => { quiet.onAddToDocument?.(file); } : undefined}
+              onReplace={offersReplace(file, artifact) ? () => { targetRef.current = file; replaceRef.current?.click(); } : null}
+              onAdd={quiet?.onAddToDocument ? () => { quiet.onAddToDocument?.([file]); } : undefined}
             />
           ))}
         </ul>
       ) : null}
-      <input ref={pickerRef} type="file" accept={fileInputAccept} className="sr-only" tabIndex={-1} aria-hidden data-slot="replace-file-input" onChange={onPicked} />
-      {quiet ? null : <FileUploader items={uploads.items} onFiles={uploads.addFiles} onRemove={(key) => { uploads.remove(key); }} />}
-      </div>
-    </section>
+      {pickers}
+      {quiet ? <UploadList items={uploads.items} onRemove={removeUpload} /> : <FileUploader items={uploads.items} onFiles={uploads.addFiles} onRemove={removeUpload} />}
+    </FilesFrame>
   );
 }

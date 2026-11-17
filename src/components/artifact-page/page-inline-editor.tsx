@@ -7,7 +7,9 @@ import { useAutosave, type SaveArtifact } from "@/components/app/artifact-editor
 import { useCatchUp, useCaughtUp, type CaughtUp } from "@/components/app/artifact-editor/use-catch-up";
 import type { SignalEditing } from "@/components/app/artifact-editor/use-editing-signal";
 import { useArtifactHarness } from "@/components/harness/use-artifact-harness";
+import { askToAttach } from "@/components/files/attach-bridge";
 import type { ArtifactDto } from "@/lib/artifact-types";
+import { attachesBeside } from "@/lib/files/loose-rules";
 
 import { PageEditContext, type PageEdit } from "./page-edit-context";
 import { useOwnSaves, usePublishPageEditorChrome, type PageEditorChrome } from "./page-editor-chrome";
@@ -69,12 +71,13 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
     artifact,
     draft,
     update,
+    onUpdated,
     revision,
     sourceOpen,
     showSource: () => { if (!sourceOpen) toggleSource(); },
     hideSource: () => { if (sourceOpen) toggleSource(); },
     changedFrames,
-  }), [artifact, draft, update, revision, sourceOpen, toggleSource, changedFrames]);
+  }), [artifact, draft, update, onUpdated, revision, sourceOpen, toggleSource, changedFrames]);
 
   return { artifact, draft, replace, sourceOpen, toggleSource, onUpdated, restored, start, value, caughtUp, caughtUpWith, dismissCaughtUp };
 }
@@ -107,6 +110,9 @@ function PageEditControls({ artifact, editor, reviewed, pageFullWidth, save, sig
   // The person's own cover, icon, or theme save is not news: ask from the newest save this tab made.
   useCatchUp({ artifact, knownUpdatedAt: ownSaveBase(artifact.updatedAt, ownSaves), stored: true, unsaved: dirty || status.kind === "saving", onCaughtUp: caughtUpWith });
   const harness = useArtifactHarness(artifact, editor.onUpdated);
+  // "Attach file" for a format that keeps attachments beside its content; the page's list of attached files answers it (page-attached-files.tsx).
+  const attachable = attachesBeside(editor.draft.kind);
+  const attach = useMemo(() => (attachable ? () => { askToAttach(artifact.id); } : null), [attachable, artifact.id]);
   const chrome = useMemo<PageEditorChrome>(() => ({
     history: {
       publicId: artifact.publicId,
@@ -126,7 +132,8 @@ function PageEditControls({ artifact, editor, reviewed, pageFullWidth, save, sig
     agentSaved: agentSaved ? { onDismiss: dismissAgentSaved } : null,
     caughtUp: caughtUp ? { words: caughtUp.words, onDismiss: dismissCaughtUp } : null,
     harness,
-  }), [caughtUp, dismissCaughtUp, artifact, ownSaves, reviewed, dirty, restored, sourceOpen, toggleSource, fullWidth, status, retryNow, loadTheirs, keepMine, agentSaved, dismissAgentSaved, harness]);
+    attach,
+  }), [attach, caughtUp, dismissCaughtUp, artifact, ownSaves, reviewed, dirty, restored, sourceOpen, toggleSource, fullWidth, status, retryNow, loadTheirs, keepMine, agentSaved, dismissAgentSaved, harness]);
   usePublishPageEditorChrome(chrome);
   return null;
 }

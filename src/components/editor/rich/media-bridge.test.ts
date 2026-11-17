@@ -18,8 +18,10 @@ describe("dropZoneProps", () => {
 describe("readMediaRequest", () => {
   const event = (detail: unknown) => new CustomEvent(addMediaEvent, { detail });
 
-  it("should read a file the artifact already has when the request names one", () => {
-    expect(readMediaRequest(event({ attached }))).toEqual({ attached });
+  it("should read the files the artifact already has, in order, when the request names them", () => {
+    const second = { ...attached, id: "22222222-2222-4222-8222-222222222222", filename: "notes.pdf", contentType: "application/pdf" };
+    expect(readMediaRequest(event({ attached: [attached, second] }))).toEqual({ attached: [attached, second] });
+    expect(readMediaRequest(event({ attached: [attached, { id: 4 }] }))).toEqual({ attached: [attached] });
   });
 
   it("should read dropped files with their point when the request carries them", () => {
@@ -34,7 +36,9 @@ describe("readMediaRequest", () => {
   });
 
   it("should refuse a detail that is not a request", () => {
-    expect(readMediaRequest(event({ attached: { id: 4 } }))).toBeNull();
+    expect(readMediaRequest(event({ attached: [{ id: 4 }] }))).toBeNull();
+    expect(readMediaRequest(event({ attached: [] }))).toBeNull();
+    expect(readMediaRequest(event({ attached }))).toBeNull();
     expect(readMediaRequest(event({ files: "a.png" }))).toBeNull();
     expect(readMediaRequest(event(null))).toBeNull();
     expect(readMediaRequest(new Event(addMediaEvent))).toBeNull();

@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { ArtifactDraft } from "@/components/app/artifact-editor/use-artifact-draft";
 import { useLeaveGuard } from "@/components/artifact-page/use-leave-guard";
 import { useFileUploads } from "@/components/files/use-file-uploads";
 import type { ArtifactDto } from "@/lib/artifact-types";
-import { fileTitle } from "@/lib/create/detect-kind-rules";
 import { BLANK_ARTIFACT_ID, filesForCreate, uploadsToDiscard, uploadStep, type CreateState } from "@/lib/create/new-artifact-rules";
 
 import type { BlankPageOptions } from "./use-blank-page";
@@ -27,20 +25,7 @@ export interface CreateTracker {
 interface BlankUploadsOptions {
   options: BlankPageOptions | undefined;
   artifact: ArtifactDto;
-  draftRef: React.RefObject<ArtifactDraft>;
-  replace: (draft: ArtifactDraft, remount: boolean) => void;
   onUpdated: (artifact: ArtifactDto) => void;
-}
-
-/**
- * A Files page without a title is named after its files. Only a page whose
- * format is Files: a document takes files in its text and keeps its format,
- * and every other format gets them attached and keeps its title.
- */
-function namedAfterFiles(draft: ArtifactDraft, names: readonly string[]): ArtifactDraft | null {
-  if (draft.kind !== "file" || draft.title.trim() !== "") return null;
-  const [first] = names;
-  return { ...draft, title: names.length === 1 && first ? fileTitle(first) : `${String(names.length)} files` };
 }
 
 const attachFailed = "The files could not be added. Drop them again to try once more.";
@@ -166,32 +151,26 @@ function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, h
  * while the create was on its way. Once the artifact has them all, the list
  * clears, and the artifact's own list of attached files shows them. (A
  * document never comes here: it takes files in its text.) Removing a file
- * takes it out of the create too (filesForCreate); a Files page that loses
- * all its files loses the title they gave it, so it is a blank page again.
+ * takes it out of the create too (filesForCreate).
  * Leaving while files upload asks first. Uploads that never reached an
  * artifact are deleted when the page goes (uploadsToDiscard); the cleanup
  * job is the backstop.
  */
-export function useBlankUploads({ options, artifact, draftRef, replace, onUpdated }: BlankUploadsOptions) {
+export function useBlankUploads({ options, artifact, onUpdated }: BlankUploadsOptions) {
   const api = options?.api;
   const uploads = useFileUploads({ send: api?.send });
   const standingRef = useRef<CreateStanding>({ state: "none", mounted: true, attempts: 0 });
-  /** Counts creates that came back, so the page can settle what waited for them. */
-  const [settled, setSettled] = useState(0);
   const tracker = useMemo<CreateTracker>(() => ({
     read: () => standingRef.current,
     set: (state) => {
       standingRef.current.state = state;
       if (state === "inFlight") standingRef.current.attempts += 1;
-      else setSettled((count) => count + 1);
     },
   }), []);
   /** Files handed to the create, which attaches them on the server. */
   const handedRef = useRef<{ ids: string[] }>({ ids: [] });
   /** Files whose attach is on its way or whose answer was lost. */
   const holdRef = useRef(new Set<string>());
-  /** The title the files gave a Files page, so removing every file can take it back. */
-  const filesTitleRef = useRef<string | null>(null);
   const uploadsRef = useRef(uploads);
   useEffect(() => { uploadsRef.current = uploads; }, [uploads]);
   const { attach, problem, round } = useAttach(api, uploadsRef, holdRef, onUpdated);
@@ -199,7 +178,6 @@ export function useBlankUploads({ options, artifact, draftRef, replace, onUpdate
   const readyKey = useMemo(() => uploads.readyFiles.map((file) => file.id).join(","), [uploads.readyFiles]);
   const attachedKey = useMemo(() => artifact.files.map((file) => file.id).join(","), [artifact.files]);
   const stored = artifact.id !== BLANK_ARTIFACT_ID;
-  const itemCount = uploads.items.length;
 
   useEffect(() => {
     if (!api) return;
@@ -213,24 +191,9 @@ export function useBlankUploads({ options, artifact, draftRef, replace, onUpdate
       attach({ id: artifact.id, publicId: artifact.publicId }, step.ids);
       return;
     }
-    if (step.step !== "create") return;
-    handedRef.current.ids = [...new Set([...handedRef.current.ids, ...step.ids])];
-    // No remount: the title keeps its caret.
-    const next = namedAfterFiles(draftRef.current, files.map((file) => file.filename));
-    if (!next) return;
-    filesTitleRef.current = next.title;
-    replace(next, false);
-  }, [api, stored, artifact.id, artifact.publicId, uploads.busy, readyKey, attachedKey, round, attach, draftRef, replace]);
-
-  // Every file removed before the create: the title they gave the page goes too, so nothing is stored for an empty page.
-  // Not while a create is on its way: it may still store the Files page, and the draft must match what comes back.
-  useEffect(() => {
-    const auto = filesTitleRef.current;
-    if (stored || itemCount > 0 || auto === null || standingRef.current.state === "inFlight") return;
-    filesTitleRef.current = null;
-    const draft = draftRef.current;
-    if (draft.title === auto) replace({ ...draft, title: "" }, false);
-  }, [stored, itemCount, settled, draftRef, replace]);
+    // Not stored yet: the files wait on the page, and the create carries them once something is written.
+    if (step.step === "create") handedRef.current.ids = [...new Set([...handedRef.current.ids, ...step.ids])];
+  }, [api, stored, artifact.id, artifact.publicId, uploads.busy, readyKey, attachedKey, round, attach]);
 
   /** Removes a file from the page and from the create; its upload goes unless a create on its way may carry it. */
   const removeUpload = useCallback((key: string) => {

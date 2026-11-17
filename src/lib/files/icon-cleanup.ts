@@ -5,6 +5,7 @@ import { artifact, artifactFile, artifactVersion } from "@/db/schema";
 import { FILE_PREFIX } from "@/lib/artifact-icons";
 
 import { imageFileIdOf, imageFileIdsOf, unusedIconFiles, type IconUseState } from "./icon-cleanup-rules";
+import type { FileCounts } from "./limit-rules";
 import { fileRefsInContent } from "./refs";
 import { removeCopiesOf } from "./copies";
 import { deleteFileRows, deleteStoredObjects, getFileRows } from "./store";
@@ -164,23 +165,24 @@ export async function pruneUnusedContentFiles(artifactId: string, candidates?: r
 
 /**
  * How many of the artifact's attached files only older versions show, kept
- * so Restore can bring them back: icon or cover images, and content media
- * the artifact no longer shows. They do not count
- * toward the per-artifact file limit, so changing a cover or swapping
- * screenshots many times never blocks the next upload; history retention
- * (and the account's storage quota) bounds them instead.
+ * so Restore can bring them back: icon or cover images (plain attachments),
+ * and content media the artifact no longer shows (inline). They do not
+ * count toward the per-artifact file limits (limit-rules.ts), so changing a
+ * cover or swapping screenshots many times never blocks the next upload;
+ * history retention (and the account's storage quota) bounds them instead.
  */
-export async function countHistoryOnlyFiles(artifactId: string): Promise<number> {
+export async function countHistoryOnlyFiles(artifactId: string): Promise<FileCounts> {
   const current = await currentState(artifactId);
-  if (!current) return 0;
+  if (!current) return { plain: 0, inline: 0 };
   const shownByVersions = (await retainedImageRefs(artifactId)).flatMap(imageFileIdsOf);
   const historyOnlyImages = unusedIconFiles(shownByVersions, current, []);
   const [images, contentFiles] = await Promise.all([
     historyOnlyImages.length > 0 ? getFileRows(historyOnlyImages) : Promise.resolve([]),
     contentFilesNotShown(artifactId, current),
   ]);
-  const attachedImages = images.filter((row) => row.artifactId === artifactId).map((row) => row.id);
-  return new Set([...attachedImages, ...contentFiles]).size;
+  const inline = new Set(contentFiles);
+  const attachedImages = images.filter((row) => row.artifactId === artifactId && !inline.has(row.id));
+  return { plain: new Set(attachedImages.map((row) => row.id)).size, inline: inline.size };
 }
 
 /** pruneUnusedIconFiles as housekeeping: a failure is logged, never thrown, and the save stands. */

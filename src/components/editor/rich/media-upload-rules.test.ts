@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultMediaLabel, fetchableUrl, filenameFromUrl, insertableFiles, maxFilesPerInsert, mediaUploadProblem, pasteIsFiles, uploadMediaKind } from "./media-upload-rules";
+import { defaultMediaLabel, documentFullProblem, fetchableUrl, filenameFromUrl, insertProblems, mediaUploadProblem, pasteIsFiles, uploadMediaKind } from "./media-upload-rules";
 
 function file(name: string, type: string, size = 10) {
   return new File([new Uint8Array(size)], name, { type });
@@ -38,10 +38,27 @@ describe("defaultMediaLabel", () => {
   });
 });
 
-describe("insertableFiles", () => {
-  it("should skip empty files and cap how many one drop adds", () => {
-    const many = Array.from({ length: maxFilesPerInsert + 3 }, (_, index) => file(`${String(index)}.png`, "image/png"));
-    expect(insertableFiles([file("empty.png", "image/png", 0), ...many])).toHaveLength(maxFilesPerInsert);
+describe("insertProblems", () => {
+  const images = (count: number) => Array.from({ length: count }, (_, index) => file(`${String(index)}.png`, "image/png"));
+
+  it("should take every file of a drop, however many, when the document has room", () => {
+    expect(insertProblems(images(30), 0)).toEqual(Array.from({ length: 30 }, () => null));
+  });
+
+  it("should give an empty or unsupported file its own reason, and the others none", () => {
+    const problems = insertProblems([file("empty.png", "image/png", 0), file("a.png", "image/png"), file("logo.svg", "image/svg+xml")], 0);
+    expect(problems[0]).toMatch(/empty/);
+    expect(problems[1]).toBeNull();
+    expect(problems[2]).toMatch(/not supported/);
+  });
+
+  it("should say the document is full for each file past the 100 it shows", () => {
+    expect(insertProblems(images(3), 98)).toEqual([null, null, documentFullProblem]);
+    expect(documentFullProblem).toContain("at most 100 files");
+  });
+
+  it("should not let a refused file use up the room of the next one", () => {
+    expect(insertProblems([file("logo.svg", "image/svg+xml"), file("a.png", "image/png")], 99).at(1)).toBeNull();
   });
 });
 

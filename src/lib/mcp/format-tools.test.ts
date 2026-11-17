@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { earlierFormatNote, formatInfo, newVisualWork } from "@/lib/artifact-formats";
 import { artifactKinds } from "@/lib/artifact-types";
 import { exampleCanvas } from "@/lib/canvas/fixtures";
+import { fileLimits } from "@/lib/files/config";
 import { exampleUiSpec } from "@/lib/ui/fixtures/example";
 
 import { formatGuide, validationReport } from "./format-tools";
@@ -47,6 +48,24 @@ describe("formatGuide", () => {
     expect(guide).toContain("- Metric:");
     expect(guide).toContain('"root": "page"');
     expect(guide).not.toContain("JSONL patches");
+  });
+});
+
+describe("formatGuide on how many files a document shows", () => {
+  it("should state both limits from the one constant the server checks", () => {
+    const guide = formatGuide("markdown");
+    expect(guide).toContain(`A document shows at most ${String(fileLimits.maxInlineFilesPerArtifact)} files in its text`);
+    expect(guide).toContain(`counted apart, at most ${String(fileLimits.maxFilesPerArtifact)}`);
+    expect(fileLimits.maxInlineFilesPerArtifact).toBe(100);
+    expect(fileLimits.maxFilesPerArtifact).toBe(20);
+  });
+});
+
+describe("formatGuide on which files files_replace changes", () => {
+  it("should name every way a plain attachment gets onto an artifact, not only a Files artifact's page", () => {
+    const guide = formatGuide("markdown");
+    expect(guide).toContain("files_replace is for plain attachments: files attached with files_attach, or added by a person on the artifact's page (Attach file, a file dropped on the page, or the Files section");
+    expect(guide).not.toContain("added on a Files artifact's page");
   });
 });
 
