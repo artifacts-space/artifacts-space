@@ -147,6 +147,52 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
     expect(r2.deleted).toEqual([]);
   });
 
+  it("should give the entry the new picture's pixel size, and keep the old picture's size with its copy", async () => {
+    const db = getDb();
+    await db.update(artifactFile).set({ contentType: "image/png", filename: "plan.png", width: 1600, height: 900 }).where(eq(artifactFile.id, sow));
+    const next = await upload(ids.author, "plan-v2.png", { contentType: "image/png" });
+    await db.update(artifactFile).set({ width: 800, height: 1200 }).where(eq(artifactFile.id, next));
+
+    const result = await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");
+
+    expect(result.file).toMatchObject({ id: sow, width: 800, height: 1200 });
+    expect(await entry()).toMatchObject({ width: 800, height: 1200 });
+    const [copy] = await copies();
+    expect(copy).toMatchObject({ fileId: sow, width: 1600, height: 900 });
+  });
+
+  it("should give readers an image's pixel size with the page's files: the old picture's to readers of the version that showed it", async () => {
+    const db = getDb();
+    await db.update(artifactFile).set({ contentType: "image/png", filename: "plan.png", width: 1600, height: 900 }).where(eq(artifactFile.id, sow));
+    const [shown] = await publicFiles();
+    expect(shown).toMatchObject({ id: sow, width: 1600, height: 900 });
+    expect(shown).not.toHaveProperty("embedded");
+    expect(shown).not.toHaveProperty("pictured");
+
+    const before = await versionAt(at(20));
+    const next = await upload(ids.author, "plan-v2.png", { contentType: "image/png" });
+    await db.update(artifactFile).set({ width: 800, height: 1200 }).where(eq(artifactFile.id, next));
+    await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");
+    expect(await publicFiles()).toEqual([expect.objectContaining({ id: sow, width: 800, height: 1200 })]);
+
+    await serve(before);
+    expect(await publicFiles()).toEqual([expect.objectContaining({ id: sow, size: 10, width: 1600, height: 900 })]);
+    // History shows editors the old copy with its own size too.
+    expect(await filesReplacedSince(ids.doc, at(20))).toEqual([expect.objectContaining({ fileId: sow, width: 1600, height: 900 })]);
+  });
+
+  it("should leave the entry with no pixel size when the new file states none, never the old picture's", async () => {
+    const db = getDb();
+    await db.update(artifactFile).set({ contentType: "image/png", filename: "plan.png", width: 1600, height: 900 }).where(eq(artifactFile.id, sow));
+    const next = await upload(ids.author, "plan-v2.png", { contentType: "image/png" });
+
+    const result = await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");
+
+    expect(result.file).not.toHaveProperty("width");
+    expect(await entry()).toMatchObject({ width: null, height: null });
+    expect((await copies())[0]).toMatchObject({ width: 1600, height: 900 });
+  });
+
   it("should offer the old copy in History for a version saved before the replace, and to editors only", async () => {
     const next = await upload(ids.author);
     await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");

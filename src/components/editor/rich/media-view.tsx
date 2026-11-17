@@ -1,26 +1,32 @@
 "use client";
 
-import { IconDownload, IconExternalLink, IconTrash } from "@tabler/icons-react";
+import { IconArrowsMaximize, IconDownload, IconExternalLink, IconTrash } from "@tabler/icons-react";
 import type { Editor } from "@tiptap/core";
 import { NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
 import { useCallback, useRef, useState } from "react";
 
-import { MediaBlock, MediaNotice } from "@/components/artifact-view/media-block";
+import { useArtifactFile } from "@/components/artifact-view/files-context";
+import { useImageViewer } from "@/components/artifact-view/image-viewer/use-image-viewer";
+import { MediaBlock, MediaNotice, OPEN_LARGER_LABEL, type MediaFileFacts } from "@/components/artifact-view/media-block";
 import { Button } from "@/components/ui/button";
-import { clampMediaWidth, hasAdjustableWidth, mediaKindForType, parseFileMediaUrl, type MediaKind } from "@/lib/files/media-rules";
+import { hasAdjustableWidth, mediaKindForType, parseFileMediaUrl, type MediaKind } from "@/lib/files/media-rules";
 import { cn } from "@/lib/utils";
 
 import { useEditorMedia } from "./media-context";
 import { MEDIA_NODE, mediaFileId, readMediaAttrs, type MediaAttrs } from "./media-markdown";
 import { kindCopy, MediaPicker, UploadingMedia } from "./media-picker";
-import { forgetUpload, queueUpload, type UploadedMedia } from "./media-uploads";
+import { ResizeHandles } from "./media-resize";
+import { forgetUpload, queueUpload, uploadedFacts, type UploadedMedia } from "./media-uploads";
 
 /**
  * A media block in the editor. Empty, it offers an upload or a link;
  * uploading, it shows progress; with a file, it draws the same MediaBlock
- * as the read view, with a caption field under it, a handle to resize
- * images and video, and a small toolbar (width, alt text, replace, open,
- * download, remove) while it is selected. Every change is a node attribute, so it saves as Markdown.
+ * as the read view, with a caption field under it, handles on both edges
+ * and the corners to resize images and video (media-resize.tsx), and a
+ * small toolbar (width, alt text, replace, open larger, open in a new tab,
+ * download, remove) while it is selected. A click selects the block, so an
+ * image opens larger from the toolbar or with a double-click. Every change
+ * is a node attribute, so it saves as Markdown.
  */
 
 type Patch = Partial<MediaAttrs>;
@@ -54,9 +60,11 @@ interface ToolbarProps {
   onEditAlt: () => void;
   /** Picks a new file for this block. */
   onReplace: () => void;
+  /** Images only: opens the image larger in place. */
+  onOpenLarger: (() => void) | undefined;
 }
 
-function Toolbar({ attrs, links, onChange, onRemove, onEditAlt, onReplace }: ToolbarProps) {
+function Toolbar({ attrs, links, onChange, onRemove, onEditAlt, onReplace, onOpenLarger }: ToolbarProps) {
   return (
     <div role="toolbar" aria-label="Media options" className="flex flex-wrap items-center gap-1 rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10">
       {hasAdjustableWidth(attrs.kind)
@@ -68,37 +76,11 @@ function Toolbar({ attrs, links, onChange, onRemove, onEditAlt, onReplace }: Too
         : null}
       <Button type="button" variant="ghost" size="xs" onClick={onEditAlt}>{attrs.kind === "image" ? "Alt text" : "Name"}</Button>
       <Button type="button" variant="ghost" size="xs" onClick={onReplace}>Replace</Button>
+      {onOpenLarger ? <Button type="button" variant="ghost" size="icon-xs" aria-label={OPEN_LARGER_LABEL} onClick={onOpenLarger}><IconArrowsMaximize aria-hidden /></Button> : null}
       <Button variant="ghost" size="icon-xs" nativeButton={false} render={<a href={links.open} target="_blank" rel="noopener noreferrer" aria-label="Open in a new tab" />}><IconExternalLink aria-hidden /></Button>
       <Button variant="ghost" size="icon-xs" nativeButton={false} render={<a href={links.download} aria-label="Download" />}><IconDownload aria-hidden /></Button>
       <Button type="button" variant="ghost" size="icon-xs" aria-label="Remove" onClick={onRemove}><IconTrash aria-hidden /></Button>
     </div>
-  );
-}
-
-/** A drag handle on the right edge that sets the width as a share of the text column. Wider screens only; phones always use the full column. */
-function ResizeHandle({ editor, onPreview, onCommit }: { editor: Editor; onPreview: (width: number | null) => void; onCommit: (width: number) => void }) {
-  const start = useRef<{ left: number; column: number } | null>(null);
-  const widthAt = (clientX: number) => (start.current ? clampMediaWidth(((clientX - start.current.left) / start.current.column) * 100) : 100);
-  return (
-    <div
-      aria-hidden
-      data-media-resize=""
-      onPointerDown={(event) => {
-        const figure = event.currentTarget.parentElement;
-        if (!figure) return;
-        event.preventDefault();
-        event.currentTarget.setPointerCapture(event.pointerId);
-        start.current = { left: figure.getBoundingClientRect().left, column: editor.view.dom.clientWidth || 1 };
-      }}
-      onPointerMove={(event) => { if (start.current) onPreview(widthAt(event.clientX)); }}
-      onPointerUp={(event) => {
-        if (!start.current) return;
-        onCommit(widthAt(event.clientX));
-        start.current = null;
-        onPreview(null);
-      }}
-      className="absolute top-1/2 right-1 hidden h-12 w-1.5 -translate-y-1/2 cursor-ew-resize rounded-full bg-foreground/40 opacity-0 shadow-xs ring-2 ring-background transition-opacity group-hover/media:opacity-100 group-data-[selected]/media:opacity-100 sm:block"
-    />
   );
 }
 
@@ -129,10 +111,32 @@ function AltField({ attrs, onChange }: { attrs: MediaAttrs; onChange: (patch: Pa
   );
 }
 
+/**
+ * What the block shows of its file: the artifact's own list when the page
+ * gave one (a saved document), else what this tab's upload of it said, so a
+ * file dropped a moment ago already has its type, its size, and an image's
+ * shape.
+ */
+function useMediaFile(fileId: string): MediaFileFacts | null {
+  const listed = useArtifactFile(fileId).file;
+  if (listed) return listed;
+  const uploaded = uploadedFacts(fileId);
+  if (uploaded?.size === undefined) return null;
+  return { ...uploaded, size: uploaded.size };
+}
+
+/** The control a reader's image carries: where the focus goes back to when the viewer closes. */
+function openControlOf(image: HTMLImageElement): HTMLElement | null {
+  return image.parentElement?.querySelector<HTMLElement>(`button[aria-label="${OPEN_LARGER_LABEL}"]`) ?? null;
+}
+
 function ReadOnlyMedia({ attrs }: { attrs: MediaAttrs }) {
   const media = useEditorMedia();
   const fileId = mediaFileId(attrs) ?? "";
-  return <MediaBlock kind={attrs.kind} url={media.urlFor(fileId, false)} downloadUrl={media.urlFor(fileId, true)} alt={attrs.alt} caption={attrs.caption} width={attrs.width} file={null} />;
+  const file = useMediaFile(fileId);
+  const downloadUrl = media.urlFor(fileId, true);
+  const viewer = useImageViewer({ fileId, downloadUrl, enabled: attrs.kind === "image", focusOnClose: openControlOf });
+  return <MediaBlock kind={attrs.kind} url={media.urlFor(fileId, false)} downloadUrl={downloadUrl} alt={attrs.alt} caption={attrs.caption} width={attrs.width} file={file} view={{ viewer, trigger: "click" }} />;
 }
 
 function EditableMedia({ editor, attrs, selected, onChange, onRemove }: { editor: Editor; attrs: MediaAttrs; selected: boolean; onChange: (patch: Patch) => void; onRemove: () => void }) {
@@ -141,17 +145,20 @@ function EditableMedia({ editor, attrs, selected, onChange, onRemove }: { editor
   const [altOpen, setAltOpen] = useState(false);
   const replaceRef = useRef<HTMLInputElement>(null);
   const fileId = mediaFileId(attrs) ?? "";
+  const file = useMediaFile(fileId);
   const links = { open: media.urlFor(fileId, false), download: media.urlFor(fileId, true) };
+  const image = attrs.kind === "image";
+  const viewer = useImageViewer({ fileId, downloadUrl: links.download, enabled: image });
   // The block keeps its place, caption, alt text, and width; the new file uploads in it. One step, so Undo brings the old file back.
   const replaceWith = (file: File | undefined) => { if (file) onChange({ src: "", uploadId: queueUpload(file) }); };
   const caption = <TextField value={attrs.caption} label="Caption" placeholder="Add a caption" onChange={(next) => { onChange({ caption: next }); }} />;
-  const overlay = hasAdjustableWidth(attrs.kind) ? <ResizeHandle editor={editor} onPreview={setPreview} onCommit={(width) => { onChange({ width }); }} /> : null;
+  const overlay = hasAdjustableWidth(attrs.kind) ? <ResizeHandles editor={editor} width={attrs.width} selected={selected} onPreview={setPreview} onCommit={(width) => { onChange({ width }); }} /> : null;
   return (
     <div className="flex flex-col gap-2">
-      {selected || altOpen ? <Toolbar attrs={attrs} links={links} onChange={onChange} onRemove={onRemove} onEditAlt={() => { setAltOpen((open) => !open); }} onReplace={() => { replaceRef.current?.click(); }} /> : null}
+      {selected || altOpen ? <Toolbar attrs={attrs} links={links} onChange={onChange} onRemove={onRemove} onEditAlt={() => { setAltOpen((open) => !open); }} onReplace={() => { replaceRef.current?.click(); }} onOpenLarger={image ? viewer.show : undefined} /> : null}
       <input ref={replaceRef} type="file" accept={kindCopy[attrs.kind].accept} hidden aria-label="Replace: choose a file" onChange={(event) => { replaceWith(event.target.files?.[0]); event.target.value = ""; }} />
       {altOpen ? <AltField attrs={attrs} onChange={onChange} /> : null}
-      <MediaBlock kind={attrs.kind} url={links.open} downloadUrl={links.download} alt={attrs.alt} caption={caption} width={preview ?? attrs.width} file={null} overlay={overlay} />
+      <MediaBlock kind={attrs.kind} url={links.open} downloadUrl={links.download} alt={attrs.alt} caption={caption} width={preview ?? attrs.width} file={file} overlay={overlay} view={{ viewer, trigger: "double-click" }} />
     </div>
   );
 }

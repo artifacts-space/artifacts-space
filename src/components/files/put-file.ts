@@ -1,11 +1,21 @@
+/** What a cancelled upload rejects with. */
+export const uploadCancelled = "The upload was cancelled.";
+
 /**
  * PUTs a file straight to a presigned R2 URL and reports progress. Uses
  * XMLHttpRequest because fetch cannot report upload progress. The browser
- * sets Content-Length itself, so that header is skipped here.
+ * sets Content-Length itself, so that header is skipped here. With a
+ * `signal`, aborting it stops the request and rejects with `uploadCancelled`.
  */
-export function putFile(url: string, headers: Record<string, string>, file: Blob, onProgress: (percent: number) => void): Promise<void> {
+export function putFile(url: string, headers: Record<string, string>, file: Blob, onProgress: (percent: number) => void, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error(uploadCancelled));
+      return;
+    }
     const request = new XMLHttpRequest();
+    signal?.addEventListener("abort", () => { request.abort(); }, { once: true });
+    request.onabort = () => { reject(new Error(uploadCancelled)); };
     request.open("PUT", url);
     for (const [name, value] of Object.entries(headers)) {
       if (name.toLowerCase() !== "content-length") request.setRequestHeader(name, value);

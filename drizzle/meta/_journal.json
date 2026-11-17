@@ -351,6 +351,13 @@
       "when": 1794928579812,
       "tag": "0049_page_files",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1794940272204,
+      "tag": "0050_image_dimensions",
+      "breakpoints": true
     }
   ]
 }

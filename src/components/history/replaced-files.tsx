@@ -6,6 +6,7 @@ import { useMemo, type ReactNode } from "react";
 import { ArtifactFilesProvider, type FileUrlBuilder } from "@/components/artifact-view/files-context";
 import { Button } from "@/components/ui/button";
 import { fileTypeLabel, formatBytes } from "@/lib/files/config";
+import { keptDimensions } from "@/lib/files/image-dimensions";
 import { fileUrl, oldCopyUrl, type FileDto, type OldFileDto } from "@/lib/files/types";
 
 /**
@@ -38,6 +39,14 @@ export function ReplacedFiles({ files }: { files: readonly OldFileDto[] }) {
   );
 }
 
+/** A file as its old copy: the copy's name, type, size, and pixel size, never the newer file's. */
+function asOldCopy(file: FileDto, copy: OldFileDto): FileDto {
+  const shown: FileDto = { ...file, filename: copy.filename, contentType: copy.contentType, size: copy.size };
+  delete shown.width;
+  delete shown.height;
+  return { ...shown, ...keptDimensions(copy.width, copy.height) };
+}
+
 /**
  * The files a version's preview shows: the artifact's files, with each one
  * replaced since that version shown as it was then, and opened from its old
@@ -49,7 +58,7 @@ export function VersionFiles({ files, replacedSince, children }: { files: readon
     const copies = new Map(replacedSince.map((copy) => [copy.fileId, copy]));
     const shown = files.map((file) => {
       const copy = copies.get(file.id);
-      return copy ? { ...file, filename: copy.filename, contentType: copy.contentType, size: copy.size } : file;
+      return copy ? asOldCopy(file, copy) : file;
     });
     const urlFor: FileUrlBuilder = (fileId, download) => {
       const copy = copies.get(fileId);

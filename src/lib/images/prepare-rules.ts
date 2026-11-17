@@ -114,6 +114,43 @@ export function uploadsUnprepared(file: { type: string; size: number }, profile:
   return file.type === "image/gif" && file.size > 0 && file.size <= profile.maxBytes;
 }
 
+/** How many leading bytes say whether a WebP or a PNG is animated. */
+export const animationBytes = 65_536;
+
+/** Whether the ASCII `word` is in `bytes` at `at`. */
+function wordAt(bytes: Uint8Array, at: number, word: string): boolean {
+  for (let index = 0; index < word.length; index += 1) {
+    if (bytes[at + index] !== word.charCodeAt(index)) return false;
+  }
+  return true;
+}
+
+/** Whether a WebP's extended header sets its animation flag. */
+function isAnimatedWebp(start: Uint8Array): boolean {
+  return wordAt(start, 0, "RIFF") && wordAt(start, 8, "WEBPVP8X") && ((start[20] ?? 0) & 0x02) !== 0;
+}
+
+/** Whether a PNG has an `acTL` chunk before its first picture data. */
+function isAnimatedPng(start: Uint8Array): boolean {
+  if (!wordAt(start, 1, "PNG")) return false;
+  const view = new DataView(start.buffer, start.byteOffset, start.byteLength);
+  for (let at = 8; at + 8 <= start.length; at += 12 + view.getUint32(at)) {
+    if (wordAt(start, at + 4, "acTL")) return true;
+    if (wordAt(start, at + 4, "IDAT")) return false;
+  }
+  return false;
+}
+
+/**
+ * True when a file's first bytes say it is an animated WebP or an animated
+ * PNG. Redrawing one would keep only its first frame, so it uploads as it
+ * is, as a GIF does.
+ */
+export function isAnimatedImage(type: string, start: Uint8Array): boolean {
+  if (type === "image/webp") return isAnimatedWebp(start);
+  return type === "image/png" && isAnimatedPng(start);
+}
+
 /** True when RGBA pixel data has any pixel that is not fully opaque. */
 export function hasTransparentPixel(rgba: ArrayLike<number>): boolean {
   for (let index = 3; index < rgba.length; index += 4) {

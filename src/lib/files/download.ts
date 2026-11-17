@@ -2,12 +2,14 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
+import type { ArtifactFileCopyRecord } from "@/db/file-copy-schema";
 import { artifact, artifactFile, type ArtifactFileRecord } from "@/db/schema";
 import { getArtifactAccess, type ArtifactAccess } from "@/lib/access";
 
 import { canReadFile, type FileArtifactAccess } from "./access-rules";
 import { fileLimits, isInlineType } from "./config";
 import { copiesCurrentAt } from "./copies";
+import { keptDimensions } from "./image-dimensions";
 import { contentDisposition } from "./names";
 import { presignDownload, r2ConfigFromEnv } from "./r2";
 import { replacedSince } from "./replace-rules";
@@ -51,9 +53,9 @@ export async function filesForViewer(viewable: Pick<ArtifactAccess, "record" | "
   return (servedAt ? await asServedAt(shown, servedAt) : shown).map(forReaders);
 }
 
-/** A file as readers get it: what it is, without the editing flags (embedded, pictured) only the Files section uses. */
-function forReaders({ id, filename, contentType, size, createdAt, replacedAt, pagePath }: FileDto): FileDto {
-  return { id, filename, contentType, size, createdAt, replacedAt, ...(pagePath === undefined ? {} : { pagePath }) };
+/** A file as readers get it: what it is, and an image's pixel size, without the editing flags (embedded, pictured) only the Files section uses. */
+export function forReaders({ id, filename, contentType, size, createdAt, replacedAt, pagePath, width, height }: FileDto): FileDto {
+  return { id, filename, contentType, size, createdAt, replacedAt, ...(pagePath === undefined ? {} : { pagePath }), ...keptDimensions(width, height) };
 }
 
 /**
@@ -61,6 +63,14 @@ function forReaders({ id, filename, contentType, size, createdAt, replacedAt, pa
  * a file replaced since then shows the copy that was current then, and is
  * left out if that copy is gone. Never the newer, unapproved file.
  */
+/** A file entry as one of its old copies: the copy's name, type, size, and pixel size, never the newer file's. */
+function asCopy(file: FileDto, copy: ArtifactFileCopyRecord): FileDto {
+  const entry: FileDto = { ...file, filename: copy.filename, contentType: copy.contentType, size: copy.size, replacedAt: copy.currentFrom?.toISOString() ?? null };
+  delete entry.width;
+  delete entry.height;
+  return { ...entry, ...keptDimensions(copy.width, copy.height) };
+}
+
 async function asServedAt(files: readonly FileDto[], servedAt: Date): Promise<FileDto[]> {
   const replaced = files.filter((file) => replacedSince({ replacedAt: file.replacedAt ? new Date(file.replacedAt) : null }, servedAt));
   if (replaced.length === 0) return [...files];
@@ -69,7 +79,7 @@ async function asServedAt(files: readonly FileDto[], servedAt: Date): Promise<Fi
   return files.flatMap((file) => {
     if (!replacedIds.has(file.id)) return [file];
     const copy = copies.get(file.id);
-    return copy ? [{ ...file, filename: copy.filename, contentType: copy.contentType, size: copy.size, replacedAt: copy.currentFrom?.toISOString() ?? null }] : [];
+    return copy ? [asCopy(file, copy)] : [];
   });
 }
 
@@ -78,7 +88,7 @@ export async function fileServedAt(file: ArtifactFileRecord, servedAt: Date | nu
   if (!servedAt || !replacedSince(file, servedAt)) return file;
   const copy = (await copiesCurrentAt([file.id], servedAt)).get(file.id);
   if (!copy) return null;
-  return { ...file, key: copy.key, filename: copy.filename, contentType: copy.contentType, size: copy.size, uploaderId: copy.uploaderId, replacedAt: copy.currentFrom };
+  return { ...file, key: copy.key, filename: copy.filename, contentType: copy.contentType, size: copy.size, width: copy.width, height: copy.height, uploaderId: copy.uploaderId, replacedAt: copy.currentFrom };
 }
 
 /** One file request: asks only about this file, so a page with many media does not recompute the artifact's hidden set per file. */

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
-import { finalizeUploadAction, requestUploadAction } from "@/app/(workspace)/app/file-actions";
+import { discardUploadAction, finalizeUploadAction, requestUploadAction } from "@/app/(workspace)/app/file-actions";
 import { putFile } from "@/components/files/put-file";
 import { fileUrl } from "@/lib/files/types";
 
@@ -20,14 +20,30 @@ export interface EditorMedia {
   urlFor: (fileId: string, download: boolean) => string;
 }
 
-/** Uploads one file through the normal flow; throws with a message for people when a step fails. */
-export const uploadThroughFileStore: MediaUploader = async (file, onProgress) => {
+/** Removes the upload a cancelled request left unfinished, so it does not wait an hour for the cleanup job. Best effort: the job is the backstop. */
+function discardCancelled(fileId: string, signal: AbortSignal | undefined) {
+  if (signal?.aborted) void discardUploadAction(fileId).catch(() => undefined);
+}
+
+/**
+ * Uploads one file through the normal flow; throws with a message for
+ * people when a step fails. Aborting `signal` (Cancel) stops the request
+ * that carries the bytes and removes the unfinished upload.
+ */
+export const uploadThroughFileStore: MediaUploader = async (file, onProgress, signal) => {
   const ticket = await requestUploadAction({ filename: file.name, contentType: file.type, size: file.size });
   if (!ticket.success) throw new Error(ticket.error);
-  await putFile(ticket.data.url, ticket.data.headers, file, onProgress);
+  try {
+    await putFile(ticket.data.url, ticket.data.headers, file, onProgress, signal);
+  } catch (error) {
+    discardCancelled(ticket.data.fileId, signal);
+    throw error;
+  }
   const ready = await finalizeUploadAction(ticket.data.fileId);
   if (!ready.success) throw new Error(ready.error);
-  return { id: ready.data.id, filename: ready.data.filename, contentType: ready.data.contentType };
+  discardCancelled(ready.data.id, signal);
+  const { id, filename, contentType, size, width, height } = ready.data;
+  return { id, filename, contentType, size, ...(width && height ? { width, height } : {}) };
 };
 
 const defaultMedia: EditorMedia = {

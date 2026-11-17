@@ -8,6 +8,7 @@ import { getEditableArtifactMeta } from "@/lib/access";
 
 import { deleteObject, r2ConfigFromEnv } from "./r2";
 import { copyCurrentAt } from "./replace-rules";
+import { keptDimensions } from "./image-dimensions";
 import type { OldFileDto } from "./types";
 
 /**
@@ -126,7 +127,7 @@ export async function copiesCurrentAt(fileIds: readonly string[], at: Date): Pro
 }
 
 function toOldFileDto(row: ArtifactFileCopyRecord & { fileId: string }): OldFileDto {
-  return { fileId: row.fileId, copyId: row.id, filename: row.filename, contentType: row.contentType, size: row.size, replacedAt: row.replacedAt.toISOString() };
+  return { fileId: row.fileId, copyId: row.id, filename: row.filename, contentType: row.contentType, size: row.size, replacedAt: row.replacedAt.toISOString(), ...keptDimensions(row.width, row.height) };
 }
 
 /**
