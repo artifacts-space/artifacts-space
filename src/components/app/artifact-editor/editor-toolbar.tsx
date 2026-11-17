@@ -1,6 +1,6 @@
 "use client";
 
-import { IconArrowsHorizontal, IconCode, IconCopy, IconDots, IconLink, IconLock, IconTransform, IconTrash } from "@tabler/icons-react";
+import { IconArrowsHorizontal, IconCode, IconCopy, IconDots, IconLink, IconLock, IconPaperclip, IconTransform, IconTrash } from "@tabler/icons-react";
 import { toast } from "sonner";
 
 import { ShowSidebarButton } from "@/components/app/sidebar-visibility";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
 import type { ArtifactKind, ArtifactProjectDto } from "@/lib/artifact-types";
+import { ATTACH_FILE_LABEL } from "@/lib/files/loose-rules";
 import { FULL_WIDTH_LABEL, hasWidthSetting } from "@/lib/page-width/rules";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,8 @@ interface MoreMenuProps {
   source: SourceToggle;
   /** Opens the Format and language dialog. */
   onChangeFormat: () => void;
+  /** Opens the file picker to attach files; null for a format that has no attachments beside its content (a document's files go into its text). */
+  onAttachFile: (() => void) | null;
   /** Null for a CSV, which is always full width. */
   fullWidth: FullWidthControl | null;
   harness: HarnessControl;
@@ -46,8 +49,8 @@ interface MoreMenuProps {
   onWithdraw: (() => void) | null;
 }
 
-/** Copy content, Copy link, View source, Format and language, Full width, and Made with for every editor; Delete for the author; Withdraw sharing for a team owner or admin editing a teammate's artifact. */
-function MoreMenu({ content, link, source, onChangeFormat, fullWidth, harness, onRequestDelete, onWithdraw }: MoreMenuProps) {
+/** Copy content, Copy link, View source, Format and language, Attach file (where the format keeps attachments), Full width, and Made with for every editor; Delete for the author; Withdraw sharing for a team owner or admin editing a teammate's artifact. */
+function MoreMenu({ content, link, source, onChangeFormat, onAttachFile, fullWidth, harness, onRequestDelete, onWithdraw }: MoreMenuProps) {
   const { copy } = useCopyToClipboard();
   const copyContent = () => { void copy(content).then((done) => { if (done) toast.success("Copied the content."); }); };
   const copyLink = () => { void copy(link).then((done) => { if (done) toast.success("Copied the link."); }); };
@@ -69,6 +72,11 @@ function MoreMenu({ content, link, source, onChangeFormat, fullWidth, harness, o
         <DropdownMenuItem onClick={onChangeFormat} className="py-2">
           <IconTransform /> Format and language
         </DropdownMenuItem>
+        {onAttachFile ? (
+          <DropdownMenuItem onClick={onAttachFile} className="py-2">
+            <IconPaperclip /> {ATTACH_FILE_LABEL}
+          </DropdownMenuItem>
+        ) : null}
         {fullWidth ? (
           <DropdownMenuCheckboxItem checked={fullWidth.checked} disabled={fullWidth.pending} onCheckedChange={fullWidth.onChange} className="py-2">
             <IconArrowsHorizontal /> {FULL_WIDTH_LABEL}
@@ -120,6 +128,8 @@ interface EditorToolbarProps {
   harness: HarnessControl;
   /** Format and language, in the More menu. */
   onChangeFormat: () => void;
+  /** "Attach file", in the More menu; null where the format has none. */
+  onAttachFile: (() => void) | null;
   /** Shown after the breadcrumb, such as the "Detected CSV · Change" chip. */
   notice?: React.ReactNode;
 }
@@ -177,7 +187,7 @@ function KindMark({ kind }: { kind: ArtifactKind }) {
  * header (h-14) to keep History in reach; from md up the /app shell keeps it
  * in place.
  */
-export function EditorToolbar({ publicId, link, project, title, kind, content, shareControl, history, comments, views, source, onRequestDelete, onWithdraw, fullWidth, harness, onChangeFormat, notice }: EditorToolbarProps) {
+export function EditorToolbar({ publicId, link, project, title, kind, content, shareControl, history, comments, views, source, onRequestDelete, onWithdraw, fullWidth, harness, onChangeFormat, onAttachFile, notice }: EditorToolbarProps) {
   return (
     <div className={toolbarClass}>
       <ShowSidebarButton />
@@ -189,7 +199,7 @@ export function EditorToolbar({ publicId, link, project, title, kind, content, s
         {views}
         {shareControl}
         <OpenPageButton publicId={publicId} />
-        <MoreMenu content={content} link={link} source={source} onChangeFormat={onChangeFormat} fullWidth={hasWidthSetting(kind) ? fullWidth : null} harness={harness} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
+        <MoreMenu content={content} link={link} source={source} onChangeFormat={onChangeFormat} onAttachFile={onAttachFile} fullWidth={hasWidthSetting(kind) ? fullWidth : null} harness={harness} onRequestDelete={onRequestDelete} onWithdraw={onWithdraw} />
       </div>
     </div>
   );

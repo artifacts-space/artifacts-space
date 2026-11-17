@@ -13,6 +13,7 @@ import { EditorFrameCaptures } from "@/components/artifact-view/canvas/capture/c
 import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
 import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
 import { AttachedFiles, type AttachFilesApi } from "@/components/files/attached-files";
+import { useAttachBeside } from "@/components/files/use-attach-beside";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { BlockMenuFor } from "@/components/editor/rich/block-menu/block-menu-context";
 import { askDocument, dropZoneProps } from "@/components/editor/rich/media-bridge";
@@ -24,7 +25,7 @@ import { ArtifactOrganizers } from "@/components/projects/artifact-organizers";
 import { useArtifactHarness, type HarnessControl } from "@/components/harness/use-artifact-harness";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import { sheetFormatTarget } from "@/lib/create/new-artifact-rules";
-import { addsToDocument, filesPanel, looseFiles } from "@/lib/files/loose-rules";
+import { addsToDocument, attachesBeside, filesPanel, looseFiles } from "@/lib/files/loose-rules";
 import type { FileDto } from "@/lib/files/types";
 import { previewColumnClass, usesFullWidth } from "@/lib/page-width/rules";
 import { cn } from "@/lib/utils";
@@ -67,6 +68,8 @@ interface ArtifactEditorProps {
   focusRequest?: number;
   /** How a stored artifact saves: the server action unless the workspace hands its own (the /dev/workspace fixture's store). */
   save?: SaveArtifact | undefined;
+  /** Where its list of attached files uploads, attaches, and replaces: the server actions unless the workspace hands its own (the fixture's). */
+  attachApi?: AttachFilesApi | undefined;
 }
 
 interface SharingSlotProps {
@@ -94,9 +97,14 @@ interface FilesSlotProps {
   body: RefObject<HTMLElement | null>;
   /** True while the document can take a file: the rich editor shows, not the source. */
   hasDocument: boolean;
+  /** The New artifact pane's store, while the artifact is one it made. */
   api: AttachFilesApi | undefined;
+  /** The workspace's store for an artifact opened from the list; the server actions when neither is given. */
+  fallbackApi: AttachFilesApi | undefined;
   onUpdated: (artifact: ArtifactDto) => void;
   column: string;
+  /** True while files are held over the page of a format that attaches them beside its content. */
+  dragging: boolean;
 }
 
 /**
@@ -105,14 +113,17 @@ interface FilesSlotProps {
  * quiet list of the files that are attached and shown nowhere on the page,
  * drawn only while there is one. A document's files go into its text.
  */
-function FilesSlot({ artifact, kind, content, body, hasDocument, api, onUpdated, column }: FilesSlotProps) {
+function FilesSlot({ artifact, kind, content, body, hasDocument, api: paneApi, fallbackApi, onUpdated, column, dragging }: FilesSlotProps) {
+  const api = paneApi ?? fallbackApi;
   if (filesPanel(kind) === "section") return <AttachedFiles artifact={artifact} onUpdated={onUpdated} api={api} column={column} className={gutterRoom} />;
   const loose = looseFiles(artifact.files, { kind, content, icon: artifact.icon, cover: artifact.cover });
-  if (loose.length === 0) return null;
-  const add = (file: FileDto) => {
-    if (!askDocument(body.current, { attached: file })) toast.error("The file could not be added to the document. Try again.");
+  const attach = attachesBeside(kind);
+  // A document's list is there only while it lists a file. The other formats keep it mounted, drawing nothing, so "Attach file" and a dropped file have somewhere to go.
+  if (loose.length === 0 && !attach) return null;
+  const add = (files: readonly FileDto[]) => {
+    if (!askDocument(body.current, { attached: [...files] })) toast.error("The file could not be added to the document. Try again.");
   };
-  return <AttachedFiles artifact={artifact} onUpdated={onUpdated} api={api} column={column} className={gutterRoom} quiet={{ files: loose, onAddToDocument: addsToDocument(kind) && hasDocument ? add : undefined }} />;
+  return <AttachedFiles artifact={artifact} onUpdated={onUpdated} api={api} column={column} className={gutterRoom} quiet={{ files: loose, onAddToDocument: addsToDocument(kind) && hasDocument ? add : undefined, attach, dragging }} />;
 }
 
 interface ArtifactToolbarProps {
@@ -131,11 +142,13 @@ interface ArtifactToolbarProps {
   fullWidth: FullWidthControl;
   harness: HarnessControl;
   onChangeFormat: () => void;
+  /** "Attach file" in the More menu; null for a format that has no attachments beside its content. */
+  onAttachFile: (() => void) | null;
   notice: React.ReactNode;
 }
 
 /** The toolbar of a stored artifact: copy, open, history, views, comments, share, and the More menu. */
-function ArtifactToolbar({ artifact, kind, title, shareUrl, shared, access, dirty, source, onRequestDelete, onRestored, onUpdated, fullWidth, harness, onChangeFormat, notice }: ArtifactToolbarProps) {
+function ArtifactToolbar({ artifact, kind, title, shareUrl, shared, access, dirty, source, onRequestDelete, onRestored, onUpdated, fullWidth, harness, onChangeFormat, onAttachFile, notice }: ArtifactToolbarProps) {
   const { canShare, canDelete, team, seesComments, onWithdraw } = access;
   return (
     <EditorToolbar
@@ -162,6 +175,7 @@ function ArtifactToolbar({ artifact, kind, title, shareUrl, shared, access, dirt
       fullWidth={fullWidth}
       harness={harness}
       onChangeFormat={onChangeFormat}
+      onAttachFile={onAttachFile}
       notice={notice}
     />
   );
@@ -174,7 +188,7 @@ function ArtifactToolbar({ artifact, kind, title, shareUrl, shared, access, dirt
  * shows the raw content. The author (or the person who added the agent that
  * wrote it) also shares and deletes it.
  */
-export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, seesComments, onWithdraw, onUpdated, onDeleted, blankPage, focusRequest, save }: ArtifactEditorProps) {
+export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, seesComments, onWithdraw, onUpdated, onDeleted, blankPage, focusRequest, save, attachApi }: ArtifactEditorProps) {
   const { draft, update, replace, reset, remount, revision } = useArtifactDraft(artifact);
   const [sourceOpen, setSourceOpen] = useState(false);
   const { outerRef, bodyRef, remember } = useScrollPlace(sourceOpen ? "source" : "page");
@@ -200,6 +214,9 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
   // A canvas or interface takes a newer save (an agent's, say) when the tab comes back, and says who changed what.
   const catchUp = useEditorCatchUp({ artifact, stored: !page.blank, unsaved, onUpdated });
   const noticeHistory = <VersionHistory publicId={artifact.publicId} title={artifact.title} updatedAt={artifact.updatedAt} reviewed={shared} files={artifact.files} hasUnsavedChanges={autosave.dirty} onRestored={(restored) => { reset(restored); onUpdated(restored); }} trigger={openHistoryButton} />;
+
+  // A format that keeps attachments beside its content: "Attach file" in the More menu, and a file dropped anywhere on the page. The New artifact pane takes drops its own way.
+  const attachBeside = useAttachBeside({ artifactId: artifact.id, kind: draft.kind, takesDrops: !page.active, root: () => sectionRef.current });
 
   const toggleSource = () => {
     remember();
@@ -228,6 +245,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
           fullWidth={fullWidth}
           harness={harness}
           onChangeFormat={() => { setFormatOpen(true); }}
+          onAttachFile={attachBeside.onAttachFile}
           notice={notice}
         />
       )}
@@ -292,7 +310,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
             </ArtifactSheetFormat>
           </SheetKeyContext>
           <BlankPageFilesSlot page={page} dragging={dragging} column={column} />
-          {page.blank ? null : <FilesSlot artifact={artifact} kind={draft.kind} content={draft.content} body={bodyRef} hasDocument={!sourceOpen} api={filesApi} onUpdated={onUpdated} column={column} />}
+          {page.blank ? null : <FilesSlot artifact={artifact} kind={draft.kind} content={draft.content} body={bodyRef} hasDocument={!sourceOpen} api={filesApi} fallbackApi={attachApi} onUpdated={onUpdated} column={column} dragging={attachBeside.dragging} />}
         </div>
       </div>
       <FormatDialog

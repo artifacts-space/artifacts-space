@@ -20,6 +20,7 @@ import { ArtifactPageShare } from "@/components/artifact-page/page-share";
 import type { CsvDownloadSetting } from "@/components/artifact-page/csv-download-item";
 import { EditorIsland } from "@/components/artifact-page/editor-island";
 import { InlineBody, InlineSummary, InlineTitle } from "@/components/artifact-page/inline-fields";
+import { PageAttachedFiles } from "@/components/artifact-page/page-attached-files";
 import { PageConflictNotice, PageEditorChromeProvider } from "@/components/artifact-page/page-editor-chrome";
 import { ReportDialog } from "@/components/artifact-page/report-dialog";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
@@ -464,6 +465,8 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
                       </SheetFormatFor>
                     </SheetFill>
                   </article>
+                  {/* For someone who may edit a format that keeps attachments beside its content: the attached files, "Attach file", and a file dropped on the page. */}
+                  <PageAttachedFiles />
                   {/* Opens links to one block (#block=…): scrolls to it and highlights it. */}
                   <BlockLinkTarget />
                 </ThemeScope>

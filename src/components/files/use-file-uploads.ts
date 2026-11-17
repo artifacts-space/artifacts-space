@@ -30,6 +30,15 @@ export interface UploadProgress {
   started?: (fileId: string) => void;
 }
 
+/** What a file past the artifact's limit is told when more are added at once than an artifact holds. */
+export const tooManyAtOnce = `An artifact holds at most ${String(fileLimits.maxFilesPerArtifact)} attached files. This one was left out.`;
+
+/** Why this file cannot upload (its size or type), or null when it can. */
+function uploadProblem(file: File): string | null {
+  const check = checkUpload({ filename: file.name, contentType: file.type, size: file.size });
+  return check.ok ? null : check.error;
+}
+
 /** Sends one file and returns it once the server has checked it. */
 export type SendFile = (file: File, report: UploadProgress) => Promise<ActionResult<FileDto>>;
 
@@ -73,11 +82,12 @@ export function useFileUploads(options: { onReady?: (file: FileDto, key: string)
   }, [onReady, patch, send]);
 
   const addFiles = useCallback((files: readonly File[]) => {
-    const added = files.slice(0, fileLimits.maxFilesPerArtifact).map((file) => {
+    // Every file gets a row: one past what an artifact holds says so, and none goes with no word. The server decides for real when a file is attached.
+    const added = files.map((file, index) => {
       nextKey += 1;
-      const check = checkUpload({ filename: file.name, contentType: file.type, size: file.size });
-      const item: UploadItem = { key: `upload-${String(nextKey)}`, name: file.name, size: file.size, status: check.ok ? "uploading" : "error", progress: 0, error: check.ok ? null : check.error, file: null };
-      return { item, file, ok: check.ok };
+      const problem = index < fileLimits.maxFilesPerArtifact ? uploadProblem(file) : tooManyAtOnce;
+      const item: UploadItem = { key: `upload-${String(nextKey)}`, name: file.name, size: file.size, status: problem ? "error" : "uploading", progress: 0, error: problem, file: null };
+      return { item, file, ok: problem === null };
     });
     setItems((current) => [...current, ...added.map(({ item }) => item)]);
     for (const { item, file, ok } of added) if (ok) void upload(item.key, file);
@@ -103,7 +113,10 @@ export function useFileUploads(options: { onReady?: (file: FileDto, key: string)
     setItems((current) => current.map((item) => (item.file && fileIds.includes(item.file.id) ? { ...item, status: "checking" } : item)));
   }, []);
 
+  /** Shows a file as refused, with the reason: one that uploaded but could not be attached. Its row keeps Remove, which deletes the upload. */
+  const fail = useCallback((key: string, error: string) => { patch(key, { status: "error", error }); }, [patch]);
+
   const readyFiles = items.flatMap((item) => (item.status === "ready" && item.file ? [item.file] : []));
   const busy = items.some((item) => item.status === "uploading" || item.status === "checking");
-  return { items, addFiles, remove, reset, markChecking, readyFiles, busy };
+  return { items, addFiles, remove, reset, markChecking, fail, readyFiles, busy };
 }

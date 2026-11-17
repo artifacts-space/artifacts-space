@@ -17,6 +17,8 @@ export interface PageEdit {
   /** What the editor typed, saved on its own a moment after typing stops. */
   draft: ArtifactDraft;
   update: <K extends keyof ArtifactDraft>(key: K, value: ArtifactDraft[K]) => void;
+  /** Takes the artifact as a change outside the draft saved it (a file attached or removed), so the page shows it. */
+  onUpdated: (artifact: ArtifactDto) => void;
   /** Changes when the content was replaced from outside, so stateful editors reload it. */
   revision: number;
   /** View source is open: the raw content replaces the rendered artifact. */

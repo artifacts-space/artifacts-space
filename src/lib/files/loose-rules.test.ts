@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addsToDocument, filesPanel, looseFiles, looseFilesWords } from "./loose-rules";
+import { addsToDocument, attachesBeside, filesPanel, looseFiles, looseFilesWords } from "./loose-rules";
 
 const plain = { id: "11111111-1111-4111-8111-111111111111" };
 const embedded = { id: "22222222-2222-4222-8222-222222222222", embedded: true };
@@ -65,7 +65,26 @@ describe("addsToDocument", () => {
   });
 });
 
+describe("attachesBeside", () => {
+  it.each(["code", "text", "json", "csv", "svg", "mermaid", "html"])("should let a person attach a file beside %s content", (kind) => {
+    expect(attachesBeside(kind)).toBe(true);
+  });
+
+  it("should not offer it for a document, whose files go into its text", () => {
+    expect(attachesBeside("markdown")).toBe(false);
+  });
+
+  it.each(["file", "ui", "canvas"])("should leave %s to its Files section", (kind) => {
+    expect(attachesBeside(kind)).toBe(false);
+  });
+});
+
 describe("looseFilesWords", () => {
+  it("should say nothing while the list holds no file yet, only uploads on their way", () => {
+    expect(looseFilesWords([])).toBe("");
+  });
+
+
   it("should say the files are not shown on the page when none is a page file", () => {
     expect(looseFilesWords([{}])).toBe("1 file, not shown on the page");
     expect(looseFilesWords([{}, {}])).toBe("2 files, not shown on the page");

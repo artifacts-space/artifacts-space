@@ -26,6 +26,9 @@ export function filesPanel(kind: string): FilesPanel {
   return kind === "file" || kind === "ui" || kind === "canvas" ? "section" : "list";
 }
 
+/** The name of every control that attaches a file beside an artifact's content: both More menus, and the list's heading. */
+export const ATTACH_FILE_LABEL = "Attach file";
+
 /** A file as the list needs it. */
 interface ListedFile {
   id: string;
@@ -66,9 +69,20 @@ function counted(count: number, one: string, many: string): string {
 export function looseFilesWords(files: readonly { pagePath?: string | undefined }[]): string {
   const pageFiles = files.filter((file) => file.pagePath !== undefined).length;
   const others = files.length - pageFiles;
+  if (files.length === 0) return "";
   if (others === 0) return counted(pageFiles, "page file", "page files");
   if (pageFiles === 0) return `${counted(others, "file", "files")}, not shown on the page`;
   return `${counted(pageFiles, "page file", "page files")} and ${counted(others, "file", "files")} not shown on the page`;
+}
+
+/**
+ * True when a person attaches files beside this format's content on the
+ * web ("Attach file", and a drop anywhere on the page): every format with
+ * the quiet list but a document, whose files go into its text. An HTML
+ * artifact's are plain attachments too; its page files come from agents.
+ */
+export function attachesBeside(kind: string): boolean {
+  return filesPanel(kind) === "list" && kind !== "markdown";
 }
 
 /** True when a file can be put into a document's text from the list: only a document has text for it. */

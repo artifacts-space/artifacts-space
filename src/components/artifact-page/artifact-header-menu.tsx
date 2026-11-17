@@ -1,6 +1,6 @@
 "use client";
 
-import { IconAlertTriangle, IconArrowsHorizontal, IconCheck, IconCode, IconDots, IconHistory, IconLink, IconLoader2, IconRefresh } from "@tabler/icons-react";
+import { IconAlertTriangle, IconArrowsHorizontal, IconCheck, IconCode, IconDots, IconHistory, IconLink, IconLoader2, IconPaperclip, IconRefresh } from "@tabler/icons-react";
 import { toast } from "sonner";
 
 import { COPY_LINK_LABEL } from "@/components/copy-button";
@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ATTACH_FILE_LABEL } from "@/lib/files/loose-rules";
 import { FULL_WIDTH_LABEL } from "@/lib/page-width/rules";
 import { siteDefaultTheme } from "@/lib/themes/resolve";
 import type { Theme } from "@/lib/themes/schema";
@@ -106,6 +107,20 @@ function FullWidthItem({ control, shown }: { control: PageFullWidthControl | und
   );
 }
 
+/** "View source" or "Hide source"; disabled until the editable copy has loaded. */
+function SourceItem({ source }: { source: PageEditorChrome["source"] | undefined }) {
+  return (
+    <DropdownMenuItem onClick={source?.onToggle} disabled={!source} className="py-2">
+      <IconCode /> {source?.open ? "Hide source" : "View source"}
+    </DropdownMenuItem>
+  );
+}
+
+/** "Attach file", once the editable copy has loaded, for a format that keeps attachments beside its content. */
+function AttachItem({ attach }: { attach: (() => void) | null | undefined }) {
+  return attach ? <DropdownMenuItem onClick={attach} className="py-2"><IconPaperclip /> {ATTACH_FILE_LABEL}</DropdownMenuItem> : null;
+}
+
 /** "Made with", once the editable copy has loaded. */
 function HarnessItem({ control }: { control: HarnessControl | null | undefined }) {
   return control ? <HarnessMenu control={control} /> : null;
@@ -122,11 +137,10 @@ function CopyLinkItem() {
   return <DropdownMenuItem onClick={copyLink} className="py-2"><IconLink /> {COPY_LINK_LABEL}</DropdownMenuItem>;
 }
 
-/** The page header's "⋯": why a change is not saved (and Try again after a failed save), Copy link, Full width (not for a CSV), History, View source, and Made with. Disabled until the editor is ready. */
+/** The page header's "⋯": why a change is not saved (and Try again after a failed save), Copy link, Full width (not for a CSV), History, View source, Attach file (where the format keeps attachments), and Made with. Disabled until the editor is ready. */
 function MoreMenu({ chrome, onHistory, theme, widthSetting, csvDownload }: MoreMenuProps) {
   // Menus open in a layer above the page, so the popup takes the artifact theme's colors itself, like the header around its button.
   const popup = themeChromeProps(theme ?? siteDefaultTheme());
-  const source = chrome?.source ?? null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="More actions" disabled={!chrome} />}>
@@ -138,9 +152,8 @@ function MoreMenu({ chrome, onHistory, theme, widthSetting, csvDownload }: MoreM
         <FullWidthItem control={chrome?.fullWidth} shown={widthSetting} />
         <CsvDownloadItem setting={csvDownload} />
         <DropdownMenuItem onClick={onHistory} className="py-2"><IconHistory /> History</DropdownMenuItem>
-        <DropdownMenuItem onClick={source?.onToggle} disabled={!source} className="py-2">
-          <IconCode /> {source?.open ? "Hide source" : "View source"}
-        </DropdownMenuItem>
+        <SourceItem source={chrome?.source} />
+        <AttachItem attach={chrome?.attach} />
         <HarnessItem control={chrome?.harness} />
       </DropdownMenuContent>
     </DropdownMenu>
