@@ -117,12 +117,14 @@ function useImageShape(file: MediaFileFacts | null): { shape: ImageDimensions | 
   const stored = keptDimensions(file?.width, file?.height);
   const width = stored?.width ?? 0;
   const height = stored?.height ?? 0;
-  const [wrong, setWrong] = useState(false);
+  // The size that was found wrong, not a flag: a file put in the block's place (Replace) brings a size of its own, which is checked afresh.
+  const size = `${String(width)}x${String(height)}`;
+  const [wrong, setWrong] = useState<string | null>(null);
   const check = useCallback((image: HTMLImageElement) => {
     if (width === 0 || !image.complete || image.naturalWidth === 0) return;
-    if (image.naturalWidth !== width || image.naturalHeight !== height) setWrong(true);
-  }, [width, height]);
-  return { shape: wrong ? null : stored, check };
+    if (image.naturalWidth !== width || image.naturalHeight !== height) setWrong(size);
+  }, [width, height, size]);
+  return { shape: wrong === size ? null : stored, check };
 }
 
 /** What opens the image larger: a click for a reader, a double-click in the editor. */

@@ -29,6 +29,9 @@ export interface OldFileDto {
   size: number;
   /** When a newer upload replaced it. */
   replacedAt: string;
+  /** An image copy's pixel size, when it was stored. */
+  width?: number;
+  height?: number;
 }
 
 /**

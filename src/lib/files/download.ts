@@ -53,9 +53,9 @@ export async function filesForViewer(viewable: Pick<ArtifactAccess, "record" | "
   return (servedAt ? await asServedAt(shown, servedAt) : shown).map(forReaders);
 }
 
-/** A file as readers get it: what it is, without the editing flags (embedded, pictured) only the Files section uses. */
-function forReaders({ id, filename, contentType, size, createdAt, replacedAt, pagePath }: FileDto): FileDto {
-  return { id, filename, contentType, size, createdAt, replacedAt, ...(pagePath === undefined ? {} : { pagePath }) };
+/** A file as readers get it: what it is, and an image's pixel size, without the editing flags (embedded, pictured) only the Files section uses. */
+export function forReaders({ id, filename, contentType, size, createdAt, replacedAt, pagePath, width, height }: FileDto): FileDto {
+  return { id, filename, contentType, size, createdAt, replacedAt, ...(pagePath === undefined ? {} : { pagePath }), ...keptDimensions(width, height) };
 }
 
 /**

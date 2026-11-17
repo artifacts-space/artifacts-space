@@ -82,7 +82,7 @@ export function ImageViewer({ images, index, onStep, onClose, returnFocus }: Ima
           initialFocus={closeRef}
           finalFocus={() => returnFocus() ?? true}
           onKeyDown={onKeyDown}
-          className="fixed inset-0 z-50 outline-none duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 motion-reduce:animate-none"
+          className="fixed inset-0 z-50 outline-none"
         >
           <ThemeScope theme={source?.theme} mode={source?.mode} className="flex h-full flex-col bg-background text-foreground">
             <div className="flex shrink-0 items-center gap-2 px-4 py-2">
