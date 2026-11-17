@@ -78,6 +78,17 @@ describe("media uploads", () => {
     expect(uploadedFacts(report.id)).toEqual(report);
   });
 
+  it("should upload an animated WebP as it is, never a redraw that keeps one frame", async () => {
+    const bytes = new Uint8Array([...new TextEncoder().encode("RIFF"), 0, 0, 0, 0, ...new TextEncoder().encode("WEBPVP8X"), 10, 0, 0, 0, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    const picked = new File([bytes], "loop.webp", { type: "image/webp" });
+    const uploader = vi.fn<MediaUploader>().mockResolvedValue({ id: "3f2504e0-4f89-41d3-9a0c-0305e82c3301", filename: "loop.webp", contentType: "image/webp" });
+    const uploadId = queueUpload(picked);
+    startUpload(uploadId, uploader);
+    await expect(settled(uploadId)).resolves.toMatchObject({ status: "done" });
+    expect(uploader.mock.lastCall?.[0]).toBe(picked);
+    forgetUpload(uploadId);
+  });
+
   it("should read as failed when a block names an upload this tab never started", () => {
     expect(uploadState("upload-from-another-tab")).toMatchObject({ status: "failed" });
   });

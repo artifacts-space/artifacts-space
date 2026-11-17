@@ -1139,8 +1139,9 @@ to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
   per upload in `media-uploads.ts`), then discards the pending upload.
 - **Every still image is redrawn in the browser before it uploads**
   (`documentPrepareProfile`): at most 2400 px on its long side, upright,
-  camera data such as the place it was taken removed. GIFs upload as they
-  are. Never loosen this to "small pictures upload untouched": that would
+  camera data such as the place it was taken removed. A GIF, an animated
+  WebP, and an animated PNG upload as they are (`isAnimatedImage`): a
+  redraw would keep one frame. Never loosen this to "small pictures upload untouched": that would
   put a phone photo's location into a shared page.
 - The fixture is `/dev/editor?kind=media&doc=gallery` (add `&as=reader` for
   the read view); `e2e/document-images.spec.ts` covers all of the above.

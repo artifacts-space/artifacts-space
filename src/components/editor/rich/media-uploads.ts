@@ -1,6 +1,6 @@
 import { prepareImage } from "@/components/images/prepare-image";
 import { fileLimits, formatBytes } from "@/lib/files/config";
-import { documentPrepareProfile, uploadsUnprepared } from "@/lib/images/prepare-rules";
+import { animationBytes, documentPrepareProfile, isAnimatedImage, uploadsUnprepared } from "@/lib/images/prepare-rules";
 
 import { filenameFromUrl, mediaUploadProblem, uploadMediaKind } from "./media-upload-rules";
 
@@ -96,9 +96,20 @@ export function subscribeUpload(uploadId: string, listener: () => void): () => v
   return () => { entry?.listeners.delete(listener); };
 }
 
-/** Images are redrawn first (upright, at most 2400 px, camera data dropped); everything else uploads as it is. */
+/** Whether a picked image moves: a redraw would keep only its first frame. A file that cannot be read counts as a still. */
+async function isAnimated(file: File): Promise<boolean> {
+  if (file.size > documentPrepareProfile.maxBytes) return false;
+  try {
+    return isAnimatedImage(file.type, new Uint8Array(await file.slice(0, animationBytes).arrayBuffer()));
+  } catch {
+    return false;
+  }
+}
+
+/** Still images are redrawn first (upright, at most 2400 px, camera data dropped); a GIF, an animated image, and every other file upload as they are. */
 async function prepared(file: File): Promise<File> {
   if (uploadMediaKind(file) !== "image" || uploadsUnprepared(file, documentPrepareProfile)) return file;
+  if (await isAnimated(file)) return file;
   return prepareImage(file, documentPrepareProfile);
 }
 

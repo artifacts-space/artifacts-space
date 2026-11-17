@@ -147,6 +147,32 @@ describe.runIf(Boolean(databaseUrl))("replacing a file, with a database", async 
     expect(r2.deleted).toEqual([]);
   });
 
+  it("should give the entry the new picture's pixel size, and keep the old picture's size with its copy", async () => {
+    const db = getDb();
+    await db.update(artifactFile).set({ contentType: "image/png", filename: "plan.png", width: 1600, height: 900 }).where(eq(artifactFile.id, sow));
+    const next = await upload(ids.author, "plan-v2.png", { contentType: "image/png" });
+    await db.update(artifactFile).set({ width: 800, height: 1200 }).where(eq(artifactFile.id, next));
+
+    const result = await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");
+
+    expect(result.file).toMatchObject({ id: sow, width: 800, height: 1200 });
+    expect(await entry()).toMatchObject({ width: 800, height: 1200 });
+    const [copy] = await copies();
+    expect(copy).toMatchObject({ fileId: sow, width: 1600, height: 900 });
+  });
+
+  it("should leave the entry with no pixel size when the new file states none, never the old picture's", async () => {
+    const db = getDb();
+    await db.update(artifactFile).set({ contentType: "image/png", filename: "plan.png", width: 1600, height: 900 }).where(eq(artifactFile.id, sow));
+    const next = await upload(ids.author, "plan-v2.png", { contentType: "image/png" });
+
+    const result = await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");
+
+    expect(result.file).not.toHaveProperty("width");
+    expect(await entry()).toMatchObject({ width: null, height: null });
+    expect((await copies())[0]).toMatchObject({ width: 1600, height: 900 });
+  });
+
   it("should offer the old copy in History for a version saved before the replace, and to editors only", async () => {
     const next = await upload(ids.author);
     await replaceFile(ids.author, { fileId: sow, uploadId: next }, "person");

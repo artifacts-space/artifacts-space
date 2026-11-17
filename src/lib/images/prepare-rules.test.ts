@@ -10,6 +10,7 @@ import {
   DOCUMENT_IMAGE_MAX_BYTES,
   documentPrepareProfile,
   imageOutputType,
+  isAnimatedImage,
   uploadsUnprepared,
   imageSourceProblem,
   imageTargetSize,
@@ -139,5 +140,38 @@ describe("documentPrepareProfile", () => {
 
   it("should name the use when a picked file is not an image", () => {
     expect(imageSourceProblem({ type: "application/pdf", name: "a.pdf", size: 10 }, documentPrepareProfile)).toContain("cannot be an image here");
+  });
+});
+
+describe("isAnimatedImage", () => {
+  const ascii = (word: string) => Array.from(new TextEncoder().encode(word));
+  const be32 = (value: number) => [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255];
+  const chunk = (type: string, data: number[]) => [...be32(data.length), ...ascii(type), ...data, 0, 0, 0, 0];
+  const png = (...chunks: number[][]) => new Uint8Array([0x89, ...ascii("PNG"), 0x0d, 0x0a, 0x1a, 0x0a, ...chunk("IHDR", new Array<number>(13).fill(0)), ...chunks.flat()]);
+  const webp = (flags: number) => new Uint8Array([...ascii("RIFF"), 0, 0, 0, 0, ...ascii("WEBPVP8X"), 10, 0, 0, 0, flags, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+  it("should know an animated WebP by the animation flag of its extended header", () => {
+    expect(isAnimatedImage("image/webp", webp(0x02))).toBe(true);
+    expect(isAnimatedImage("image/webp", webp(0x12))).toBe(true);
+  });
+
+  it("should read a WebP with transparency, or a plain one, as a still", () => {
+    expect(isAnimatedImage("image/webp", webp(0x10))).toBe(false);
+    expect(isAnimatedImage("image/webp", new Uint8Array([...ascii("RIFF"), 0, 0, 0, 0, ...ascii("WEBPVP8 "), 0, 0, 0, 0, 0x02]))).toBe(false);
+  });
+
+  it("should know an animated PNG by an animation chunk before its picture data, after other chunks", () => {
+    expect(isAnimatedImage("image/png", png(chunk("gAMA", [0, 0, 0, 1]), chunk("acTL", new Array<number>(8).fill(0)), chunk("IDAT", [1, 2, 3])))).toBe(true);
+  });
+
+  it("should read a PNG as a still when no animation chunk comes before its picture data", () => {
+    expect(isAnimatedImage("image/png", png(chunk("IDAT", [...ascii("acTL"), 1, 2, 3])))).toBe(false);
+    expect(isAnimatedImage("image/png", png())).toBe(false);
+  });
+
+  it("should not read another type, or bytes that are not the type stated, as animated", () => {
+    expect(isAnimatedImage("image/jpeg", webp(0x02))).toBe(false);
+    expect(isAnimatedImage("image/png", webp(0x02))).toBe(false);
+    expect(isAnimatedImage("image/webp", new Uint8Array())).toBe(false);
   });
 });
