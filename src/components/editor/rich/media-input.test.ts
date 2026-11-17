@@ -49,4 +49,14 @@ describe("uploadIdsAdded", () => {
     expect(uploadIdsAdded(state.tr.insert(1, schema.text("x")))).toEqual([]);
     expect(uploadIdsAdded(state.tr.insert(state.doc.content.size, mediaNode("upload-1")))).toEqual(["upload-1"]);
   });
+
+  it("should name an upload a block is given after it is in the document, however the attribute is written", () => {
+    const empty = editorWith(uploadCleanupPlugin());
+    const state = empty.apply(empty.tr.insert(empty.doc.content.size, schema.node(MEDIA_NODE, emptyMediaAttrs("image"))));
+    const position = state.doc.content.size - 1;
+    // A block's picker and its Replace write the whole block again, as a node view's updateAttributes does.
+    expect(uploadIdsAdded(state.tr.setNodeMarkup(position, undefined, { ...emptyMediaAttrs("image"), uploadId: "upload-2" }))).toEqual(["upload-2"]);
+    expect(uploadIdsAdded(state.tr.setNodeAttribute(position, "uploadId", "upload-3"))).toEqual(["upload-3"]);
+    expect(uploadIdsAdded(state.tr.setNodeAttribute(position, "alt", "A caption"))).toEqual([]);
+  });
 });

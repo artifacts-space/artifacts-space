@@ -6,6 +6,7 @@ import { unusableFilesForPeople } from "@/lib/files/person-messages";
 import type { FileDto } from "@/lib/files/types";
 
 import { fixtureArtifact } from "./fixture-content";
+import { withContentMedia } from "./fixture-media";
 
 /**
  * The /dev/workspace fixture's stand-in for storing new artifacts: kept in
@@ -150,7 +151,8 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     const now = new Date().toISOString();
     const id = `fixture-new-${String(Date.now())}-${String(created)}`;
     const base = fixtureArtifact({ id, kind, title: input.title, content: input.content, publicId: `fixturenew${String(Date.now()).slice(-10)}${String(created).padStart(2, "0")}`, updatedAt: now });
-    const files = fileIds.flatMap((fileId) => uploaded.get(fileId) ?? []);
+    // As the server does (writeAndAttach): the create also attaches the uploads its content names.
+    const files = withContentMedia(fileIds.flatMap((fileId) => uploaded.get(fileId) ?? []), kind, input.content);
     createdByRequest.set(requestId, id);
     return save({ ...base, summary: input.summary ?? "", language: input.language ?? "", icon: input.icon ?? null, files });
   },
@@ -162,7 +164,7 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     const touchesContent = changes.content !== undefined || changes.kind !== undefined;
     const problem = touchesContent ? contentProblem(next.kind, next.content, updateCheckOptions(current.content)) : null;
     if (problem) return Promise.resolve({ success: false, error: problem });
-    return Promise.resolve(save(next));
+    return Promise.resolve(save({ ...next, files: withContentMedia(next.files, next.kind, next.content) }));
   },
   send: async (file, report) => {
     await gate(holdUploadsKey, "fixture:release-uploads");

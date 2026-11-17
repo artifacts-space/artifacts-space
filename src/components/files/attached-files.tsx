@@ -1,6 +1,6 @@
 "use client";
 
-import { IconExternalLink, IconFile, IconLoader2, IconReplace, IconTrash } from "@tabler/icons-react";
+import { IconExternalLink, IconFile, IconLoader2, IconReplace, IconRowInsertBottom, IconTrash } from "@tabler/icons-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -9,6 +9,7 @@ import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
 import { fileInputAccept, formatBytes, fileTypeLabel } from "@/lib/files/config";
+import { looseFilesWords } from "@/lib/files/loose-rules";
 import { offersReplace } from "@/lib/files/replace-rules";
 import { fileUrl, type FileDto } from "@/lib/files/types";
 import { cn } from "@/lib/utils";
@@ -47,10 +48,12 @@ interface RowProps {
   onRemove: () => void;
   /** Null when the file is not replaced here: media the document embeds, or the icon or cover. */
   onReplace: (() => void) | null;
+  /** Puts the file into the document's text; set only in a document's quiet list. */
+  onAdd?: (() => void) | undefined;
 }
 
-/** One attached file: name, type and size, and open, copy-id, replace, and remove actions. */
-function AttachedRow({ file, showId, removing, replacing, busy, onRemove, onReplace }: RowProps) {
+/** One attached file: name, type and size, and open, copy-id, add-to-document, replace, and remove actions. */
+function AttachedRow({ file, showId, removing, replacing, busy, onRemove, onReplace, onAdd }: RowProps) {
   return (
     <li className="card-nested flex min-w-0 items-center gap-3 bg-card px-3 py-2" data-replacing={replacing ? "" : undefined}>
       <IconFile aria-hidden className="size-4 shrink-0 text-muted-foreground" />
@@ -60,6 +63,11 @@ function AttachedRow({ file, showId, removing, replacing, busy, onRemove, onRepl
         <span className="text-xs text-muted-foreground" aria-live="polite">{rowFacts(file, replacing)}</span>
       </span>
       {showId ? <CopyButton value={file.id} label="Copy id" variant="ghost" size="xs" /> : null}
+      {onAdd ? (
+        <Button type="button" variant="ghost" size="xs" aria-label={`Add to document: ${file.filename}`} disabled={busy} onClick={onAdd}>
+          <IconRowInsertBottom aria-hidden /> Add to document
+        </Button>
+      ) : null}
       <Button variant="ghost" size="icon-xs" nativeButton={false} render={<a href={fileUrl(file.id, { replacedAt: file.replacedAt })} target="_blank" rel="noopener noreferrer" aria-label={`Open ${file.filename}`} />}>
         <IconExternalLink />
       </Button>
@@ -75,11 +83,25 @@ function AttachedRow({ file, showId, removing, replacing, busy, onRemove, onRepl
   );
 }
 
+/** The quiet list: only these files, under "Attached files", with no upload box. */
+export interface QuietFiles {
+  /** The files the page shows nowhere else (looseFiles). */
+  files: readonly FileDto[];
+  /** Puts a file into the document's text. Left out where there is no document to put it in. */
+  onAddToDocument?: ((file: FileDto) => void) | undefined;
+}
+
 /**
  * The editor's files section: the artifact's attached files, and an uploader
  * that attaches each file as soon as it finishes. Replace puts a new upload
  * in place of a file, keeping its name, place, and links; the old copy
  * stays in History. In a ui artifact, copy a file's id into an Image or File element.
+ *
+ * With `quiet` it is the list a document and the other text formats show
+ * instead (filesPanel): the files that are attached and shown nowhere on
+ * the page, each with Open, Replace, and Remove, and in a document "Add to
+ * document". It has no upload box, and the page draws it only while it
+ * lists a file: a document's files go into its text.
  */
 interface AttachedFilesProps {
   artifact: ArtifactDto;
@@ -89,9 +111,18 @@ interface AttachedFilesProps {
   column?: string | undefined;
   /** Extra classes for the band, such as the room the pane leaves beside the column. */
   className?: string | undefined;
+  quiet?: QuietFiles | undefined;
 }
 
-export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, className }: AttachedFilesProps) {
+/** The words beside the heading: how many files, and in the quiet list why they are listed. */
+function countWords(files: readonly FileDto[], quiet: boolean): string {
+  if (quiet) return looseFilesWords(files);
+  return files.length === 0 ? "None yet" : `${String(files.length)} attached`;
+}
+
+export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, className, quiet }: AttachedFilesProps) {
+  const files = quiet ? quiet.files : artifact.files;
+  const heading = quiet ? "Attached files" : "Files";
   const [removing, setRemoving] = useState<string | null>(null);
   const pickerRef = useRef<HTMLInputElement>(null);
   const targetRef = useRef<FileDto | null>(null);
@@ -136,15 +167,15 @@ export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, cl
   }
 
   return (
-    <section aria-label="Files" data-slot="attached-files" className={cn("border-t bg-background/60 py-4", column ? null : "px-5 sm:px-7", className)}>
+    <section aria-label={heading} data-slot="attached-files" data-quiet={quiet ? "" : undefined} className={cn("border-t bg-background/60 py-4", column ? null : "px-5 sm:px-7", className)}>
       <div className={cn(column, "flex flex-col gap-3")}>
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-md font-medium">Files</h2>
-        <span className="text-xs text-muted-foreground">{artifact.files.length === 0 ? "None yet" : `${String(artifact.files.length)} attached`}</span>
+        <h2 className="text-md font-medium">{heading}</h2>
+        <span className="text-xs text-muted-foreground">{countWords(files, quiet !== undefined)}</span>
       </div>
-      {artifact.files.length > 0 ? (
+      {files.length > 0 ? (
         <ul className="flex min-w-0 flex-col gap-2">
-          {artifact.files.map((file) => (
+          {files.map((file) => (
             <AttachedRow
               key={file.id}
               file={file}
@@ -154,12 +185,13 @@ export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, cl
               busy={replacing !== null}
               onRemove={() => void remove(file)}
               onReplace={offersReplace(file, artifact) ? () => { pickReplacement(file); } : null}
+              onAdd={quiet?.onAddToDocument ? () => { quiet.onAddToDocument?.(file); } : undefined}
             />
           ))}
         </ul>
       ) : null}
       <input ref={pickerRef} type="file" accept={fileInputAccept} className="sr-only" tabIndex={-1} aria-hidden data-slot="replace-file-input" onChange={onPicked} />
-      <FileUploader items={uploads.items} onFiles={uploads.addFiles} onRemove={(key) => { uploads.remove(key); }} />
+      {quiet ? null : <FileUploader items={uploads.items} onFiles={uploads.addFiles} onRemove={(key) => { uploads.remove(key); }} />}
       </div>
     </section>
   );

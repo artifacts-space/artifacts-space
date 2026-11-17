@@ -7,6 +7,7 @@ import { Dashboard } from "@/components/app/dashboard";
 import { ShareActionsProvider } from "@/components/app/share-actions";
 import type { ShareTeam } from "@/components/app/share-teams-context";
 import { ConfirmationsProvider } from "@/components/confirmations-provider";
+import { EditorMediaProvider } from "@/components/editor/rich/media-context";
 import { defaultRoleCapabilities } from "@/lib/teams/capability-rules";
 import type { ArtifactLink } from "@/lib/app-link";
 import { toArtifactListItem } from "@/lib/artifact-preview";
@@ -23,6 +24,7 @@ import { createFixtureProjectsStore, fixtureFacets, LOCKED_TITLE, withProjects }
 import { asTeamArtifacts, createFixtureShareStore, withSharing } from "./fixture-sharing";
 import { useFixtureControls } from "./fixture-controls";
 import { fixtureFeedbackSend } from "./feedback-fixture";
+import { fixtureMediaUpload, fixtureMediaUrl } from "./fixture-media";
 import { fixtureNotifications, LINK_ONLY_PUBLIC_ID } from "./notification-fixture";
 
 /** The viewer's personal team, so the Share dialog can offer link and public sharing. The switcher does not list it. */
@@ -165,7 +167,8 @@ function fixtureScope(scopes: boolean, team: string | null): { teams: ShareTeam[
  * Development only: the real /app workspace (frame, header, list, editor)
  * with long artifacts, a long list, and projects, and no database. Every
  * artifact is handed in full, so none loads. Project changes stay in
- * memory, and so do sharing changes. The app shell and sidebar projects e2e
+ * memory, and so do sharing changes. Files a document uploads from its
+ * text stay in the tab. The app shell and sidebar projects e2e
  * tests use it. With `scopes`, the viewer is also in shared teams, so the
  * workspace switcher lists them, and `team` opens one of them as the scope.
  * Each workspace lists only the artifacts whose home it is, as /app does
@@ -209,6 +212,8 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
   }, [full, link, linkFailed]);
   return (
     <ConfirmationsProvider initial={[]}>
+      {/* Files a document uploads from its text stay in this tab (fixture-media.ts). */}
+      <EditorMediaProvider upload={fixtureMediaUpload} urlFor={fixtureMediaUrl}>
       <ShareActionsProvider actions={sharing.store.actions}>
       <div className="workspace-frame">
         <AppHeader userId="fixture" name="Fixture" email="fixture@example.com" username="fixture" unreadNotifications={4} notificationSeed={notifications} feedbackSend={fixtureFeedbackSend} />
@@ -237,6 +242,7 @@ export function WorkspaceFixture({ projectFilter, link = null, linkFailed = fals
         />
       </div>
       </ShareActionsProvider>
+      </EditorMediaProvider>
     </ConfirmationsProvider>
   );
 }

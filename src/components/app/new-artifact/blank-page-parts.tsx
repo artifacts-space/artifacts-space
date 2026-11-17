@@ -67,7 +67,7 @@ interface BlankPageFilesProps {
   onRemove: (key: string) => void;
   /** Shown before anything was added: the quiet "Upload files" button. */
   showUpload: boolean;
-  /** Its own drop box with the uploads: only while the page is blank. A stored page has its Files section for that. */
+  /** Its own drop box with the uploads: only while the page is blank. A stored Files artifact has its Files section for that, and any other stored page lists what was attached. */
   dropBox: boolean;
   dragging: boolean;
   filesProblem: string | null;
@@ -95,8 +95,9 @@ export function BlankPageFilesSlot({ page, dragging, column }: { page: { active:
 
 /**
  * The blank page's files: a small "Upload files" button while the page is
- * empty, the uploads' progress and errors once files were dropped or picked,
- * and a hint while something is held over the page.
+ * empty (a picked file goes into the document, as a dropped one does), the
+ * uploads' progress and errors once files were dropped or picked on a page
+ * that is not a document, and a hint while something is held over the page.
  */
 export function BlankPageFiles({ items, onFiles, onRemove, showUpload, dropBox, dragging, filesProblem, column }: BlankPageFilesProps) {
   const inputRef = useRef<HTMLInputElement>(null);

@@ -3,6 +3,7 @@
 import { IconFile, IconFileTypePdf, IconLoader2, IconMovie, IconMusic, IconPhoto, IconUpload, IconX, type Icon } from "@tabler/icons-react";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 
+import { useLeaveGuard } from "@/components/artifact-page/use-leave-guard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -141,6 +142,8 @@ export function UploadingMedia({ uploadId, kind, onDone, onRemove }: UploadingPr
   const name = uploadFile(uploadId)?.name ?? "File";
 
   useEffect(() => { startUpload(uploadId, media.upload); }, [uploadId, media.upload]);
+  // Closing the tab now would lose the file: the save names it only once it is uploaded.
+  useLeaveGuard(state.status !== "failed" && state.status !== "done");
   useEffect(() => { if (state.status === "done") onDone(state.file); }, [state, onDone]);
 
   if (state.status === "failed") {
@@ -163,6 +166,8 @@ export function UploadingMedia({ uploadId, kind, onDone, onRemove }: UploadingPr
         <IconLoader2 aria-hidden className="size-4 shrink-0 animate-spin" />
         <span className="min-w-0 flex-1 truncate">{name}</span>
         <span className="shrink-0 tabular-nums">{statusText(state)}</span>
+        {/* Stops the upload and takes the block out, as Remove does after a failure. */}
+        <Button type="button" variant="ghost" size="xs" aria-label={`Cancel the upload of ${name}`} onClick={onRemove}>Cancel</Button>
       </div>
       {progress === null ? null : <Progress value={progress} aria-label={`Uploading ${name}`} />}
     </PickerFrame>
