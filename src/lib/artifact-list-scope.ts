@@ -1,4 +1,5 @@
 import { and, type SQL } from "drizzle-orm";
+import { cache } from "react";
 
 import { getDb } from "@/db";
 import { viewableInTeamCondition } from "@/lib/access";
@@ -21,6 +22,12 @@ import { homeOutsideTeams, sharedTeamIdsFor } from "@/lib/projects/scope";
 export type ArtifactScope = { kind: "mine" } | { kind: "personal" } | { kind: "team"; teamId: string };
 
 /**
+ * The viewer's shared teams, read once per request: one page load builds
+ * the Personal scope for the list, the project counts, and the tag counts.
+ */
+const sharedTeamsOnce = cache((viewerId: string) => sharedTeamIdsFor(viewerId));
+
+/**
  * The one SQL condition for a list scope: the list, its counts, its search,
  * and its filters all build on it, so they cannot disagree about what a
  * workspace holds. An artifact the viewer shared through a team they have
@@ -31,7 +38,7 @@ export async function scopeCondition(viewerId: string, scope: ArtifactScope): Pr
   if (scope.kind === "team") return viewableInTeamCondition(viewerId, scope.teamId);
   const authored = authoredByViewerCondition(getDb(), viewerId);
   if (scope.kind === "mine") return authored;
-  const personal = homeOutsideTeams(await sharedTeamIdsFor(viewerId));
+  const personal = homeOutsideTeams(await sharedTeamsOnce(viewerId));
   const condition = personal ? and(authored, personal) : authored;
   if (!condition) throw new Error("The personal scope could not be built.");
   return condition;

@@ -252,6 +252,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   const listRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const scopeTeamId = scopeTeam?.id ?? null;
   const { artifacts, setArtifacts, selectedId, pick, afterDelete, notice, dismissNotice, opened, held, urlSync } = useArtifactLink({ initialArtifacts, target: linkTarget, failed: linkFailed, onHandled: onLinkHandled, loadArtifact, list: listRef, detail: detailRef });
   const listFilters = useListFilters();
   const { query, setQuery, kind, setKind, view, setView, clearFilters } = listFilters;
@@ -260,7 +261,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   useLinkLeavesNewArtifact(opened, fresh.leave);
   const sidebar = useDashboardProjects({ artifacts, setArtifacts, rows: projectRows, facets, api: projectsApi, teams, scopeTeam, tagFilter, listPath, viewerId });
   const entryKeys = useMemo(() => sidebar.projects.entries.map((entry) => entry.key), [sidebar.projects.entries]);
-  const { counts, partial, filtered, groups, narrowed } = useWorkspaceList({ artifacts, filters: listFilters, projectFilter, tagFilter, teamId: scopeTeam?.id ?? null, teams, viewerId, entryKeys, totals: facets });
+  const { counts, partial, filtered, groups, narrowed } = useWorkspaceList({ artifacts, filters: listFilters, projectFilter, tagFilter, teamId: scopeTeamId, teams, viewerId, entryKeys, totals: facets });
 
   const selected = pickSelected(artifacts, filtered, selectedId);
   useSelectionInUrl(selected, urlSync);
@@ -271,13 +272,17 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
     setArtifacts((current) => listWithReturned(current, toArtifactListItem(artifact)));
     pick(artifact.id);
   }, [setArtifacts, pick]);
-  const moves = useHomeMoves({ teams, scopeTeam, viewerId, listPath, onReturned: comeBack });
+  // A saved artifact, in the list: a sharing change that moved it to another workspace takes it out at once (home-move-rules.ts).
+  const { refresh } = fresh;
+  const saved = useCallback((artifact: ArtifactDto) => {
+    refresh(artifact);
+    setArtifacts((current) => listAfterSave(current, toArtifactListItem(artifact), teams, scopeTeamId));
+  }, [refresh, setArtifacts, teams, scopeTeamId]);
+  const moves = useHomeMoves({ teams, scopeTeam, viewerId, listPath, onReturned: comeBack, onChanged: saved });
 
   function updated(artifact: ArtifactDto) {
-    fresh.refresh(artifact);
     moves.settle(artifact.id);
-    // A sharing change that moved it to another workspace takes it out of this one's list at once (home-move-rules.ts).
-    setArtifacts((current) => listAfterSave(current, toArtifactListItem(artifact), teams, scopeTeam?.id ?? null));
+    saved(artifact);
   }
 
   function deleted(id: string) {

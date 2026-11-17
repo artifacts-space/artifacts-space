@@ -200,3 +200,27 @@ test("should list a team's artifact only in the team's workspace, and name the t
   await expect(row(page, "Note 5")).toHaveCount(1);
   await expect(row(page, "Note 6"), "another team's workspace does not list it").toHaveCount(0);
 });
+
+test("should say where the artifact went, never that a request was sent, when Undo puts a link-opened artifact back in its own workspace", async ({ page }) => {
+  // Note 6 lives in Design; a link opened it in Personal.
+  await page.goto("/dev/workspace?scopes=1&artifact=fixtureworkspacenote05");
+  const dialog = await openShare(page, "Note 6");
+  await dialog.getByRole("radiogroup", { name: "Who can read it" }).getByRole("radio", { name: /^Private/ }).click();
+  await dialog.getByRole("button", { name: "Move to Personal" }).click();
+
+  // It moved into the workspace that is open: it is on screen already, so only Undo is offered.
+  const arrived = toastWith(page, "Moved “Note 6” back to Personal.");
+  await expect(arrived).toBeVisible();
+  await expect(arrived.getByRole("button", { name: /^Open in/ })).toHaveCount(0);
+  await expect(row(page, "Note 6").locator("[data-slot=row-workspace]"), "it is at home now").toHaveCount(0);
+  await expect(allCount(page)).toContainText("40");
+
+  // Undo shares it with Design again, which applies at once: it is Design's again, and the toast says so.
+  await arrived.getByRole("button", { name: "Undo" }).click();
+  const left = toastWith(page, "Moved “Note 6” to Design.");
+  await expect(left).toBeVisible();
+  await expect(left.getByRole("button", { name: "Open in Design" })).toBeVisible();
+  await expect(toastWith(page, "Request sent")).toHaveCount(0);
+  await expect(row(page, "Note 6")).toHaveCount(0);
+  await expect(allCount(page)).toContainText("39");
+});

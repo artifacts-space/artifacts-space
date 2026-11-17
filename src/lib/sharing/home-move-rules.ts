@@ -98,6 +98,22 @@ export function movedMessage(title: string, move: HomeMove): string {
   return move.to === "team" ? `Moved “${name}” to ${move.team.name}.` : `Moved “${name}” back to Personal.`;
 }
 
+/**
+ * What an Undo of a move did, read from the artifact the server answered
+ * with and never assumed: it is back in the workspace that shows it; or the
+ * sharing went back and its home is another workspace (it was only opened
+ * here by a link); or its home did not change, because the server filed a
+ * request this time (the team's rule or the viewer's role changed).
+ */
+export type UndoResult = { kind: "returned" } | { kind: "elsewhere"; move: HomeMove } | { kind: "stayed" };
+
+/** What an Undo did: `moved` is the artifact as the move left it, `answered` as the server answered the Undo. */
+export function undoResult(moved: HomeSubject, answered: HomeSubject, teams: readonly HomeTeam[], scopeTeamId: string | null): UndoResult {
+  const move = homeMove(moved, answered, teams);
+  if (!move) return { kind: "stayed" };
+  return listedInWorkspace(answered, teams, scopeTeamId) ? { kind: "returned" } : { kind: "elsewhere", move };
+}
+
 /** The toast after Undo brought a moved artifact back to the workspace that shows it (`teamName` null for Personal). */
 export function returnedMessage(title: string, teamName: string | null): string {
   const name = title.trim() || "Untitled artifact";

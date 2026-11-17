@@ -14,6 +14,7 @@ import {
   returnedMessage,
   saveLabel,
   teamPickerLabel,
+  undoResult,
   type HomeMove,
 } from "./home-move-rules";
 
@@ -159,6 +160,25 @@ describe("listAfterSave", () => {
     const withVisitor = [item("a"), item("v", inAcme)];
     expect(listAfterSave(withVisitor, item("v", linkByAcme), teams, null).map((entry) => entry.id)).toEqual(["a", "v"]);
     expect(listAfterSave(list, item("z", inAcme), teams, null).map((entry) => entry.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("undoResult", () => {
+  it("should say it returned when the Undo put it back in the workspace that shows it", () => {
+    expect(undoResult(inAcme, isPrivate, teams, null)).toEqual({ kind: "returned" });
+    expect(undoResult(isPrivate, inAcme, teams, acme.id)).toEqual({ kind: "returned" });
+  });
+
+  it("should say where it went when the Undo applied and its home is another workspace, never that a request was sent", () => {
+    // In Acme's workspace: the viewer's private artifact, opened by a link, was moved to Acme; Undo makes it private again.
+    expect(undoResult(inAcme, isPrivate, teams, acme.id)).toEqual({ kind: "elsewhere", move: { to: "personal", from: acme } });
+    expect(undoResult(isPrivate, inAcme, teams, globex.id)).toEqual({ kind: "elsewhere", move: { to: "team", team: acme, from: null } });
+  });
+
+  it("should say it stayed when the server filed a request and its home did not change, never that it is back", () => {
+    // Made private from Acme's workspace; the Undo's share with Acme now waits for an approval, so it is still private.
+    expect(undoResult(isPrivate, isPrivate, teams, acme.id)).toEqual({ kind: "stayed" });
+    expect(undoResult(inAcme, inAcme, teams, null)).toEqual({ kind: "stayed" });
   });
 });
 
