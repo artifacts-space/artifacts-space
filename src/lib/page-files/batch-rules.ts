@@ -1,5 +1,6 @@
 import { formatBytes } from "@/lib/files/config";
 
+import { suggestPagePath } from "./drop-rules";
 import { heldAt, planPagePublish, repeatedPaths, wholeSetFault, type HeldPageFile } from "./publish-rules";
 import { pageFileLimits, pagePathProblem } from "./rules";
 
@@ -76,6 +77,33 @@ function reviewEach(files: readonly BatchFile[], held: readonly HeldPageFile[]):
     else if (at?.exact) replaces.set(file.key, at.file.pagePath);
   }
   return { pathProblems, replaces };
+}
+
+/** `path` with `-<n>` before its extension: "img/logo.png" and 2 give "img/logo-2.png". */
+function numbered(path: string, n: number): string {
+  const slash = path.lastIndexOf("/");
+  const dot = path.lastIndexOf(".");
+  const at = dot > slash + 1 ? dot : path.length;
+  return `${path.slice(0, at)}-${String(n)}${path.slice(at)}`;
+}
+
+/**
+ * The path a row offers in place of one that cannot be used, for the
+ * person to take or change: the path cleaned (suggestPagePath); the held
+ * file's own path when the cleaned one is a case twin of it, so the new
+ * file replaces it; and, when another file of the set (`taken`, lowercase)
+ * has it, the same with a number. Nothing takes it until the person does.
+ */
+export function pathSuggestion(path: string, held: readonly HeldPageFile[], taken: ReadonlySet<string>): string {
+  const cleaned = suggestPagePath(path) || "file";
+  const at = heldAt(held, cleaned);
+  if (at) return at.file.pagePath;
+  if (!taken.has(cleaned.toLowerCase())) return cleaned;
+  for (let n = 2; n < 1000; n += 1) {
+    const candidate = numbered(cleaned, n);
+    if (!taken.has(candidate.toLowerCase()) && !heldAt(held, candidate)) return candidate;
+  }
+  return cleaned;
 }
 
 /** Where one file's upload stands. */

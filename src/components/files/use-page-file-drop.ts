@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 
+import { readDrop, type DroppedFile } from "./dropped-files";
+
 interface PageFileDropOptions {
   /** The part of the page that takes the files: the editor's pane, or the whole document. Read when the listeners start. */
   root: () => HTMLElement | null;
   /** Off for a reader, for a format whose files go elsewhere (a document's go into its text), and for a page that takes files another way. */
   enabled: boolean;
-  onFiles: (files: File[]) => void;
+  /** The dropped files, each with its place in a dropped folder (dropped-files.ts). */
+  onFiles: (files: DroppedFile[]) => void;
 }
 
 /** True when a drag holds files, from the desktop or from another page. */
@@ -54,8 +57,8 @@ export function usePageFileDrop({ root, enabled, onFiles }: PageFileDropOptions)
       if (!takes(event)) return;
       event.preventDefault();
       event.stopPropagation();
-      const files = Array.from(event.dataTransfer?.files ?? []);
-      if (files.length > 0) onFilesRef.current(files);
+      // Read now: the browser hands out a drop's folders only during the event.
+      void readDrop(event.dataTransfer).then((files) => { if (files.length > 0) onFilesRef.current(files); });
     };
     const leave = (event: DragEvent) => {
       if (!(event.relatedTarget instanceof Node) || !element.contains(event.relatedTarget)) setDragging(false);

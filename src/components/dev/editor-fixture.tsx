@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
 import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
@@ -27,6 +27,7 @@ import { sheetAtLimit } from "@/lib/ui/fixtures/formats";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
 import { CanvasCatchUp, type FixtureCatchUp } from "./catch-up-fixture";
+import { fixtureFiles, fixturePageFile, memoryPageFilesApi, type FixtureFiles } from "./fixture-page-files";
 import { fixtureMediaUpload, fixtureMediaUrl } from "./fixture-media";
 import { counterPage, dataUi, fixtureArtifact, longJson, longMarkdown, longUi, shortUi, styledUi, type EditorFixtureKind } from "./fixture-content";
 
@@ -57,16 +58,17 @@ const FIXTURE_AGENT_SUMMARY = "An agent rewrote this summary.";
  * before the person's first save, which goes through over it, as the server
  * does (src/lib/artifact-save.ts).
  */
-function useMemorySave(initial: ArtifactDto, agentFirst: boolean): SaveArtifact {
+function useMemorySave(initial: ArtifactDto, agentFirst: boolean, files: FixtureFiles): SaveArtifact {
   const saved = useRef(initial);
   const agentPending = useRef(agentFirst);
   return useCallback((_id, changes) => {
     const overAgents = agentPending.current;
     agentPending.current = false;
     const before = overAgents ? { ...saved.current, summary: FIXTURE_AGENT_SUMMARY } : saved.current;
-    saved.current = { ...before, ...changes, updatedAt: new Date().toISOString() };
+    // As the server does: a save answers with the artifact's files as they are now.
+    saved.current = { ...before, ...changes, files: files.get(), updatedAt: new Date().toISOString() };
     return Promise.resolve({ success: true, data: saved.current, savedOverAgents: overAgents });
-  }, []);
+  }, [files]);
 }
 
 /**
@@ -75,9 +77,8 @@ function useMemorySave(initial: ArtifactDto, agentFirst: boolean): SaveArtifact 
  * named `refused…` is refused by the attach, as the server refuses one
  * over the artifact's limit.
  */
-function useMemoryAttach(artifact: ArtifactDto): AttachFilesApi {
+function useMemoryAttach(artifact: ArtifactDto, attached: FixtureFiles): AttachFilesApi {
   const uploaded = useRef(new Map<string, FileDto>());
-  const attached = useRef<FileDto[]>([]);
   return useMemo(() => ({
     send: (file, report) => {
       report.progress(100);
@@ -88,12 +89,14 @@ function useMemoryAttach(artifact: ArtifactDto): AttachFilesApi {
     attach: (_artifactId, fileIds) => {
       const files = fileIds.flatMap((fileId) => uploaded.current.get(fileId) ?? []);
       if (files.some((file) => file.filename.startsWith("refused"))) return Promise.resolve({ success: false, error: fullMessage("plain") });
-      attached.current = [...attached.current, ...files];
-      return Promise.resolve({ success: true, data: { ...artifact, files: attached.current } });
+      attached.set([...attached.get(), ...files]);
+      return Promise.resolve({ success: true, data: { ...artifact, files: attached.get() } });
     },
     replace: () => Promise.resolve({ success: false, error: "The fixture does not replace files." }),
     discard: (fileId) => Promise.resolve(uploaded.current.delete(fileId)),
-  }), [artifact]);
+    // A web page's page files, in the same list (fixture-page-files.ts).
+    page: memoryPageFilesApi({ artifact, files: attached }),
+  }), [artifact, attached]);
 }
 
 /** "I'm editing" stays in the tab: the fixture has no database. */
@@ -108,11 +111,14 @@ const keepSignalInTab = () => Promise.resolve(null);
  * `catchUp`, the editor finds an agent's save of the canvas when the tab
  * comes back (e2e/catch-up.spec.ts). The layout e2e test edits here.
  */
-export function EditorFixture({ kind, failingSaves = false, agentSaves = false, catchUp = null }: { kind: EditorFixtureKind; failingSaves?: boolean; agentSaves?: boolean; catchUp?: FixtureCatchUp }) {
-  const artifact = useMemo(() => fixtureArtifact({ id: `fixture-${kind}`, kind: samples[kind].kind, title: `Long ${kind} fixture`, content: samples[kind].content() }), [kind]);
-  const save = useMemorySave(artifact, agentSaves);
+export function EditorFixture({ kind, failingSaves = false, agentSaves = false, catchUp = null, pageFiles = false }: { kind: EditorFixtureKind; failingSaves?: boolean; agentSaves?: boolean; catchUp?: FixtureCatchUp; pageFiles?: boolean }) {
+  // `pageFiles`: a web page that starts with two page files, for the tests that replace and remove one.
+  const [seeded] = useState(() => (pageFiles ? [fixturePageFile("css/site.css", 120), fixturePageFile("img/logo.png", 2048)] : []));
+  const artifact = useMemo(() => ({ ...fixtureArtifact({ id: `fixture-${kind}`, kind: samples[kind].kind, title: `Long ${kind} fixture`, content: samples[kind].content() }), files: seeded }), [kind, seeded]);
+  const [files] = useState(() => fixtureFiles(seeded));
+  const save = useMemorySave(artifact, agentSaves, files);
   const onSaved = useCallback(() => undefined, []);
-  const attachApi = useMemoryAttach(artifact);
+  const attachApi = useMemoryAttach(artifact, files);
   return (
     <div className="min-h-screen">
       <PageEditorChromeProvider>

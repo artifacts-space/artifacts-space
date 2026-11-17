@@ -23,6 +23,8 @@ export const confirmationActions = [
   "removePushDevice",
   "deleteTeamRole",
   "removeTeamIcon",
+  // Replacing a web page's HTML with an index.html dropped with its files.
+  "usePageHtml",
 ] as const;
 
 export const confirmationActionSchema = z.enum(confirmationActions, { error: "Unknown confirmation." });

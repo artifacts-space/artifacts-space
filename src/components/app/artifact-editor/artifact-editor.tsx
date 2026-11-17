@@ -13,6 +13,7 @@ import { EditorFrameCaptures } from "@/components/artifact-view/canvas/capture/c
 import { ArtifactSheetFormat } from "@/components/artifact-view/sheet-format";
 import { SheetKeyContext } from "@/components/artifact-view/use-sheet-prefs";
 import { AttachedFiles, type AttachFilesApi } from "@/components/files/attached-files";
+import { PageFilesSection } from "@/components/files/page-files-section";
 import { useAttachBeside } from "@/components/files/use-attach-beside";
 import { CommentsDialog } from "@/components/comments/comments-dialog";
 import { BlockMenuFor } from "@/components/editor/rich/block-menu/block-menu-context";
@@ -105,6 +106,8 @@ interface FilesSlotProps {
   column: string;
   /** True while files are held over the page of a format that attaches them beside its content. */
   dragging: boolean;
+  /** Puts new HTML into the draft as a web page's content (an index.html dropped with its files). */
+  onUseAsPage: (html: string) => void;
 }
 
 /**
@@ -113,10 +116,12 @@ interface FilesSlotProps {
  * quiet list of the files that are attached and shown nowhere on the page,
  * drawn only while there is one. A document's files go into its text.
  */
-function FilesSlot({ artifact, kind, content, body, hasDocument, api: paneApi, fallbackApi, onUpdated, column, dragging }: FilesSlotProps) {
+function FilesSlot({ artifact, kind, content, body, hasDocument, api: paneApi, fallbackApi, onUpdated, column, dragging, onUseAsPage }: FilesSlotProps) {
   const api = paneApi ?? fallbackApi;
   if (filesPanel(kind) === "section") return <AttachedFiles artifact={artifact} onUpdated={onUpdated} api={api} column={column} className={gutterRoom} />;
   const loose = looseFiles(artifact.files, { kind, content, icon: artifact.icon, cover: artifact.cover });
+  // A web page's files go to the page or beside it by their type, and a set of page files is one version.
+  if (kind === "html") return <PageFilesSection artifact={artifact} files={loose} onUpdated={onUpdated} api={api} column={column} className={gutterRoom} dragging={dragging} onUseAsPage={onUseAsPage} />;
   const attach = attachesBeside(kind);
   // A document's list is there only while it lists a file. The other formats keep it mounted, drawing nothing, so "Attach file" and a dropped file have somewhere to go.
   if (loose.length === 0 && !attach) return null;
@@ -310,7 +315,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
             </ArtifactSheetFormat>
           </SheetKeyContext>
           <BlankPageFilesSlot page={page} dragging={dragging} column={column} />
-          {page.blank ? null : <FilesSlot artifact={artifact} kind={draft.kind} content={draft.content} body={bodyRef} hasDocument={!sourceOpen} api={filesApi} fallbackApi={attachApi} onUpdated={onUpdated} column={column} dragging={attachBeside.dragging} />}
+          {page.blank ? null : <FilesSlot artifact={artifact} kind={draft.kind} content={draft.content} body={bodyRef} hasDocument={!sourceOpen} api={filesApi} fallbackApi={attachApi} onUpdated={onUpdated} column={column} dragging={attachBeside.dragging} onUseAsPage={(html) => { update("content", html); }} />}
         </div>
       </div>
       <FormatDialog

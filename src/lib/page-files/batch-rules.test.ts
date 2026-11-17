@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { batchStep, caseTwinProblem, inChunks, inPathOrder, pageFilesTotalsWords, publishButtonWords, publishedWords, repeatedPathProblem, reviewBatch, type BatchReview } from "./batch-rules";
+import { batchStep, caseTwinProblem, inChunks, inPathOrder, pageFilesTotalsWords, pathSuggestion, publishButtonWords, publishedWords, repeatedPathProblem, reviewBatch, type BatchReview } from "./batch-rules";
 import { pageBatchLimits, type HeldPageFile } from "./publish-rules";
 import { pageFileLimits, pagePathProblem } from "./rules";
 
@@ -98,5 +98,20 @@ describe("inPathOrder", () => {
   it("should list the page's own folder first, then folders by path", () => {
     const files = [{ pagePath: "js/app.js" }, { pagePath: "data.json" }, { pagePath: "css/site.css" }, { pagePath: "about.txt" }];
     expect(inPathOrder(files).map((file) => file.pagePath)).toEqual(["about.txt", "data.json", "css/site.css", "js/app.js"]);
+  });
+});
+
+describe("pathSuggestion", () => {
+  it("should clean a path the rules refuse", () => {
+    expect(pathSuggestion("Hero Image.png", held, new Set())).toBe("hero-image.png");
+  });
+
+  it("should offer the held file's own path for a case twin, so the new file replaces it", () => {
+    expect(pathSuggestion("img/logo.png", held, new Set())).toBe("img/Logo.png");
+  });
+
+  it("should number a path another file of the set has", () => {
+    expect(pathSuggestion("js/a.js", held, new Set(["js/a.js"]))).toBe("js/a-2.js");
+    expect(pathSuggestion("js/a.js", held, new Set(["js/a.js", "js/a-2.js"]))).toBe("js/a-3.js");
   });
 });

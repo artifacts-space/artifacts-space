@@ -15,7 +15,9 @@ import { fileUrl, type FileDto } from "@/lib/files/types";
 import { cn } from "@/lib/utils";
 
 import { attachFilesEvent, readAttachRequest } from "./attach-bridge";
+import type { DroppedFile } from "./dropped-files";
 import { FileUploader, UploadList } from "./file-uploader";
+import type { PageFilesApi } from "./page-files-api";
 import { sendToServer, useFileUploads, type SendFile } from "./use-file-uploads";
 import { useReplaceFile, type ReplaceFileApi, type Replacing } from "./use-replace-file";
 
@@ -25,18 +27,21 @@ export interface AttachFilesApi {
   attach: (artifactId: string, fileIds: string[]) => Promise<ActionResult<ArtifactDto>>;
   replace: ReplaceFileApi["replace"];
   discard: ReplaceFileApi["discard"];
+  /** Where a web page's page files go; the server actions when left out. */
+  page?: PageFilesApi | undefined;
 }
 
-const serverApi: AttachFilesApi = {
+/** The server actions behind the list. */
+export const serverApi: AttachFilesApi = {
   send: sendToServer,
   attach: attachFilesAction,
   replace: replaceFileAction,
   discard: discardUploadAction,
 };
 
-/** The line under a file's name: its type and size (and that the page loads it, for a page file), or how far its replacement got. */
-function rowFacts(file: FileDto, replacing: Replacing | null): string {
-  if (!replacing) return `${file.pagePath === undefined ? "" : "Page file · "}${fileTypeLabel(file.contentType)} · ${formatBytes(file.size)}`;
+/** The line under a file's name: its type and size (and what it is, where a list holds two kinds), or how far its replacement got. */
+function rowFacts(file: FileDto, replacing: Replacing | null, kindLabel: string | undefined): string {
+  if (!replacing) return `${kindLabel ?? (file.pagePath === undefined ? "" : "Page file")}${kindLabel === undefined && file.pagePath === undefined ? "" : " · "}${fileTypeLabel(file.contentType)} · ${formatBytes(file.size)}`;
   return replacing.checking ? "Checking the new file…" : `Uploading the new file · ${String(replacing.progress)}%`;
 }
 
@@ -51,17 +56,19 @@ interface RowProps {
   onReplace: (() => void) | null;
   /** Puts the file into the document's text; set only in a document's quiet list. */
   onAdd?: (() => void) | undefined;
+  /** What the file is, first on the line under its name, in a list that holds page files and attachments ("Attachment"). */
+  kindLabel?: string | undefined;
 }
 
 /** One attached file: name, type and size, and open, copy-id, add-to-document, replace, and remove actions. */
-function AttachedRow({ file, showId, removing, replacing, busy, onRemove, onReplace, onAdd }: RowProps) {
+export function AttachedRow({ file, showId, removing, replacing, busy, onRemove, onReplace, onAdd, kindLabel }: RowProps) {
   return (
     <li className="card-nested flex min-w-0 items-center gap-3 bg-card px-3 py-2" data-replacing={replacing ? "" : undefined}>
       <IconFile aria-hidden className="size-4 shrink-0 text-muted-foreground" />
       <span className="flex min-w-0 flex-1 flex-col">
         {/* A page file shows the path its page loads it by. */}
         <span className="truncate text-sm">{file.pagePath ?? file.filename}</span>
-        <span className="text-xs text-muted-foreground" aria-live="polite">{rowFacts(file, replacing)}</span>
+        <span className="text-xs text-muted-foreground" aria-live="polite">{rowFacts(file, replacing, kindLabel)}</span>
       </span>
       {showId ? <CopyButton value={file.id} label="Copy id" variant="ghost" size="xs" /> : null}
       {onAdd ? (
@@ -158,7 +165,7 @@ function QuietActions({ quiet, busy, onAttach }: { quiet: QuietFiles; busy: bool
  * (attach-bridge.ts) while `enabled`: with files, they upload and attach;
  * with none, the file picker opens.
  */
-function useAttachRequests(artifactId: string, enabled: boolean, onFiles: (files: File[]) => void, onPick: () => void) {
+export function useAttachRequests(artifactId: string, enabled: boolean, onFiles: (files: DroppedFile[]) => void, onPick: () => void) {
   const handlers = useRef({ onFiles, onPick });
   useEffect(() => { handlers.current = { onFiles, onPick }; }, [onFiles, onPick]);
   useEffect(() => {
@@ -176,7 +183,7 @@ function useAttachRequests(artifactId: string, enabled: boolean, onFiles: (files
 }
 
 /** The section's uploads: each file is attached to the artifact as soon as it is ready, and one that is refused says why in its row. */
-function useAttachingUploads(artifactId: string, api: AttachFilesApi, onUpdated: (artifact: ArtifactDto) => void) {
+export function useAttachingUploads(artifactId: string, api: AttachFilesApi, onUpdated: (artifact: ArtifactDto) => void) {
   const uploads = useFileUploads({
     send: api.send,
     onReady: (file, key) => {
@@ -194,7 +201,7 @@ function useAttachingUploads(artifactId: string, api: AttachFilesApi, onUpdated:
 }
 
 /** Removes an attached file, and says which one is on its way out. */
-function useRemoveFile(onUpdated: (artifact: ArtifactDto) => void) {
+export function useRemoveFile(onUpdated: (artifact: ArtifactDto) => void) {
   const [removing, setRemoving] = useState<string | null>(null);
   async function remove(file: FileDto) {
     setRemoving(file.id);
@@ -262,6 +269,10 @@ function Pickers({ onReplacement, onAttach, replaceRef, attachRef }: PickersProp
 
 interface FilesFrameProps {
   quiet: QuietFiles | undefined;
+  /** The heading, when it is not the format's usual one. */
+  heading?: string | undefined;
+  /** What the list says while files are held over the page (dropHint). */
+  hint?: string | undefined;
   column: string | undefined;
   className: string | undefined;
   /** How many files the list holds, in words. */
@@ -272,8 +283,8 @@ interface FilesFrameProps {
 }
 
 /** The section around the rows: its heading, the buttons beside it, the count, and, while files are held over the page, where they will go. */
-function FilesFrame({ quiet, column, className, count, actions, children }: FilesFrameProps) {
-  const heading = quiet ? "Attached files" : "Files";
+export function FilesFrame({ quiet, heading: named, hint = "Drop to attach it to this artifact", column, className, count, actions, children }: FilesFrameProps) {
+  const heading = named ?? (quiet ? "Attached files" : "Files");
   return (
     <section aria-label={heading} data-slot="attached-files" data-quiet={quiet ? "" : undefined} className={cn("border-t bg-background/60 py-4", column ? null : "px-5 sm:px-7", className)}>
       <div className={cn(column, "flex flex-col gap-3")}>
@@ -282,7 +293,7 @@ function FilesFrame({ quiet, column, className, count, actions, children }: File
           {actions}
           <span className="ml-auto text-xs text-muted-foreground">{count}</span>
         </div>
-        {quiet?.dragging ? <p data-slot="attach-drop-hint" className="card-nested border-dashed px-4 py-6 text-center text-md text-muted-foreground">Drop to attach it to this artifact</p> : null}
+        {quiet?.dragging ? <p data-slot="attach-drop-hint" className="card-nested border-dashed px-4 py-6 text-center text-md text-muted-foreground">{hint}</p> : null}
         {children}
       </div>
     </section>
@@ -305,7 +316,7 @@ export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, cl
   const { removing, remove } = useRemoveFile(onUpdated);
   const attaches = quiet?.attach === true;
   const pickToAttach = () => { attachRef.current?.click(); };
-  useAttachRequests(artifact.id, attaches, uploads.addFiles, pickToAttach);
+  useAttachRequests(artifact.id, attaches, (dropped) => { uploads.addFiles(dropped.map((entry) => entry.file)); }, pickToAttach);
   const removeUpload = (key: string) => { uploads.remove(key); };
 
   const pickers = (

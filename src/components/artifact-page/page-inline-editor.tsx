@@ -9,7 +9,7 @@ import type { SignalEditing } from "@/components/app/artifact-editor/use-editing
 import { useArtifactHarness } from "@/components/harness/use-artifact-harness";
 import { askToAttach } from "@/components/files/attach-bridge";
 import type { ArtifactDto } from "@/lib/artifact-types";
-import { attachesBeside } from "@/lib/files/loose-rules";
+import { attachesBeside, attachLabel } from "@/lib/files/loose-rules";
 
 import { PageEditContext, type PageEdit } from "./page-edit-context";
 import { useOwnSaves, usePublishPageEditorChrome, type PageEditorChrome } from "./page-editor-chrome";
@@ -110,9 +110,10 @@ function PageEditControls({ artifact, editor, reviewed, pageFullWidth, save, sig
   // The person's own cover, icon, or theme save is not news: ask from the newest save this tab made.
   useCatchUp({ artifact, knownUpdatedAt: ownSaveBase(artifact.updatedAt, ownSaves), stored: true, unsaved: dirty || status.kind === "saving", onCaughtUp: caughtUpWith });
   const harness = useArtifactHarness(artifact, editor.onUpdated);
-  // "Attach file" for a format that keeps attachments beside its content; the page's list of attached files answers it (page-attached-files.tsx).
+  // "Attach file" ("Add files" on a web page) for a format that keeps attachments beside its content; the page's list of attached files answers it (page-attached-files.tsx).
   const attachable = attachesBeside(editor.draft.kind);
-  const attach = useMemo(() => (attachable ? () => { askToAttach(artifact.id); } : null), [attachable, artifact.id]);
+  const attachName = attachLabel(editor.draft.kind);
+  const attach = useMemo(() => (attachable ? { label: attachName, run: () => { askToAttach(artifact.id); } } : null), [attachable, attachName, artifact.id]);
   const chrome = useMemo<PageEditorChrome>(() => ({
     history: {
       publicId: artifact.publicId,
