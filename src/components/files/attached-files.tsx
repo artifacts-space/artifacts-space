@@ -9,6 +9,7 @@ import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
 import { fileInputAccept, formatBytes, fileTypeLabel } from "@/lib/files/config";
+import { looseFilesWords } from "@/lib/files/loose-rules";
 import { offersReplace } from "@/lib/files/replace-rules";
 import { fileUrl, type FileDto } from "@/lib/files/types";
 import { cn } from "@/lib/utils";
@@ -114,9 +115,9 @@ interface AttachedFilesProps {
 }
 
 /** The words beside the heading: how many files, and in the quiet list why they are listed. */
-function countWords(count: number, quiet: boolean): string {
-  if (!quiet) return count === 0 ? "None yet" : `${String(count)} attached`;
-  return count === 1 ? "1 file, not shown on the page" : `${String(count)} files, not shown on the page`;
+function countWords(files: readonly FileDto[], quiet: boolean): string {
+  if (quiet) return looseFilesWords(files);
+  return files.length === 0 ? "None yet" : `${String(files.length)} attached`;
 }
 
 export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, className, quiet }: AttachedFilesProps) {
@@ -170,7 +171,7 @@ export function AttachedFiles({ artifact, onUpdated, api = serverApi, column, cl
       <div className={cn(column, "flex flex-col gap-3")}>
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-md font-medium">{heading}</h2>
-        <span className="text-xs text-muted-foreground">{countWords(files.length, quiet !== undefined)}</span>
+        <span className="text-xs text-muted-foreground">{countWords(files, quiet !== undefined)}</span>
       </div>
       {files.length > 0 ? (
         <ul className="flex min-w-0 flex-col gap-2">

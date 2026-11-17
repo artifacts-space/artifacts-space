@@ -9,7 +9,8 @@ import { fileRefsInContent } from "./refs";
  * section for adding files. A file the page shows nowhere (attached by an
  * agent with files_attach, or from before files went into the text) must
  * still be reachable, so those, and only those, are listed, and the list
- * goes once nothing is left in it. Pure rules, tested without a browser.
+ * goes once nothing is left in it. An HTML artifact's page files are listed
+ * there too, by their paths. Pure rules, tested without a browser.
  */
 
 /** What the page shows under an artifact's content for its files. */
@@ -51,6 +52,23 @@ export function looseFiles<T extends ListedFile>(files: readonly T[], artifact: 
   const icon = iconFileId(artifact.icon);
   const cover = coverFileId(artifact.cover);
   return files.filter((file) => file.embedded !== true && file.pictured !== true && file.id !== icon && file.id !== cover && !inContent.has(file.id.toLowerCase()));
+}
+
+function counted(count: number, one: string, many: string): string {
+  return count === 1 ? `1 ${one}` : `${String(count)} ${many}`;
+}
+
+/**
+ * The words beside the list's heading: how many files, and why they are
+ * listed. A page file (one with a path, which an HTML artifact's page loads
+ * by that path) is named as one, never as "not shown on the page".
+ */
+export function looseFilesWords(files: readonly { pagePath?: string | undefined }[]): string {
+  const pageFiles = files.filter((file) => file.pagePath !== undefined).length;
+  const others = files.length - pageFiles;
+  if (others === 0) return counted(pageFiles, "page file", "page files");
+  if (pageFiles === 0) return `${counted(others, "file", "files")}, not shown on the page`;
+  return `${counted(pageFiles, "page file", "page files")} and ${counted(others, "file", "files")} not shown on the page`;
 }
 
 /** True when a file can be put into a document's text from the list: only a document has text for it. */

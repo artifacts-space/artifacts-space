@@ -775,8 +775,9 @@ path, as on any website: `<link href="css/site.css">`, a module's
 - Agents: `files_request_upload` takes `pagePath`, `files_attach` attaches
   it, `files_replace` and `files_delete` change it, and every artifact
   result lists each file's `pagePath`. `buildHtmlGuide` tells them the
-  rules from the same constants. The Files section shows a page file's
-  path; adding one in the web app is not built yet.
+  rules from the same constants. The list of attached files on the
+  artifact's page shows a page file by its path (`looseFilesWords`);
+  adding one in the web app is not built yet.
 - Tests without a database: under `next dev` only, a token for the stand-in
   artifact id `fixture:page-files` is answered from files held in memory
   (`fixture-source.ts`), so `e2e/page-files.spec.ts` on

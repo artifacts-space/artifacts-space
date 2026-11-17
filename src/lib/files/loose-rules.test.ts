@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addsToDocument, filesPanel, looseFiles } from "./loose-rules";
+import { addsToDocument, filesPanel, looseFiles, looseFilesWords } from "./loose-rules";
 
 const plain = { id: "11111111-1111-4111-8111-111111111111" };
 const embedded = { id: "22222222-2222-4222-8222-222222222222", embedded: true };
@@ -62,5 +62,21 @@ describe("addsToDocument", () => {
     expect(addsToDocument("markdown")).toBe(true);
     expect(addsToDocument("csv")).toBe(false);
     expect(addsToDocument("html")).toBe(false);
+  });
+});
+
+describe("looseFilesWords", () => {
+  it("should say the files are not shown on the page when none is a page file", () => {
+    expect(looseFilesWords([{}])).toBe("1 file, not shown on the page");
+    expect(looseFilesWords([{}, {}])).toBe("2 files, not shown on the page");
+  });
+
+  it("should name page files as page files, never as not shown, when the page loads them", () => {
+    expect(looseFilesWords([{ pagePath: "css/site.css" }])).toBe("1 page file");
+    expect(looseFilesWords([{ pagePath: "css/site.css" }, { pagePath: "app.js" }])).toBe("2 page files");
+  });
+
+  it("should count each kind apart when the list holds both", () => {
+    expect(looseFilesWords([{ pagePath: "app.js" }, {}, {}])).toBe("1 page file and 2 files not shown on the page");
   });
 });
