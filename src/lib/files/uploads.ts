@@ -94,6 +94,15 @@ export function storedObjectProblem(row: Pick<ArtifactFileRecord, "size" | "cont
   return null;
 }
 
+/**
+ * Whether storage gave no size it could state for an object that exists
+ * (headObject's -1). That says nothing about the file: it is a failed
+ * read, to try again, never a mismatch that deletes the upload.
+ */
+export function storedSizeUnread(stored: { size: number }): boolean {
+  return !Number.isInteger(stored.size) || stored.size < 0;
+}
+
 async function rejectUpload(row: ArtifactFileRecord, reason: string): Promise<never> {
   await removeFiles([row]);
   throw new UserFacingError(`The upload was refused and removed. ${reason} Request a new upload and try again.`);
@@ -109,7 +118,8 @@ async function ownPendingOrReady(uploaderId: string, fileId: string) {
 /**
  * Checks an uploaded object and marks it ready. Finalizing a ready file
  * returns it unchanged. A file whose size, type, or first bytes do not
- * match the request is deleted.
+ * match the request is deleted. A size that storage did not report is not
+ * a mismatch: the upload stays, and the caller tries again.
  */
 export async function finalizeUpload(uploaderId: string, fileId: string): Promise<FileDto> {
   const row = await ownPendingOrReady(uploaderId, fileId);
@@ -117,6 +127,7 @@ export async function finalizeUpload(uploaderId: string, fileId: string): Promis
   const config = r2ConfigFromEnv();
   const stored = await headObject(config, row.key);
   if (!stored) throw new UserFacingError("The file has not arrived yet. PUT it to the upload URL with the returned headers, then finalize again.");
+  if (storedSizeUnread(stored)) throw new UserFacingError("Storage did not report the file's size, so the upload could not be checked. It was not removed. Try again.");
   const problem = storedObjectProblem(row, stored);
   if (problem) return rejectUpload(row, problem);
   if (row.pagePath === null && !isAllowedFileType(row.contentType)) return rejectUpload(row, "This file type is not supported.");

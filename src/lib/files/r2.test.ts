@@ -151,6 +151,11 @@ describe("reads ask for the stored bytes", () => {
     expect(await headObject(config, key)).toEqual({ size: css.length, contentType: "text/css" });
   });
 
+  it.each([[{}], [{ "Content-Length": "abc" }], [{ "Content-Length": "1.5" }], [{ "Content-Length": "" }]])("should give -1, never NaN, for the size of an answer with the headers %j", async (headers) => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(null, { status: 200, headers: { "Content-Type": "text/css", ...headers } }))));
+    expect(await headObject(config, key)).toEqual({ size: -1, contentType: "text/css" });
+  });
+
   it("should open a stylesheet with its length when R2 would compress it", async () => {
     likeR2(css);
     const opening = await openObject(config, key);

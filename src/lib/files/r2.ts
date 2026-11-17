@@ -207,13 +207,19 @@ async function send(config: R2Config, operation: string, method: "HEAD" | "GET" 
   }
 }
 
-/** The stored size and type of an object, or null when it does not exist. */
+/**
+ * The stored size and type of an object, or null when it does not exist.
+ * The size is -1 when R2's answer states none this can read (no
+ * Content-Length, or one that is not a whole number): never NaN, which
+ * would pass every "too small" and "too large" comparison. A caller must
+ * not read -1 as the object's size (`storedSizeUnread` in uploads.ts).
+ */
 export async function headObject(config: R2Config, key: string): Promise<{ size: number; contentType: string } | null> {
   const response = await send(config, "HEAD", "HEAD", key);
   if (response.status === 404) return null;
   if (!response.ok) throw new R2Error("HEAD", response.status);
   return {
-    size: Number(response.headers.get("content-length") ?? "-1"),
+    size: lengthOf(response) ?? -1,
     contentType: response.headers.get("content-type") ?? "",
   };
 }
