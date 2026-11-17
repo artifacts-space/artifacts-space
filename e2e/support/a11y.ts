@@ -43,8 +43,15 @@ interface ScanOptions {
  */
 const pageStructureRules = ["region", "landmark-one-main", "page-has-heading-one"];
 
-/** Marks the elements a locator matches so axe can be told to scan only them. */
-const scanAttribute = "data-a11y-scan";
+/**
+ * Names one element for axe's `include` without changing it: a CSS selector,
+ * or, for an element inside a shadow root, the host's selector followed by
+ * the selectors inside it (axe's `fromShadowDom`).
+ */
+type ScanSelector = string | { readonly fromShadowDom: [string, string, ...string[]] };
+
+/** The part of a page a scan is limited to, or null for the whole page. */
+type ScanScope = readonly ScanSelector[] | null;
 
 /** One rule's result from an axe run, of either kind: a violation, or nodes the rule could not judge (`incomplete`). */
 interface AxeRuleResult {
@@ -80,10 +87,11 @@ async function settleAnimations(page: Page) {
   });
 }
 
-/** A builder for one scan: the whole page, or only the marked part. */
-function builder(page: Page, token: string | null): AxeBuilder {
+/** A builder for one scan: the whole page, or only the elements named. */
+function builder(page: Page, scope: ScanScope): AxeBuilder {
   const axe = new AxeBuilder({ page });
-  return token ? axe.include(`[${scanAttribute}="${token}"]`) : axe;
+  for (const selector of scope ?? []) axe.include(selector);
+  return axe;
 }
 
 /**
@@ -133,11 +141,11 @@ function noteUnjudged(page: Page, incomplete: readonly AxeRuleResult[]): void {
  * nodes), there is nothing to run here and the narrowed pass does the work;
  * `ran` says how many rules this pass ran, so a scan that runs none can fail.
  */
-async function mainPass(page: Page, token: string | null, left: readonly string[], only: readonly string[] | undefined): Promise<{ violations: AxeRuleResult[]; incomplete: AxeRuleResult[]; ran: number | null }> {
-  if (!only) return { ...(await builder(page, token).disableRules([...left]).analyze()), ran: null };
+async function mainPass(page: Page, scope: ScanScope, left: readonly string[], only: readonly string[] | undefined): Promise<{ violations: AxeRuleResult[]; incomplete: AxeRuleResult[]; ran: number | null }> {
+  if (!only) return { ...(await builder(page, scope).disableRules([...left]).analyze()), ran: null };
   const wanted = only.filter((rule) => !left.includes(rule));
   if (wanted.length === 0) return { violations: [], incomplete: [], ran: 0 };
-  return { ...(await builder(page, token).withRules(wanted).analyze()), ran: wanted.length };
+  return { ...(await builder(page, scope).withRules(wanted).analyze()), ran: wanted.length };
 }
 
 /** A rule skipped only on some nodes: its id, and where and why it is left out. */
@@ -157,11 +165,11 @@ function narrowedSkips(skip: SkippedRules, only: readonly string[] | undefined):
  * kept everywhere but there. With `only`, what the rule could not judge
  * outside those nodes is recorded here, since the first pass left the rule out.
  */
-async function narrowedPass(page: Page, token: string | null, skips: readonly NarrowedSkip[], recordUnjudged: boolean): Promise<AxeRuleResult[]> {
+async function narrowedPass(page: Page, scope: ScanScope, skips: readonly NarrowedSkip[], recordUnjudged: boolean): Promise<AxeRuleResult[]> {
   const violations: AxeRuleResult[] = [];
   // One after another: axe cannot run twice at once in a page.
   for (const [rule, why] of skips) {
-    const narrowed = await builder(page, token).withRules([rule]).analyze();
+    const narrowed = await builder(page, scope).withRules([rule]).analyze();
     violations.push(...(await withoutNodesOn(page, narrowed.violations, why.on)));
     if (recordUnjudged) noteUnjudged(page, await withoutNodesOn(page, narrowed.incomplete, why.on));
   }
@@ -174,27 +182,78 @@ async function narrowedPass(page: Page, token: string | null, skips: readonly Na
  * nodes, everywhere but there. A scan left with no rule to run throws: it
  * would pass having checked nothing.
  */
-async function runRules(page: Page, token: string | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<AxeRuleResult[]> {
-  const partOnly = token ? pageStructureRules : [];
-  const main = await mainPass(page, token, [...partOnly, ...Object.keys(skip)], only);
+async function runRules(page: Page, scope: ScanScope, skip: SkippedRules, only: readonly string[] | undefined): Promise<AxeRuleResult[]> {
+  const partOnly = scope ? pageStructureRules : [];
+  const main = await mainPass(page, scope, [...partOnly, ...Object.keys(skip)], only);
   const skips = narrowedSkips(skip, only);
   if (only && main.ran === 0 && skips.length === 0) {
-    const part = token ? ` or is a page-structure rule (${pageStructureRules.join(", ")}) that a scan of a part never runs` : "";
+    const part = scope ? ` or is a page-structure rule (${pageStructureRules.join(", ")}) that a scan of a part never runs` : "";
     throw new Error(`This scan runs no rule: only [${only.join(", ")}] is left out by its skips${part}.`);
   }
   if (only) noteUnjudged(page, main.incomplete);
-  return [...main.violations, ...(await narrowedPass(page, token, skips, only !== undefined))];
+  return [...main.violations, ...(await narrowedPass(page, scope, skips, only !== undefined))];
 }
 
-async function analyze(page: Page, scope: Locator | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<AxeRuleResult[]> {
-  if (!scope) return runRules(page, null, skip, only);
-  const token = `scan-${String(Date.now())}-${String(Math.random()).slice(2, 8)}`;
-  await scope.evaluateAll((elements, value) => { for (const element of elements) element.setAttribute("data-a11y-scan", value); }, token);
-  try {
-    return await runRules(page, token, skip, only);
-  } finally {
-    await scope.evaluateAll((elements) => { for (const element of elements) element.removeAttribute("data-a11y-scan"); }).catch(() => undefined);
-  }
+/**
+ * What the page says about one element it was asked to name: its selectors,
+ * or why it cannot be named.
+ */
+type NamedElement = { readonly path: string[] } | { readonly problem: string };
+
+/**
+ * Names every element a locator matches with a selector, without changing
+ * the page. A scan that marked the elements instead (an attribute) would
+ * change them before React has taken over a server-rendered page, and React
+ * would log a hydration mismatch for the attribute the server did not send.
+ * Each selector is a child-position path from the top of the element's tree
+ * (`*:nth-child(1):not(* *) > *:nth-child(2)`), checked in the page to match that
+ * element and no other. An element in a shadow root is named by the path to
+ * its host, then the path inside.
+ */
+async function selectorsFor(scope: Locator): Promise<ScanSelector[]> {
+  const named = await scope.evaluateAll((elements): NamedElement[] => {
+    const pathInTree = (element: Element): string => {
+      const segments: string[] = [];
+      let node: Element | null = element;
+      while (node) {
+        const siblings = node.parentNode?.children;
+        const position = siblings ? Array.prototype.indexOf.call(siblings, node) + 1 : 1;
+        // The top of a tree has no element above it; `:not(* *)` keeps its segment from matching deeper down.
+        const top = node.parentElement ? "" : ":not(* *)";
+        segments.unshift(`*:nth-child(${String(position)})${top}`);
+        node = node.parentElement;
+      }
+      return segments.join(" > ");
+    };
+    const nameElement = (element: Element): NamedElement => {
+      if (window.top !== window) return { problem: "it is inside a frame, which a scan of this page cannot reach" };
+      const path: string[] = [];
+      let current: Element = element;
+      for (;;) {
+        const root = current.getRootNode();
+        if (!(root instanceof Document) && !(root instanceof ShadowRoot)) return { problem: "it is not in a document" };
+        const selector = pathInTree(current);
+        const matches = root.querySelectorAll(selector);
+        if (matches.length !== 1 || matches[0] !== current) return { problem: `the selector ${selector} does not match it alone` };
+        path.unshift(selector);
+        if (!(root instanceof ShadowRoot)) return { path };
+        current = root.host;
+      }
+    };
+    return elements.map(nameElement);
+  });
+  return named.map((entry) => {
+    if ("problem" in entry) throw new Error(`Cannot scan ${scope.toString()}: ${entry.problem}.`);
+    const [first, second, ...rest] = entry.path;
+    return first !== undefined && second !== undefined ? { fromShadowDom: [first, second, ...rest] } : (first ?? "");
+  });
+}
+
+async function analyze(page: Page, target: Locator | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<AxeRuleResult[]> {
+  if (!target) return runRules(page, null, skip, only);
+  const selectors = await selectorsFor(target);
+  if (selectors.length === 0) throw new Error(`Cannot scan ${target.toString()}: it matches no element.`);
+  return runRules(page, selectors, skip, only);
 }
 
 /**
