@@ -44,7 +44,7 @@ export const MARKDOWN_MEDIA_GUIDE = [
   "   Example: ![Product walkthrough](/api/files/<file id>#video&width=80 \"Two minutes\")",
   "For video, audio, and PDFs, the text in the brackets is the name people see.",
   `Saving the artifact attaches your finished uploads that it names. You do not need files_attach. A document shows at most ${String(fileLimits.maxInlineFilesPerArtifact)} files in its text; files attached with files_attach are counted apart, at most ${String(fileLimits.maxFilesPerArtifact)}. Readers can open a file only when they can read the artifact version that shows it.`,
-  "To change an embedded file, upload the new one and point the block at its id; History keeps the old one. files_replace is for plain attachments: files attached with files_attach, or added on a Files artifact's page.",
+  "To change an embedded file, upload the new one and point the block at its id; History keeps the old one. files_replace is for plain attachments: files attached with files_attach, or added by a person on the artifact's page (Attach file, a file dropped on the page, or the Files section of a Files artifact, an interface, or a canvas).",
   "Use the relative path /api/files/<file id>, not a full URL. Images from other sites never load: they show as their alt text.",
   "Keep the image alone on its line. An image inside a sentence shows inline, and the editor keeps that paragraph as written.",
 ].join("\n");

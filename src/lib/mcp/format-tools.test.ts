@@ -61,6 +61,14 @@ describe("formatGuide on how many files a document shows", () => {
   });
 });
 
+describe("formatGuide on which files files_replace changes", () => {
+  it("should name every way a plain attachment gets onto an artifact, not only a Files artifact's page", () => {
+    const guide = formatGuide("markdown");
+    expect(guide).toContain("files_replace is for plain attachments: files attached with files_attach, or added by a person on the artifact's page (Attach file, a file dropped on the page, or the Files section");
+    expect(guide).not.toContain("added on a Files artifact's page");
+  });
+});
+
 describe("formatGuide for canvas", () => {
   it("should include the canvas rules and a valid example when the kind is canvas", () => {
     const guide = formatGuide("canvas");
