@@ -1085,7 +1085,13 @@ approved version never load a file that version does not show
 attached (`artifact_file.attached_by_content`, set in the save's own
 statement by `writeAndAttach`), follows these rules: hidden from readers of a version
 that does not show it, not counted toward the file limit while only older
-versions name it, and deleted once none does (`icon-cleanup.ts`). Files
+versions name it, and deleted once none does (`icon-cleanup.ts`). Content
+media has its own limit: an artifact shows at most 100 files in its content
+(`fileLimits.maxInlineFilesPerArtifact`), counted apart from its 20 plain
+attachments (`maxFilesPerArtifact`) and from page files. Both numbers are
+read from `src/lib/files/config.ts` through `src/lib/files/limit-rules.ts`
+(`hasRoom`, `fullMessage`) by the server check (`attach.ts`), the editor's
+words, and the docs; never write either number anywhere else. Files
 attached any other way (`files_attach`, a Files artifact's section, the
 Files panel documents had before, and all files from before the column) are
 plain attachments that pruning never removes, even after content links
@@ -1126,17 +1132,56 @@ files. A file goes into its text, as a block, where it was put.
   still uploading is not in the saved content yet, so both sides ask
   `showsMedia` before they call the page empty. A page of another format
   (a table, code) gets a dropped file attached, as before
-  (`use-blank-uploads.ts`); the web makes a Files artifact only from a page
-  switched to Files.
+  (`use-blank-uploads.ts`). The web never makes a Files artifact (decided
+  by the owner on 17 Nov 2026): the Format dialog does not offer Files
+  (`offeredFormats` in `format-choice-rules.ts`) unless the artifact is one
+  already. Agents still make them with `files_create_artifact`, and an
+  existing one keeps its Files section.
+- **No file of a drop is left out.** Every dropped, pasted, or picked file
+  gets its own block at once, in order, however many there are
+  (`insertFiles` in `media-input.ts`); never cap a drop. Uploads run three
+  at a time (`maxUploadsAtOnce`, the queue in `media-uploads.ts`), so a
+  large drop stays under the limit on unfinished uploads
+  (`fileLimits.maxPendingPerUser`). A file that cannot be added (too
+  large, a type that is not supported, empty, or one more than the
+  document shows) keeps its block with the reason and Remove, and never
+  uploads (`insertProblems`, `queueUpload` with a refusal); it has no Try
+  again, since sending it again cannot work.
+- **The source takes files too.** With View source open on a Markdown
+  artifact, a dropped or pasted file uploads through the same queue and
+  its line of Markdown is typed into the field as a paragraph of its own
+  (`useSourceFileDrop` in `src/components/editor/source-file-drop.tsx`,
+  rules in `source-media-rules.ts`): at the line under the pointer for a
+  drop on the field, at the cursor otherwise. It is typed in with
+  `execCommand("insertText")`, the one way a script's edit joins the
+  field's Undo history, so Undo removes the line. Progress and refusals
+  show under the field, by file name.
 - **Files that are attached and shown nowhere stay reachable.**
   `looseFiles` (`src/lib/files/loose-rules.ts`) lists the plain attachments
   the content does not link and that are no icon or cover; the page shows
   them under the body as "Attached files" (`AttachedFiles` with `quiet`),
-  with Open, Replace, Remove, and in a document "Add to document", which
-  puts a block that points at the file at the end of the text
-  (`askDocument`): the file is linked, never copied, and stays a plain
-  attachment. The list has no upload box and is drawn only while it lists a
-  file. Never migrate such files into anyone's content. A Files artifact,
+  with Open, Replace, Remove, and in a document "Add to document" on each
+  row and "Add all to document" beside the heading, which put blocks that
+  point at the files into the text (`askDocument` with `attached`): at the
+  cursor once the editor has had the focus, at the end otherwise, in one
+  undo step. The file is linked, never copied, and stays a plain
+  attachment. Rows are not dragged into the text (left out on purpose).
+  The list has no upload box and is drawn only while it has something to
+  show. Never migrate such files into anyone's content.
+- **Every other format with a quiet list attaches files beside its
+  content** (`attachesBeside` in `loose-rules.ts`: code, text, JSON, CSV,
+  SVG, a diagram, a web page). It has "Attach file" in the More menu (the
+  /app toolbar and the artifact page's header) and beside the "Attached
+  files" heading, and takes a file dropped anywhere on its page
+  (`useAttachBeside`, `usePageFileDrop`). All three ask the one mounted
+  list through a DOM event keyed by the artifact's id
+  (`src/components/files/attach-bridge.ts`), and the list uploads and
+  attaches through `attachFiles`, so approval and versions are as for any
+  attach. A file that is refused says why in its own row, never in a
+  toast. The artifact page mounts the list for editors only
+  (`PageAttachedFiles`). For a web page the file is a plain attachment:
+  page files keep their own path (`pagePath`) and are not added here. A
+  document has none of this: its files go into its text. A Files artifact,
   an interface, and a canvas keep the Files section with its upload box
   (`filesPanel`): a Files artifact's files are its content, and an Image or
   File element names a file by the id copied from its row.
@@ -1148,6 +1193,10 @@ files. A file goes into its text, as a block, where it was put.
 - A drag that started in the document (a block moved by its grip, a
   picture dragged by itself, which browsers also offer as a file) is the
   editor's own move, never a file drop (`view.dragging` in `takesDrag`).
+- `e2e/document-files-many.spec.ts` drops 30 and 101 files, refused
+  files, files on the source, and "Add all to document";
+  `e2e/attach-file.spec.ts` covers "Attach file" and the page drop in the
+  workspace and on the artifact page fixture (`/dev/editor?kind=json`).
 - `e2e/document-files.spec.ts` drops, pastes, and picks files on
   `/dev/workspace` and on the page fixture (`/dev/editor?kind=markdown`),
   where uploads stay in the tab (`fixture-media.ts`), and reads where each
