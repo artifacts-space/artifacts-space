@@ -1,11 +1,14 @@
 "use client";
 
-import { IconAlertTriangle, IconArrowsHorizontal, IconCheck, IconCode, IconDots, IconHistory, IconLoader2, IconRefresh } from "@tabler/icons-react";
+import { IconAlertTriangle, IconArrowsHorizontal, IconCheck, IconCode, IconDots, IconHistory, IconLink, IconLoader2, IconRefresh } from "@tabler/icons-react";
+import { toast } from "sonner";
 
+import { COPY_LINK_LABEL } from "@/components/copy-button";
 import { HarnessMenu } from "@/components/harness/harness-menu";
 import type { HarnessControl } from "@/components/harness/use-artifact-harness";
 import { VersionHistory } from "@/components/history/version-history";
 import { Button } from "@/components/ui/button";
+import { useCopyToClipboard } from "@/components/use-copy-to-clipboard";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -108,7 +111,18 @@ function HarnessItem({ control }: { control: HarnessControl | null | undefined }
   return control ? <HarnessMenu control={control} /> : null;
 }
 
-/** The page header's "⋯": why a change is not saved (and Try again after a failed save), Full width (not for a CSV), History, View source, and Made with. Disabled until the editor is ready. */
+/**
+ * "Copy link": the page's own address, without its query and fragment. On
+ * the artifact page that is /artifact/<id>, the link every reader and
+ * every agent's tool opens.
+ */
+function CopyLinkItem() {
+  const { copy } = useCopyToClipboard();
+  const copyLink = () => { void copy(`${window.location.origin}${window.location.pathname}`).then((done) => { if (done) toast.success("Copied the link."); }); };
+  return <DropdownMenuItem onClick={copyLink} className="py-2"><IconLink /> {COPY_LINK_LABEL}</DropdownMenuItem>;
+}
+
+/** The page header's "⋯": why a change is not saved (and Try again after a failed save), Copy link, Full width (not for a CSV), History, View source, and Made with. Disabled until the editor is ready. */
 function MoreMenu({ chrome, onHistory, theme, widthSetting, csvDownload }: MoreMenuProps) {
   // Menus open in a layer above the page, so the popup takes the artifact theme's colors itself, like the header around its button.
   const popup = themeChromeProps(theme ?? siteDefaultTheme());
@@ -120,6 +134,7 @@ function MoreMenu({ chrome, onHistory, theme, widthSetting, csvDownload }: MoreM
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className={cn("w-60", popup.modeClass)} style={popup.style}>
         <SaveProblemItems save={chrome?.save} />
+        <CopyLinkItem />
         <FullWidthItem control={chrome?.fullWidth} shown={widthSetting} />
         <CsvDownloadItem setting={csvDownload} />
         <DropdownMenuItem onClick={onHistory} className="py-2"><IconHistory /> History</DropdownMenuItem>

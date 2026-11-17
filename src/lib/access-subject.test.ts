@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { fakeDatabaseUrl } from "@/test/fake-database-url";
 
-import { subjectQuery } from "./access";
+import { subjectQuery, subjectQueryByOlderKey } from "./access";
 
 /*
  * The access decision once matched every signed-in user to every team:
@@ -51,5 +51,38 @@ describe("subjectQuery", () => {
   it("should never compare an agent or owner column with itself when it builds the owner joins", () => {
     const { sql } = subjectQuery(db, "4fXkP9qR2sT7vW1yZ3aB5c", "viewer-1").toSQL();
     expect(sql).not.toMatch(/"user_id" = "user_id"|"owner_id" = "owner_id"|"team_id" = "team_id"/);
+  });
+});
+
+describe("subjectQueryByOlderKey", () => {
+  const uuid = "c4537d4c-1a2b-4c3d-8e9f-0123456789ab";
+
+  it("should name the row by the artifact's own id, and by nothing else, when it resolves an internal id", () => {
+    const { sql, params } = subjectQueryByOlderKey(db, { kind: "internalId", id: uuid }, "viewer-1").toSQL();
+    expect(sql).toMatch(/where "artifact"\."id" = \$\d+ limit/);
+    expect(sql).not.toContain('"artifact"."public_id" =');
+    expect(params).toContain(uuid);
+  });
+
+  it("should name the row by its share id, qualified, when it resolves a legacy share link", () => {
+    const shareId = "0123456789abcdef0123456789abcdef";
+    const { sql, params } = subjectQueryByOlderKey(db, { kind: "shareId", shareId }, "viewer-1").toSQL();
+    expect(sql).toMatch(/where "artifact"\."share_id" = \$\d+ limit/);
+    expect(params).toContain(shareId);
+  });
+
+  it("should make the same joins as the query by public id, so the read decision is the same one", () => {
+    const joins = (sql: string) => sql.slice(sql.indexOf(" from "), sql.indexOf(" where "));
+    const byId = subjectQueryByOlderKey(db, { kind: "internalId", id: uuid }, "viewer-1").toSQL();
+    const byPublicId = subjectQuery(db, "4fXkP9qR2sT7vW1yZ3aB5c", "viewer-1").toSQL();
+    expect(joins(byId.sql)).toBe(joins(byPublicId.sql));
+    expect(byId.sql.slice(0, byId.sql.indexOf(" from "))).toBe(byPublicId.sql.slice(0, byPublicId.sql.indexOf(" from ")));
+    expect(byId.params.filter((value) => value === "viewer-1")).toHaveLength(3);
+  });
+
+  it("should match no membership and no agent ownership when the viewer is anonymous", () => {
+    const { sql } = subjectQueryByOlderKey(db, { kind: "internalId", id: uuid }, null).toSQL();
+    expect(sql).toMatch(/left join "team_member" on false/);
+    expect(sql).toMatch(/left join "agent" on false/);
   });
 });

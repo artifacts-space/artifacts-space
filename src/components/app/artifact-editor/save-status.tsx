@@ -2,6 +2,7 @@
 
 import { IconAlertTriangle, IconCheck, IconCopy, IconInfoCircle } from "@tabler/icons-react";
 
+import { COPY_LINK_LABEL } from "@/components/copy-button";
 import { HarnessByline } from "@/components/harness/harness-byline";
 import { editorName, LastEdited } from "@/components/history/last-edited";
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,8 @@ interface SaveStatusBarProps {
   harness?: ArtifactHarnessDto | null | undefined;
   /** False for a new artifact that is not stored yet: nobody has edited it. */
   stored?: boolean;
-  /** The artifact's id: its first 8 characters show, with a button that copies all of it. Left out for a new artifact. */
-  id?: string | undefined;
+  /** The artifact's link: the first characters of its id show, with a button that copies the link. Left out for a new artifact. */
+  link?: ArtifactLink | undefined;
   onRetry: () => void;
   /** The content's column (previewColumnClass), so the line sits under the title. */
   column?: string;
@@ -50,17 +51,33 @@ function Dot() {
   return <span aria-hidden>·</span>;
 }
 
-/** The short id and a button that copies the whole id, for an agent or a support request. */
-function ShortId({ id }: { id: string }) {
+/** What the meta line's copy button gives out: the artifact's id as its link carries it, and the link. */
+export interface ArtifactLink {
+  /** The 22-character id, the last part of the link. Never the internal id. */
+  publicId: string;
+  /** The artifact's own address on this site: /artifact/<publicId>. */
+  url: string;
+}
+
+/** How many characters of the id the meta line shows. */
+const SHORT_ID_CHARS = 8;
+
+/**
+ * The start of the artifact's id and a button that copies its link, for an
+ * agent or a support request. The link is what opens the artifact: every
+ * MCP tool reads it, and so does a browser. It never shows or copies the
+ * internal id, which opens nothing.
+ */
+function ShortLink({ link }: { link: ArtifactLink }) {
   const { copied, copy } = useCopyToClipboard();
   return (
-    <span className="inline-flex items-center gap-0.5">
-      <span className="font-mono">{id.slice(0, 8)}</span>
+    <span data-slot="artifact-link" className="inline-flex items-center gap-0.5">
+      <span className="font-mono">{link.publicId.slice(0, SHORT_ID_CHARS)}</span>
       <button
         type="button"
-        onClick={() => void copy(id)}
-        aria-label={copied ? "Copied the id" : "Copy the artifact id"}
-        title="Copy the artifact id"
+        onClick={() => void copy(link.url)}
+        aria-label={copied ? "Copied the link" : COPY_LINK_LABEL}
+        title={COPY_LINK_LABEL}
         // 44px to tap on touch screens; the negative margin keeps the meta line's height.
         className="inline-flex size-6 items-center justify-center rounded-md hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none pointer-coarse:-m-2.5 pointer-coarse:size-11"
       >
@@ -83,9 +100,10 @@ function EditedBy({ stored, updatedAt, updatedBy, harness }: Pick<SaveStatusBarP
 
 /**
  * The meta line under the title: who saved it last and through which agent,
- * how long it is, the save status, and the short id with a copy button.
+ * how long it is, the save status, and the start of the id with a button
+ * that copies the artifact's link.
  */
-export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, harness, stored = true, id, onRetry, column, className }: SaveStatusBarProps) {
+export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, harness, stored = true, link, onRetry, column, className }: SaveStatusBarProps) {
   const label = saveStatusLabel(status, dirty);
   const problem = isSaveProblem(status);
   return (
@@ -100,7 +118,7 @@ export function SaveStatusBar({ status, dirty, length, updatedAt, updatedBy, har
           {label}
         </span>
         {status.kind === "failed" ? <Button variant="ghost" size="xs" onClick={onRetry}>Try again</Button> : null}
-        {id ? <><Dot /><ShortId id={id} /></> : null}
+        {link ? <><Dot /><ShortLink link={link} /></> : null}
       </div>
     </div>
   );

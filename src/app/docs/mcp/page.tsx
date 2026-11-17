@@ -159,6 +159,7 @@ export default function McpReferencePage() {
       <DocsH page={page} id="tools" />
       <Prose>
         <p>{tools.length} tools: {readCount} read and {writeCount} write. Arguments marked <em>required</em> must be sent; everything else is optional.</p>
+        <p>Every tool that takes an artifact takes its 22-character id or its link, so an agent opens an artifact someone pasted in one call: the page (<code>/artifact/&lt;id&gt;</code>), the workspace link (<code>/app?artifact=&lt;id&gt;</code>), a link to one block or comment, or the Markdown address. Results always carry the 22-character <code>id</code> and the <code>url</code>. A link to another site is refused and never fetched, and a refusal says what the value looked like and what to do next. <code>artifacts_list</code> returns the artifact first when its <code>query</code> is an id or a link.</p>
         <p>Each tool carries MCP annotations, so clients such as ChatGPT can run reads without asking and ask you before a write. Read tools are marked <code>readOnlyHint</code>. Write tools say whether they delete or replace something (<code>destructiveHint</code>) and whether a repeat changes nothing more (<code>idempotentHint</code>). <code>openWorldHint</code> is true only on <code>artifacts_create</code> and <code>artifacts_update</code>, because they can share an artifact by link or publicly, or open its comments to anyone signed in. Every other tool acts only on your artifacts, comments, and files, inside the audience they already have, so it is false.</p>
       </Prose>
       <ToolIndex />

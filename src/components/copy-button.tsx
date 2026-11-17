@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 
 import { useCopyToClipboard } from "./use-copy-to-clipboard";
 
+/** The one name for a control that copies an artifact's link: the Share banner and dialog, the meta line, and both More menus. */
+export const COPY_LINK_LABEL = "Copy link";
+
 /** A button that copies `value`, with an optional text label that turns into "Copied". */
 export function CopyButton({
   value,

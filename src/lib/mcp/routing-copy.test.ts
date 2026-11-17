@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { artifactToolCopy, SERVER_INSTRUCTIONS } from "./routing-copy";
+import { artifactLinkNote, artifactToolCopy, SERVER_INSTRUCTIONS } from "./routing-copy";
 import { READ_ONLY_INSTRUCTIONS } from "./tool-access";
 
 /*
@@ -24,6 +24,20 @@ describe("SERVER_INSTRUCTIONS", () => {
   it("should still fit when a read-only connection gets the read-only note after it", () => {
     // src/app/api/mcp/route.ts sends exactly this string to read-only connections.
     expect(`${SERVER_INSTRUCTIONS} ${READ_ONLY_INSTRUCTIONS}`.length).toBeLessThan(CLAUDE_CODE_INSTRUCTIONS_LIMIT);
+  });
+
+  it("should still fit with the link note and the read-only note, as the server sends them, for a long origin", () => {
+    // src/app/api/mcp/route.ts sends the instructions, then the link note with the site's origin, then the read-only note.
+    const note = artifactLinkNote(`https://${"a".repeat(63)}.${"b".repeat(63)}.example`);
+    expect(`${SERVER_INSTRUCTIONS} ${note} ${READ_ONLY_INSTRUCTIONS}`.length).toBeLessThan(CLAUDE_CODE_INSTRUCTIONS_LIMIT);
+  });
+
+  it("should say what an artifact's link looks like on this deployment, and which tool reads one, when someone hands an agent a link", () => {
+    const note = artifactLinkNote("https://artifacts.example");
+    expect(note).toContain("https://artifacts.example/artifact/<22 characters>");
+    expect(note).toContain("artifacts_get");
+    expect(note).toMatch(/takes its link as well as its id/);
+    expect(note).not.toMatch(authorityClaims);
   });
 
   it("should name the everyday words for artifacts in its first 600 characters when an agent decides what to search for", () => {
@@ -91,5 +105,10 @@ describe("artifactToolCopy", () => {
 
   it("should not claim authority in any description when tools are listed", () => {
     for (const [name, copy] of Object.entries(artifactToolCopy)) expect(copy.description, name).not.toMatch(authorityClaims);
+  });
+
+  it("should say artifacts_get reads a link as well as an id, and that a search takes one, when an agent holds an artifact's link", () => {
+    expect(artifactToolCopy.artifacts_get.description).toMatch(/by its id or its link\. The link ends in \/artifact\/ and the 22-character id/);
+    expect(artifactToolCopy.artifacts_list.description).toMatch(/A `query` that is an artifact's id or link returns that artifact first/);
   });
 });

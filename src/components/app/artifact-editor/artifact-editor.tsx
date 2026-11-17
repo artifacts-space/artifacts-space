@@ -111,6 +111,7 @@ function ArtifactToolbar({ artifact, kind, title, shareUrl, shared, access, dirt
   return (
     <EditorToolbar
       publicId={artifact.publicId}
+      link={shareUrl}
       project={artifact.project}
       title={title}
       kind={kind}
@@ -217,7 +218,7 @@ export function ArtifactEditor({ artifact, origin, canShare, canDelete, team, se
               updatedBy={artifact.updatedBy}
               harness={artifact.harness}
               stored={!page.blank}
-              id={page.blank ? undefined : artifact.id}
+              link={page.blank ? undefined : { publicId: artifact.publicId, url: shareUrl }}
               onRetry={autosave.retryNow}
               column={column}
               className={cn(gutterRoom, surface)}
