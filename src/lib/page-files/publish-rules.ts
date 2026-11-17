@@ -65,7 +65,8 @@ export interface PageFileFault {
   problem: string;
 }
 
-function sizeProblem(size: number): string | null {
+/** Why a file of this size cannot be a page file (empty, or over the limit for one file), or null when it can. */
+export function pageFileSizeProblem(size: number): string | null {
   if (!Number.isInteger(size) || size <= 0) return "The file is empty. Give its exact size in bytes.";
   if (size > fileLimits.maxBytes) return `The file is ${formatBytes(size)}. The limit is ${formatBytes(fileLimits.maxBytes)}.`;
   return null;
@@ -87,7 +88,7 @@ export function repeatedPaths(paths: readonly string[]): string[] {
  * The file the page holds at this path, or at one that differs from it only
  * by letter case, and whether the path is the same letter for letter.
  */
-function heldAt(held: readonly HeldPageFile[], path: string): { file: HeldPageFile; exact: boolean } | null {
+export function heldAt(held: readonly HeldPageFile[], path: string): { file: HeldPageFile; exact: boolean } | null {
   const exact = held.find((file) => file.pagePath === path);
   if (exact) return { file: exact, exact: true };
   const twin = held.find((file) => file.pagePath.toLowerCase() === path.toLowerCase());
@@ -98,7 +99,7 @@ function heldAt(held: readonly HeldPageFile[], path: string): { file: HeldPageFi
 function fileFaults(files: readonly RequestedPageFile[], held: readonly HeldPageFile[], removing: ReadonlySet<string>): PageFileFault[] {
   const faults: PageFileFault[] = [];
   for (const file of files) {
-    const problem = pagePathProblem(file.path) ?? sizeProblem(file.size);
+    const problem = pagePathProblem(file.path) ?? pageFileSizeProblem(file.size);
     if (problem) faults.push({ path: file.path, problem });
   }
   for (const path of repeatedPaths(files.map((file) => file.path))) {
@@ -120,6 +121,9 @@ function removalFaults(remove: readonly string[], held: readonly HeldPageFile[])
   const faults = remove.filter((path) => !paths.has(path)).map((path) => ({ path, problem: "The page has no file at this path, so there is nothing to remove. Paths match letter for letter." }));
   return [...faults, ...repeatedPaths(remove).map((path) => ({ path, problem: "This path is named more than once among the removals." }))];
 }
+
+/** The path a fault names when it is about the whole set (the page's limits), not one file. */
+export const wholeSetFault = "(all files)";
 
 /** What a set does to a page's files. */
 export interface PagePublishPlan {
@@ -158,7 +162,7 @@ export function planPagePublish(files: readonly RequestedPageFile[], remove: rea
   const kept = held.filter((file) => !gone.has(file.id));
   const totals = { count: kept.length + files.length, bytes: [...kept, ...files].reduce((sum, file) => sum + file.size, 0) };
   const problem = pageFileTotalsProblem(totals);
-  if (problem) return { ok: false, faults: [{ path: "(all files)", problem }] };
+  if (problem) return { ok: false, faults: [{ path: wholeSetFault, problem }] };
   return { ok: true, plan: { adds, replaces, removes, totals } };
 }
 

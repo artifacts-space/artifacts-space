@@ -3,17 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { actionErrorMessage } from "@/lib/action-errors";
 import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
 import { getEditableArtifact } from "@/lib/access";
-import { toArtifactDtos } from "@/lib/artifacts";
 import { createArtifactOnce } from "@/lib/create/create-once";
 import { attachFiles, deleteOwnFile, discardUnattachedUpload } from "@/lib/files/attach";
 import { replaceFile } from "@/lib/files/replace";
 import type { FileDto } from "@/lib/files/types";
 import { finalizeUpload, requestUpload, type UploadRequest } from "@/lib/files/uploads";
-import { getSession } from "@/lib/session";
 import { UserFacingError } from "@/lib/user-facing-error";
+
+import { editableArtifactDto, runFileAction as run } from "./file-action-run";
 
 /** What the browser needs to PUT one file to R2. */
 export interface UploadTicket {
@@ -24,27 +23,6 @@ export interface UploadTicket {
 
 const fileIdsSchema = z.array(z.uuid()).max(20);
 const createRequestIdSchema = z.uuid().nullable();
-
-async function run<T>(fallback: string, action: (userId: string) => Promise<T>): Promise<ActionResult<T>> {
-  try {
-    const session = await getSession();
-    if (!session) return { success: false, error: "Your session ended. Sign in again." };
-    return { success: true, data: await action(session.user.id) };
-  } catch (error) {
-    if (!(error instanceof UserFacingError) && !(error instanceof z.ZodError)) {
-      console.error("[files] Action failed", error instanceof Error ? error.name : "unknown error");
-    }
-    return { success: false, error: actionErrorMessage(error, fallback) };
-  }
-}
-
-async function editableArtifactDto(userId: string, artifactId: string): Promise<ArtifactDto> {
-  const record = await getEditableArtifact(userId, { id: artifactId });
-  if (!record) throw new UserFacingError("Artifact not found.");
-  const [dto] = await toArtifactDtos([record], userId);
-  if (!dto) throw new UserFacingError("Artifact not found.");
-  return dto;
-}
 
 /** Starts an upload: checks size and type, and returns a presigned PUT. */
 export async function requestUploadAction(input: UploadRequest): Promise<ActionResult<UploadTicket>> {

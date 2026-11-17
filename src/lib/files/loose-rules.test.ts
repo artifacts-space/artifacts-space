@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addsToDocument, attachesBeside, filesPanel, looseFiles, looseFilesWords } from "./loose-rules";
+import { addsToDocument, attachesBeside, attachLabel, dropHint, filesPanel, looseFiles, looseFilesWords } from "./loose-rules";
 
 const plain = { id: "11111111-1111-4111-8111-111111111111" };
 const embedded = { id: "22222222-2222-4222-8222-222222222222", embedded: true };
@@ -96,5 +96,17 @@ describe("looseFilesWords", () => {
 
   it("should count each kind apart when the list holds both", () => {
     expect(looseFilesWords([{ pagePath: "app.js" }, {}, {}])).toBe("1 page file and 2 files not shown on the page");
+  });
+});
+
+describe("attachLabel and dropHint", () => {
+  it("should say Add files for a web page, where files go to the page by their type", () => {
+    expect(attachLabel("html")).toBe("Add files");
+    expect(dropHint("html")).toBe("Drop to add them to this page");
+  });
+
+  it.each(["code", "text", "json", "csv", "svg", "mermaid"])("should keep Attach file for %s", (kind) => {
+    expect(attachLabel(kind)).toBe("Attach file");
+    expect(dropHint(kind)).toBe("Drop to attach it to this artifact");
   });
 });
