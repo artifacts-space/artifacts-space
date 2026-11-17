@@ -16,8 +16,14 @@ export interface PageErrorAllowance {
   reason: string;
 }
 
-/** Longest error text quoted in a failure; a hydration diff can run to pages. */
-const quotedTextLimit = 1_000;
+/**
+ * Longest error text quoted whole in a failure; a hydration diff can run to
+ * pages. A longer text keeps its start and its end: a hydration error names
+ * the element and the attribute that differed last, after the tree above it.
+ */
+const quotedTextLimit = 6_000;
+const quotedHead = 1_500;
+const quotedTail = 3_000;
 
 const hydrationWords = /hydrat/i;
 
@@ -54,7 +60,8 @@ export function unexpectedPageErrors(errors: readonly PageError[], allowances: r
 
 function quoted(text: string): string {
   if (text.length <= quotedTextLimit) return text;
-  return `${text.slice(0, quotedTextLimit)}… (${String(text.length - quotedTextLimit)} more characters)`;
+  const leftOut = text.length - quotedHead - quotedTail;
+  return `${text.slice(0, quotedHead)}\n… (${String(leftOut)} characters left out) …\n${text.slice(-quotedTail)}`;
 }
 
 /** How many errors a failure lists before it says how many more there were. */

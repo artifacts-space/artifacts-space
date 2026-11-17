@@ -62,10 +62,20 @@ describe("pageErrorReport", () => {
     expect(report).toContain("allowPageError");
   });
 
-  it("should shorten a very long error text", () => {
-    const report = pageErrorReport([{ kind: "console.error", text: "a".repeat(5_000), url: "" }]);
-    expect(report).toContain("(4000 more characters)");
-    expect(report.length).toBeLessThan(1_400);
+  it("should quote a hydration error whole when it is a few thousand characters", () => {
+    const text = `A tree hydrated but some attributes did not match.\n${"  <Boundary>\n".repeat(150)}+ aria-current="page"\n- aria-current={undefined}`;
+    const report = pageErrorReport([{ kind: "console.error", text, url: "" }]);
+    expect(report).toContain('+ aria-current="page"');
+    expect(report).not.toContain("left out");
+  });
+
+  it("should keep the start and the end of a very long error text, where a hydration error names what differed", () => {
+    const text = `START${"a".repeat(20_000)}+ data-state="open"`;
+    const report = pageErrorReport([{ kind: "console.error", text, url: "" }]);
+    expect(report).toContain("START");
+    expect(report).toContain('+ data-state="open"');
+    expect(report).toContain("(15524 characters left out)");
+    expect(report.length).toBeLessThan(5_200);
   });
 
   it("should list only the first errors and count the rest when a test logs hundreds", () => {
