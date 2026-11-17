@@ -39,22 +39,32 @@ export function restsInSource(anchor: number, head: number, pos: number, size: n
   return within(anchor) || within(head);
 }
 
+/** Where a selection is, as a block sees it: resting in its source, covering the whole block from outside, or neither. */
+export type SelectionPlace = "in" | "over" | "away";
+
+/** Where a selection from `anchor` to `head` is for the block that starts at `pos` and is `size` long. */
+export function selectionPlace(anchor: number, head: number, pos: number, size: number): SelectionPlace {
+  if (restsInSource(anchor, head, pos, size)) return "in";
+  return Math.min(anchor, head) <= pos && Math.max(anchor, head) >= pos + size ? "over" : "away";
+}
+
 /**
- * True while the cursor, or one end of a text selection, rests in the source
- * of the block at `getPos()`, so text being typed or selected there is never
- * hidden. Selecting the block itself, or covering it from outside, does not
- * count.
+ * Where the selection is for the block at `getPos()`. "in" while the cursor,
+ * or one end of a text selection, rests in its source, so text being typed
+ * or selected there is never hidden. "over" while a selection covers the
+ * block from outside (Select all), which opens nothing. Selecting the block
+ * itself is "away": the editor marks that itself.
  */
-function useCursorInside(editor: Editor, getPos: () => number | undefined): boolean {
+function useSelectionPlace(editor: Editor, getPos: () => number | undefined): SelectionPlace {
   return useEditorState({
     editor,
     selector: ({ editor: current }) => {
       const pos = getPos();
       const { selection, doc } = current.state;
-      if (typeof pos !== "number" || selection instanceof NodeSelection) return false;
+      if (typeof pos !== "number" || selection instanceof NodeSelection) return "away";
       const node = doc.nodeAt(pos);
-      if (!node) return false;
-      return restsInSource(selection.anchor, selection.head, pos, node.nodeSize);
+      if (!node) return "away";
+      return selectionPlace(selection.anchor, selection.head, pos, node.nodeSize);
     },
   });
 }
@@ -120,14 +130,17 @@ function DiagramPane({ code, state, editable, sourceShown }: { code: string; sta
  * over it. It is in the source in Preview only where the source was already
  * showing: a new or broken diagram someone is typing, or an undo that puts
  * the cursor back. The source then stays until the cursor leaves, so typed
- * text is never hidden.
+ * text is never hidden. A selection that covers the block (Select all)
+ * opens nothing; the block is outlined, as a selected block is, because the
+ * next key would replace it.
  */
 export function MermaidBlockView({ node, updateAttributes, editor, getPos }: ReactNodeViewProps) {
   const attrs = useCodeBlockAttrs(node.attrs.language, updateAttributes);
   const view = attrs.fence.view ?? defaultDiagramView;
   const code = node.textContent;
   const preview = useSettledValue(code, previewDelayMs);
-  const inside = useCursorInside(editor, getPos);
+  const place = useSelectionPlace(editor, getPos);
+  const inside = place === "in";
   const { scopeRef, state } = useMermaidDiagram(preview, { keepPrevious: true, deferUntilNear: true, skip: view === "code" });
   const editable = editor.isEditable;
   const unfinished = code.trim() === "" || state.status === "failed";
@@ -147,6 +160,8 @@ export function MermaidBlockView({ node, updateAttributes, editor, getPos }: Rea
       data-diagram-view={view}
       data-diagram-state={state.status}
       data-source-open={layout === "diagram" ? undefined : ""}
+      // The diagram cannot show a text selection, so a selection that covers it is drawn as the block's outline: typing would replace it.
+      data-selection-over={layout === "diagram" && place === "over" ? "" : undefined}
     >
       <div className="rich-code-frame">
         <CodeBlockToolbar
