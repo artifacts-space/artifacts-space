@@ -1064,6 +1064,7 @@
     background: var(--muted);
   }
   .rich-editor-content .rich-raw-block[data-selected],
+  .rich-editor-content [data-mermaid-block][data-selection-over],
   .rich-editor-content .ProseMirror-selectednode {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
