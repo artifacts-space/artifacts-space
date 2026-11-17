@@ -44,6 +44,8 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   teamIconByUser: { per: "user", where: "/api/teams/<id>/icon team icon views (browsers keep each icon for a day)", refusal: "http-429", group: "Files and pages" },
   teamIconByNetwork: { per: "network", where: "/api/teams/<id>/icon team icon views", refusal: "http-429", group: "Files and pages" },
   artifactPageByNetwork: { per: "network", where: "/artifact/<id> pages", refusal: "http-429", group: "Files and pages" },
+  pageFileByNetwork: { per: "network", where: "The files an HTML page loads by relative path from its page host", refusal: "http-429", group: "Files and pages" },
+  pageAddress: { per: "user", where: "Opening an HTML artifact that has page files (per network for a signed-out reader; over the limit the page runs without its files)", refusal: "not-counted", group: "Files and pages" },
   viewByNetwork: { per: "network", where: "Counted views of public artifact pages", refusal: "not-counted", group: "Files and pages" },
   viewByNetworkArtifact: { per: "network", where: "Counted views of one public artifact page", refusal: "not-counted", group: "Files and pages" },
   ogImageByNetwork: { per: "network", where: "Artifact preview images (cache misses only)", refusal: "http-429", group: "Files and pages" },

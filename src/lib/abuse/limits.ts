@@ -76,6 +76,21 @@ export const rateLimits = {
   /** The same follow-ups for one file, per network address per hour: the header is the client's to send, so no one file gets the whole budget. */
   fileRangeByNetworkFile: { limit: 1800, windowSeconds: hour },
   /**
+   * Page file requests (a page host's /f/<token>/<path>, src/lib/page-files/serve.ts)
+   * per network per hour, IPv6 by its /64. Each one that carries a token the
+   * server can open costs a lookup and a stream; a page may hold 100 files,
+   * so one view can be 100 requests. A request without such a token is
+   * refused before this is counted and reads no database.
+   */
+  pageFileByNetwork: { limit: 18_000, windowSeconds: hour },
+  /**
+   * Page file addresses made per viewer per hour (src/lib/page-files/actions.ts):
+   * one per view of an HTML artifact that has page files, keyed by the person,
+   * or by the network for a signed-out reader. Each one runs the artifact's
+   * access check.
+   */
+  pageAddress: { limit: 3600, windowSeconds: hour },
+  /**
    * Team icon views (/api/teams/<id>/icon) per signed-in member per hour.
    * Only members can load an icon, so each person gets their own budget and
    * an office behind one address never shares one. Browsers keep each icon
@@ -287,6 +302,8 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   fileDownloadByNetwork: "Your network has opened a lot of files in the last hour.",
   fileRequestByNetwork: "Your network has opened or played a lot of files in the last hour.",
   fileRangeByNetworkFile: "Your network has played this file a lot in the last hour.",
+  pageFileByNetwork: "Your network has loaded a lot of page files in the last hour.",
+  pageAddress: "You have opened a lot of pages in the last hour.",
   teamIconByUser: "You have loaded a lot of team icons in the last hour.",
   teamIconByNetwork: "Your network has loaded a lot of team icons in the last hour.",
   artifactPageByNetwork: "Your network has opened a lot of artifact pages in the last hour.",

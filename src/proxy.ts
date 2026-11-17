@@ -39,8 +39,9 @@ import { getTeamForMember } from "@/lib/teams/queries";
  * the sign-in and access checks.
  *
  * A request to a page host (`<label>.<PAGE_HOST>`, where an HTML artifact's
- * page runs) never reaches the app: the proxy answers it whole, with the
- * frame document or a 404 (src/lib/page-host/respond.ts). The matcher's
+ * page runs) is answered here, whole, with the frame document or a 404
+ * (src/lib/page-host/respond.ts). One kind goes on: a page file
+ * (`/f/<token>/<path>`), to the one route that serves it. The matcher's
  * last entry sends every path of such a host here.
  *
  * Signed-in visitors skip the landing page and the sign-in pages and go to
@@ -194,7 +195,8 @@ export function proxy(request: NextRequest) {
   const host = request.headers.get("host");
   // A page host never reaches the app, whatever the path. Nor does any other host under the page domain: the
   // Next config sends those to a 404 (pageDomainRewrites), and the paths that run this proxy first stop here.
-  if (looksLikePageHost(host) || isUnderPageDomain(host, pageHostBase())) return pageHostResponse({ method: request.method, pathname: request.nextUrl.pathname, host });
+  // The one request that goes on is for a page file, which its route answers (src/app/f): the route checks the host and the token again.
+  if (looksLikePageHost(host) || isUnderPageDomain(host, pageHostBase())) return pageHostResponse({ method: request.method, pathname: request.nextUrl.pathname, host }) ?? NextResponse.next();
   return siteProxy(request);
 }
 

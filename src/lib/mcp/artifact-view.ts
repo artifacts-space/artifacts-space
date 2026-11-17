@@ -57,8 +57,8 @@ export interface McpArtifact {
   isAuthor: boolean;
   /** Who saved it last, as "@handle" (or a name). Null when they are gone. */
   updatedBy: string | null;
-  /** Attached files. Get a download link with files_get_download_url. */
-  files: { id: string; filename: string; contentType: string; size: number }[];
+  /** Attached files. Get a download link with files_get_download_url. A page file of an HTML artifact also has `pagePath`: the relative path its page loads it by. */
+  files: { id: string; filename: string; contentType: string; size: number; pagePath?: string }[];
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -117,7 +117,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     pendingEdit: seesRequests && dto.pendingEdit ? { requestedAt: dto.pendingEdit.requestedAt } : null,
     isAuthor,
     updatedBy: dto.updatedBy ? (dto.updatedBy.handle ? `@${dto.updatedBy.handle}` : dto.updatedBy.name) : null,
-    files: dto.files.map(({ id, filename, contentType, size }) => ({ id, filename, contentType, size })),
+    files: dto.files.map(({ id, filename, contentType, size, pagePath }) => ({ id, filename, contentType, size, ...(pagePath === undefined ? {} : { pagePath }) })),
     metadata: dto.metadata,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,

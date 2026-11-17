@@ -5,11 +5,12 @@ import { permissionsPolicy } from "../security-header-rules";
  * The page host: where a page that an agent wrote runs. Such a page has
  * scripts, so it never runs on this site's own origin. Each artifact gets
  * its own host, `<label>.<PAGE_HOST>`, on a second domain that holds no
- * session and serves nothing but one small frame document
- * (src/lib/page-host/frame-document.ts). The site shows that document in a
- * sandboxed iframe and hands it the page's HTML with postMessage, so the
- * access check stays where it is today: whoever was given the content can
- * run it, and the page host itself reads nothing.
+ * session. It serves one small frame document
+ * (src/lib/page-host/frame-document.ts) and, under an address the site
+ * made for a viewer it checked, that artifact's own page files
+ * (src/lib/page-files). The site shows the frame document in a sandboxed
+ * iframe and hands it the page's HTML with postMessage, so the access check
+ * stays where it is today: whoever was given the content can run it.
  *
  * Pure rules, safe for the proxy, the server, and the browser.
  */
@@ -55,13 +56,22 @@ export interface HostRewrite {
 }
 
 /**
- * The page domain serves frame documents and nothing else. A wildcard
- * domain sends every host under it to this app, so without this rule
- * `www.<base>` would show the whole site on the page domain, the same site
- * (to a browser) as pages that run anyone's scripts. This rewrite, checked
- * before any file or page, sends every path of every host under the page
- * domain to the refusal. A page host itself never gets here: the proxy
- * answers it first. Read when the app is built, so `PAGE_HOST` must be set
+ * Every path but a page file's (`/f/<token>/<path>`), which goes on to its
+ * route (src/app/f): that route answers only on a page host, for a token
+ * made for that host, and with the same 404 on every other host, so
+ * leaving it out of the rewrite opens nothing on `www.<base>`.
+ */
+export const pageDomainRewriteSource = "/:path((?!f/[A-Za-z0-9_-]+/.).*)";
+
+/**
+ * The page domain serves frame documents and page files, and nothing else.
+ * A wildcard domain sends every host under it to this app, so without this
+ * rule `www.<base>` would show the whole site on the page domain, the same
+ * site (to a browser) as pages that run anyone's scripts. This rewrite,
+ * checked before any file or page, sends every path of every host under
+ * the page domain to the refusal, but a page file's path
+ * (pageDomainRewriteSource). A page host itself gets here only for a page
+ * file: the proxy answers everything else first. Read when the app is built, so `PAGE_HOST` must be set
  * for the build as well as at run time. The domain itself is not covered:
  * never point it at this app. The pattern takes the host in any letter case
  * and with the dot a fully qualified name may end with, as isUnderPageDomain
@@ -70,7 +80,34 @@ export interface HostRewrite {
 export function pageDomainRewrites(env: NodeJS.ProcessEnv = process.env): HostRewrite[] {
   const base = pageHostBase(env);
   if (!base) return [];
-  return [{ source: "/:path*", has: [{ type: "host", value: `.+\\.${hostPattern(base)}\\.?` }], destination: pageHostRefusalPath }];
+  return [{ source: pageDomainRewriteSource, has: [{ type: "host", value: `.+\\.${hostPattern(base)}\\.?` }], destination: pageHostRefusalPath }];
+}
+
+/** The page itself under a files address: the frame document, so the page's files are its siblings and relative URLs reach them. */
+export const pageDocumentName = "index.html";
+
+/** `/f/<token>/<rest>`: the token's shape is openPageToken's (src/lib/page-files/token.ts); the rest is at least one character. */
+const filesAddress = /^\/f\/[A-Za-z0-9_-]{60,400}\/(.+)$/;
+
+/** What a path on a page host is: the frame document, a page file (for the route to answer), or nothing. */
+export type PageHostPath = "frame" | "file" | "none";
+
+/**
+ * Reads a path on a page host. The frame document is at `/`, and at
+ * `/f/<token>/index.html` for a page that has files. Any other path under
+ * `/f/<token>/` names a page file. The token is not checked here: the
+ * frame document is the same for everyone, and the route checks a file's.
+ */
+export function pageHostPath(pathname: string): PageHostPath {
+  if (pathname === "/") return "frame";
+  const rest = filesAddress.exec(pathname)?.[1];
+  if (rest === undefined) return "none";
+  return rest === pageDocumentName ? "frame" : "file";
+}
+
+/** The path the frame loads: `/`, or the page's name under its files address when the page has files (`token` from the site). */
+export function pageFramePath(token: string | null): string {
+  return token === null ? "/" : `/f/${token}/${pageDocumentName}`;
 }
 
 /** A Host header without its port, in lower case, and without the dot a fully qualified name may end with. */
@@ -134,8 +171,10 @@ const fontHosts = ["https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", 
  * (the page is written into that document, so the policy holds for it and a
  * page cannot loosen it). Inline scripts and styles run: that is the point.
  * Everything else is closed: no requests except to the public package and
- * font hosts; no forms posted anywhere; no frames inside it; and only this
- * site may frame it, so its address shows nothing in a tab of its own.
+ * font hosts and to the page's own host (`'self'`), where nothing answers
+ * but the frame document and this artifact's own page files; no forms
+ * posted anywhere; no frames inside it; and only this site may frame it,
+ * so its address shows nothing in a tab of its own.
  *
  * What this does and does not promise: a page can reach no host its author
  * controls, so it cannot send what it knows to its author or track who
@@ -149,13 +188,13 @@ export function pageContentPolicy(siteOrigin: string): string {
   const scripts = pageScriptHosts.join(" ");
   return [
     "default-src 'none'",
-    `script-src 'unsafe-inline' 'unsafe-eval' blob: ${scripts}`,
-    `style-src 'unsafe-inline' ${styleHosts.join(" ")}`,
-    `font-src data: ${fontHosts.join(" ")}`,
-    `img-src data: blob: ${scripts}`,
-    "media-src data: blob:",
-    `connect-src ${scripts}`,
-    "worker-src blob:",
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: ${scripts}`,
+    `style-src 'self' 'unsafe-inline' ${styleHosts.join(" ")}`,
+    `font-src 'self' data: ${fontHosts.join(" ")}`,
+    `img-src 'self' data: blob: ${scripts}`,
+    "media-src 'self' data: blob:",
+    `connect-src 'self' ${scripts}`,
+    "worker-src 'self' blob:",
     "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'none'",

@@ -69,13 +69,13 @@ export async function writeAndAttachWith(update: SQL, editorId: string, files: S
   return { record: row.record, note: row.note };
 }
 
-/** The CTE that attaches the save's uploads from the saved row (`saved`). */
+/** The CTE that attaches the save's uploads from the saved row (`saved`). Never an upload requested as a page file: those attach only as page files (src/lib/page-files/attach.ts). */
 function attachedCte(editorId: string, files: SaveFiles, ids: readonly string[]) {
   const byContent = files.contentFileIds.length > 0 ? sql`f.id in (${idList(files.contentFileIds)})` : sql`false`;
   return getDb().$with("attached", { id: artifactFile.id }).as(sql`
     update ${artifactFile} f set artifact_id = saved.id, attached_at = now(), attached_by_content = ${byContent}
     from saved
-    where f.id in (${idList(ids)}) and f.uploader_id = ${editorId} and f.status = 'ready' and f.artifact_id is null
+    where f.id in (${idList(ids)}) and f.uploader_id = ${editorId} and f.status = 'ready' and f.artifact_id is null and f.page_path is null
     returning f.id
   `);
 }

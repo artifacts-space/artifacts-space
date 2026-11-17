@@ -18,6 +18,9 @@ import { forgetArtifactCache } from "@/lib/versions/cache";
 import { pruneArtifactVersions } from "@/lib/versions/history";
 import { planVersionedChangeApproval, prepareVersionedChange, type EditStatus, type VersionedChangeApproval } from "@/lib/versions/service";
 
+import { pageFileLimits, pageFileTotalsProblem, replacementPathProblem } from "@/lib/page-files/rules";
+import { pageFileTotals } from "@/lib/page-files/store";
+
 import { canUseFileInArtifact } from "./access-rules";
 import { replacementFilename, replaceTargetProblem } from "./replace-rules";
 import { getFileRow, toFileDto } from "./store";
@@ -66,10 +69,30 @@ async function editableTarget(editorId: string, fileId: string, inArtifact: stri
   return { ...row, artifactId };
 }
 
+/**
+ * The editor's own finished upload in no artifact. One requested as a page
+ * file is usable here too, unlike anywhere else (canUseFileInArtifact): it
+ * replaces the page file at its own path and nothing else (replacementProblem).
+ */
 async function usableUpload(editorId: string, uploadId: string): Promise<ArtifactFileRecord> {
   const row = z.uuid().safeParse(uploadId).success ? await getFileRow(uploadId.toLowerCase()) : null;
-  if (row?.artifactId !== null || !canUseFileInArtifact(row, editorId, null)) throw new UserFacingError(uploadProblem);
+  if (row?.artifactId !== null || !canUseFileInArtifact({ ...row, pagePath: null }, editorId, null)) throw new UserFacingError(uploadProblem);
   return row;
+}
+
+/** Why this upload cannot take this file's place, or null: the paths must agree, and a page stays within its size limit. */
+async function replacementProblem(target: ArtifactFileRecord & { artifactId: string }, upload: ArtifactFileRecord): Promise<string | null> {
+  const pathProblem = replacementPathProblem(target, upload);
+  if (pathProblem || target.pagePath === null) return pathProblem;
+  const totals = await pageFileTotals(target.artifactId);
+  return pageFileTotalsProblem({ count: totals.count, bytes: totals.bytes - target.size + upload.size });
+}
+
+/** SQL: for a page file, the artifact's other page files and this upload stay within the page's size limit. Nothing for a plain file. */
+function pageRoom(target: ArtifactFileRecord & { artifactId: string }) {
+  if (target.pagePath === null) return sql``;
+  return sql`
+        and (select coalesce(sum(p.size), 0) from ${artifactFile} p where p.artifact_id = ${target.artifactId} and p.page_path is not null and p.id <> ${target.id}) + u.size <= ${pageFileLimits.maxTotalBytes}`;
 }
 
 interface Swap {
@@ -188,6 +211,7 @@ async function swapInUpload(swap: Swap): Promise<{ openedRequestId: string | nul
     upload as (
       delete from ${artifactFile} u
       where u.id = ${upload.id} and u.uploader_id = ${editorId} and u.artifact_id is null and u.status = 'ready'
+        and u.page_path is not distinct from ${target.pagePath}${pageRoom(target)}
         and exists (select 1 from target)
       returning u.key, u.content_type, u.size, u.uploader_id
     ),
@@ -258,6 +282,8 @@ export async function replaceFile(editorId: string, request: ReplaceRequest, act
   const target = await editableTarget(editorId, request.fileId, request.artifactId);
   const upload = await usableUpload(editorId, request.uploadId);
   if (upload.id === target.id) throw new UserFacingError(uploadProblem);
+  const problem = await replacementProblem(target, upload);
+  if (problem) throw new UserFacingError(problem);
   await enforceRateLimit("artifactUpdate", editorId);
   const [before] = await getDb().select().from(artifact).where(eq(artifact.id, target.artifactId)).limit(1);
   if (!before) throw new UserFacingError("File not found.");

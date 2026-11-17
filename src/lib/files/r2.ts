@@ -231,6 +231,52 @@ export async function streamObject(config: R2Config, key: string, maxBytes: numb
   return { body: response.body, size };
 }
 
+/** An object opened to pass its bytes on: the whole of it (200) or the part a Range asked for (206). */
+export interface OpenedObject {
+  status: 200 | 206;
+  /** Null for a HEAD. */
+  body: ReadableStream<Uint8Array> | null;
+  /** How many bytes the body holds. */
+  length: number;
+  /** `bytes <start>-<end>/<size>` for a part. */
+  contentRange: string | null;
+}
+
+/** What opening an object for a reader gave: the object, nothing there, or a Range the object cannot satisfy. */
+export type ObjectOpening = { state: "open"; object: OpenedObject } | { state: "missing" } | { state: "bad-range" };
+
+/**
+ * Opens an object to stream it to a reader, whole or the part `range`
+ * names (one checked `bytes=` range, for audio and video seeks). The bytes
+ * are never held in memory. For files the server checked when they were
+ * uploaded, whose size the caller already knows from the row.
+ */
+export async function openObject(config: R2Config, key: string, options: { range?: string | null; head?: boolean } = {}): Promise<ObjectOpening> {
+  const head = options.head === true;
+  const response = await send(config, "GET", head ? "HEAD" : "GET", key, options.range ? { Range: options.range } : {});
+  if (response.status === 404) return { state: "missing" };
+  if (response.status === 416) return { state: "bad-range" };
+  const object = openedFrom(response, head);
+  if (object) return { state: "open", object };
+  await response.body?.cancel().catch(() => undefined);
+  throw new R2Error("GET", response.status);
+}
+
+/** The answer as an opened object, or null when it is not a whole object or a part with a stated length (and, unless `head`, a body). */
+function openedFrom(response: Response, head: boolean): OpenedObject | null {
+  const length = lengthOf(response);
+  if (response.status !== 200 && response.status !== 206) return null;
+  if (length === null) return null;
+  if (head) return { status: response.status, body: null, length, contentRange: response.headers.get("content-range") };
+  return response.body ? { status: response.status, body: response.body, length, contentRange: response.headers.get("content-range") } : null;
+}
+
+/** The body's length as the answer states it, or null when it states none. */
+function lengthOf(response: Response): number | null {
+  const length = response.headers.get("content-length") ?? "";
+  return /^\d+$/.test(length) ? Number(length) : null;
+}
+
 /** A whole small object read into memory, or why it was not read. */
 export type ObjectRead = { state: "found"; bytes: Uint8Array<ArrayBuffer>; contentType: string } | { state: "missing" } | { state: "too-large" };
 
