@@ -101,9 +101,9 @@ test("should edit a long Markdown artifact in place and save it on its own", asy
 test("should hold Full width, History, and View source in the header's More menu and keep the save status beside it", async ({ page }) => {
   await openFixture(page, "markdown");
   const header = page.getByRole("banner");
-  // The right side reads: visibility, GitHub, Copy, then the editing controls.
+  // The right side reads: visibility, Copy, the editing controls, then GitHub at the far right.
   const order = await header.locator("[data-visibility], a[aria-label='artifacts.space on GitHub'], button:has-text('Copy'), [data-slot=save-indicator], button[aria-label='More actions']").evaluateAll((elements) => elements.map((element) => element.getAttribute("aria-label") ?? (element.getAttribute("data-slot") === "save-indicator" ? "save-indicator" : element.textContent.trim())));
-  expect(order).toEqual(["Private. Only you can see this.", "artifacts.space on GitHub", "Copy", "save-indicator", "More actions"]);
+  expect(order).toEqual(["Private. Only you can see this.", "Copy", "save-indicator", "More actions", "artifacts.space on GitHub"]);
 
   // Keyboard: the menu opens from its button, moves with the arrows, and closes back onto the button.
   await moreActions(page).focus();

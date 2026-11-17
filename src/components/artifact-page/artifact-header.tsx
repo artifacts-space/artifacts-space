@@ -12,10 +12,10 @@ import { VisibilityBadge } from "./visibility-badge";
 
 /**
  * The artifact page's top bar: the logo, who can see the artifact (for
- * someone who may share it, `share`: the same status as a Share button), the
- * source link, Download CSV and Copy when this reader may take the data
- * out (`download`, `content`), and for editors `menu` (the save status and the "⋯"
- * menu, ArtifactHeaderMenu). Its colors come from the tokens around it, so the
+ * someone who may share it, `share`: the same status as a Share button),
+ * Download CSV and Copy when this reader may take the data out (`download`,
+ * `content`), for editors `menu` (the save status and the "⋯" menu,
+ * ArtifactHeaderMenu), and last, at the far right, the source link. Its colors come from the tokens around it, so the
  * page wraps it in ArtifactPageTheme to give it the artifact theme's colors.
  * `column` is the page column's classes (pageColumnClass), so the row lines
  * up with the artifact at either page width.
@@ -47,7 +47,6 @@ export function ArtifactHeader({
         <Logo compactOnPhones className="shrink-0" />
         <div className="flex min-w-0 items-center gap-2">
           {share ?? <VisibilityBadge visibility={visibility} sentence={sentence} iconOnlyOnPhones />}
-          <GitHubLink />
           {download ? (
             <a href={download.href} download={download.filename} aria-label="Download CSV" className={buttonVariants({ variant: "outline", size: "sm" })}>
               <IconDownload aria-hidden /> <span className="hidden sm:inline">Download CSV</span>
@@ -55,6 +54,8 @@ export function ArtifactHeader({
           ) : null}
           {content === null ? null : <CopyButton value={content} label="Copy" variant="outline" size="sm" />}
           {menu}
+          {/* Last, at the far right: it is about the site, not this artifact, so it sits after the artifact's own controls. */}
+          <GitHubLink />
         </div>
       </header>
     </div>
