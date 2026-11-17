@@ -1,7 +1,7 @@
-import { Extension, type Editor, type JSONContent } from "@tiptap/core";
+import { Extension, type CommandProps, type Editor, type JSONContent } from "@tiptap/core";
 import type { Fragment } from "@tiptap/pm/model";
 import { Plugin, PluginKey, type Transaction } from "@tiptap/pm/state";
-import { ReplaceAroundStep, ReplaceStep } from "@tiptap/pm/transform";
+import { AttrStep, ReplaceAroundStep, ReplaceStep } from "@tiptap/pm/transform";
 import type { EditorView } from "@tiptap/pm/view";
 
 import { mediaKindForType } from "@/lib/files/media-rules";
@@ -18,19 +18,23 @@ export function uploadingMediaNode(file: File): JSONContent {
   return { type: MEDIA_NODE, attrs: { ...emptyMediaAttrs(kind), alt: defaultMediaLabel(kind, file.name), uploadId: queueUpload(file) } };
 }
 
-/** Keeps a line to type on after media that ends the document. */
-function ensureTrailingParagraph(editor: Editor) {
-  if (editor.state.doc.lastChild?.type.name !== MEDIA_NODE) return;
-  editor.commands.insertContentAt(editor.state.doc.content.size, { type: "paragraph" });
+/**
+ * Keeps a line to type on after media that ends the document. A command
+ * for the chain that inserted the media, so the block and its line are one
+ * change: one Undo takes both away.
+ */
+function keepTrailingLine({ tr, state }: CommandProps): boolean {
+  const line = state.schema.nodes.paragraph;
+  if (line && tr.doc.lastChild?.type.name === MEDIA_NODE) tr.insert(tr.doc.content.size, line.create());
+  return true;
 }
 
 /** Inserts one uploading media block per file at `position`, or at the cursor. */
 export function insertFiles(editor: Editor, files: readonly File[], position?: number): boolean {
   const nodes = insertableFiles(files).map(uploadingMediaNode);
   if (nodes.length === 0) return false;
-  const inserted = position === undefined ? editor.chain().focus().insertContent(nodes).run() : editor.chain().focus().insertContentAt(position, nodes).run();
-  if (inserted) ensureTrailingParagraph(editor);
-  return inserted;
+  const chain = editor.chain().focus();
+  return (position === undefined ? chain.insertContent(nodes) : chain.insertContentAt(position, nodes)).command(keepTrailingLine).run();
 }
 
 function pastedFiles(event: ClipboardEvent): File[] {
@@ -49,9 +53,7 @@ function attachedMediaNode(file: AttachedFile): JSONContent {
 
 /** Puts a file the artifact already has at the end of the document, in view. */
 function insertAttached(editor: Editor, file: AttachedFile): boolean {
-  const inserted = editor.chain().focus().insertContentAt(endLanding(editor.state.doc), attachedMediaNode(file)).scrollIntoView().run();
-  if (inserted) ensureTrailingParagraph(editor);
-  return inserted;
+  return editor.chain().focus().insertContentAt(endLanding(editor.state.doc), attachedMediaNode(file)).command(keepTrailingLine).scrollIntoView().run();
 }
 
 /** True when a drag holds files, from the desktop or from another page. */
@@ -177,11 +179,17 @@ function uploadIdsIn(content: Fragment, into: Set<string>) {
   });
 }
 
-/** The upload ids of media blocks a change put into the document (inserted, pasted, or given a new upload). */
+/**
+ * The upload ids of media blocks a change put into the document: inserted,
+ * pasted, or given a new upload. A block's picker and its Replace write the
+ * whole block again (setNodeMarkup, a replace step); a change of the one
+ * attribute is read too, so no way of setting it is missed.
+ */
 export function uploadIdsAdded(tr: Transaction): string[] {
   const ids = new Set<string>();
   for (const step of tr.steps) {
     if (step instanceof ReplaceStep || step instanceof ReplaceAroundStep) uploadIdsIn(step.slice.content, ids);
+    else if (step instanceof AttrStep && step.attr === "uploadId" && typeof step.value === "string" && step.value) ids.add(step.value);
   }
   return [...ids];
 }

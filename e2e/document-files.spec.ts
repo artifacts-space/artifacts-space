@@ -182,6 +182,12 @@ test.describe("dropping files on a document", () => {
     await expectPicturesDrawn(page, 2);
     expect(await outline(page)).toEqual(["<image>", "Only paragraph.", "<image>"]);
     await expect(filesList(page)).toHaveCount(0);
+
+    // The picture that ends the document and the line kept under it are one change: one Undo takes both away.
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect(media(page)).toHaveCount(1);
+    expect(await outline(page)).toEqual(["<image>", "Only paragraph."]);
+    await expect(documentOf(page).locator(":scope > *")).toHaveCount(2);
   });
 
   test("should give each of several dropped files its own block, in order", async ({ page }) => {
