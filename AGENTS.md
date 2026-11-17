@@ -882,8 +882,13 @@ path, as on any website: `<link href="css/site.css">`, a module's
 - Accessibility: `e2e/a11y-*.spec.ts` run axe (`@axe-core/playwright`) with
   `expectNoAxeViolations` from `e2e/support/a11y.ts`, which scans a page, or
   only what a locator matches, and fails listing each rule, its help, and the
-  failing nodes' selectors. Scan a hand-built interactive piece in each state
-  it has (closed, open, empty, an item highlighted, a submenu open), once
+  failing nodes' selectors. A scan of a locator must never change the page
+  (no attribute, no class, no node): on a server-rendered page React has not
+  taken over yet, and an attribute the server did not send is a hydration
+  mismatch that the page-error fixture turns into a failed test (issue #225).
+  The helper names the matched elements with child-position selectors for
+  axe's `include`; keep it that way. Scan a hand-built interactive piece in
+  each state it has (closed, open, empty, an item highlighted, a submenu open), once
   that state is on screen and the page is interactive, on `desktop` and
   `phone` when both show it. Pair it with `toMatchAriaSnapshot` where the
   tree is the point (menus, listboxes, pickers, splitters). A new menu,
