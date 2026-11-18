@@ -1,4 +1,4 @@
-import type { AnyExtension, JSONContent, NodeViewRenderer } from "@tiptap/core";
+import { Mark, type AnyExtension, type JSONContent, type NodeViewRenderer } from "@tiptap/core";
 import CodeBlock from "@tiptap/extension-code-block";
 import { BulletList, OrderedList, TaskItem, TaskList } from "@tiptap/extension-list";
 import { renderTableToMarkdown, Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
@@ -221,10 +221,26 @@ const MarkdownOrderedList = OrderedList.extend({
   },
 });
 
-/** StarterKit with paragraphs and headings that keep block colors (block-color-nodes.ts). */
+/*
+ * Tiptap's inline code mark excludes every other mark, so `**see `x`**`
+ * lost its bold on load, failed the round trip, and kept its whole block
+ * (a table, a list) as written. Markdown nests code inside bold, italic,
+ * strike, and links, so the code mark here sits beside them. Its lower
+ * priority makes it the innermost mark, so the writer opens backticks
+ * inside `**` and `*`, never around them (code-mark-spans.ts covers runs
+ * whose other marks change part way).
+ */
+function withNestableCode(extensions: readonly AnyExtension[]): AnyExtension[] {
+  return extensions.map((extension) => (extension instanceof Mark && extension.name === "code" ? extension.extend({ excludes: "", priority: 50 }) : extension));
+}
+
+/**
+ * StarterKit with paragraphs and headings that keep block colors
+ * (block-color-nodes.ts), and inline code that nests in other marks.
+ */
 const ColorableStarterKit = StarterKit.extend({
   addExtensions() {
-    return withColorableText(this.parent?.() ?? []);
+    return withNestableCode(withColorableText(this.parent?.() ?? []));
   },
 });
 

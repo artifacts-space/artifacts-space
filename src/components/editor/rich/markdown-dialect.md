@@ -46,6 +46,18 @@ disagree, the editor keeps the source as written (see "Raw blocks").
 | Block colors on a paragraph or heading (also in lists and quotes) | A color comment at the end of its text (below) | `color` and `background` attributes |
 | Anything else | As written | `rawMarkdown` |
 
+### Inline code in other marks
+
+Inline code nests inside bold, italic, strike, and links, as GFM allows:
+`**Set `color-scheme`,** then`, `[read `docs`](…)`. In the editor the code
+mark sits beside those marks (`withNestableCode` in `markdown-schema.ts`)
+and is always the innermost one, so backticks are written inside `**` and
+`*`, never around them. When the other marks change part way through a run
+of code, the run is written as several code spans, each in its own marks
+(`` `ab`**`cd`**`ef` ``; `code-mark-spans.ts`), because a mark between
+backticks would be literal text. Before this, bold text holding code kept
+its whole block as written, a table included.
+
 ### Tables
 
 A GFM pipe table: one line per row, and one line of inline text per cell
