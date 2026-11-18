@@ -8,6 +8,7 @@ import { isSafeHref } from "@/lib/link-policy";
 import { fenceInfoOfLine, fenceLanguage } from "@/lib/markdown/fence-info";
 
 import { BlockColorComment, withColorableText } from "./block-color-nodes";
+import { isTableToken, withCellBreaks } from "./markdown-cell-breaks";
 import { MediaNode } from "./media-node";
 import { RawMarkdown } from "./raw-markdown-node";
 
@@ -96,9 +97,14 @@ export const MarkdownCodeBlock = CodeBlock.extend({
 
 /**
  * Tables without the blank lines Tiptap puts around them, so a table inside
- * a quote or list does not leave empty quoted lines behind.
+ * a quote or list does not leave empty quoted lines behind. A `<br>` in a
+ * cell loads as a line break, which Tiptap writes back as `<br>`
+ * (markdown-cell-breaks.ts).
  */
 export const MarkdownTable = Table.extend({
+  parseMarkdown(token, helpers) {
+    return this.parent?.(isTableToken(token) ? withCellBreaks(token) : token, helpers) ?? [];
+  },
   renderMarkdown: (node, helpers) => renderTableToMarkdown(node, helpers).replace(/^\n+|\n+$/g, ""),
 }).configure({ resizable: false });
 

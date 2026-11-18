@@ -40,7 +40,7 @@ disagree, the editor keeps the source as written (see "Raw blocks").
 | Quote | `>` | `blockquote` |
 | Code block | Fenced with backticks, an optional language, and optional attributes in braces (below). The fence is one longer than any fence inside; tildes when the info string holds a backtick. | `codeBlock` |
 | Mermaid diagram | A code block fenced as `mermaid`, with an optional view (below) | `codeBlock` with language `mermaid` |
-| Table | GFM pipe table with optional alignment | `table` |
+| Table | GFM pipe table with optional alignment; `<br>` for a line break in a cell (below) | `table` |
 | Divider | `---` | `horizontalRule` |
 | Media: image, video, audio, PDF, file | Image syntax alone in its paragraph (below) | `media` |
 | Block colors on a paragraph or heading (also in lists and quotes) | A color comment at the end of its text (below) | `color` and `background` attributes |
@@ -57,6 +57,18 @@ of code, the run is written as several code spans, each in its own marks
 (`` `ab`**`cd`**`ef` ``; `code-mark-spans.ts`), because a mark between
 backticks would be literal text. Before this, bold text holding code kept
 its whole block as written, a table included.
+
+### Tables
+
+A GFM pipe table: one line per row, and one line of inline text per cell
+(marks, inline code, links). A line break in a cell is written `<br>`, as
+GitHub reads it; Tiptap's table writer writes it that way, and the editor
+(`markdown-cell-breaks.ts`), the read view (`remark-cell-breaks.ts` in
+`src/lib/markdown`), and the link preview text read `<br>`, `<br/>`, and
+`<br />` in a cell as a line break (`isLineBreakTag`). It is the only HTML a
+cell reads: any other HTML in a table keeps the table as written, and a
+`<br>` outside a table is raw HTML as before. A `|` inside a cell, also
+inside inline code, is written `\|`.
 
 ### Media
 

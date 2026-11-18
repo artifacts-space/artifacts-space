@@ -1,3 +1,4 @@
+import { isTableToken, withCellBreaks } from "./markdown-cell-breaks";
 import { childFields, footnoteLabels, usesFootnotes } from "./markdown-footnotes";
 
 /** A loose view of a marked token: only the fields the block checks read. */
@@ -60,7 +61,8 @@ function rawTokenKind(value: unknown): RawKind | null {
   }
   if (!isRecord(value)) return null;
   if (typeof value.type === "string" && rawTokenTypes.has(value.type)) return rawKindOfToken[value.type] ?? "other";
-  return rawTokenKind(childValues(value));
+  // A `<br>` in a table cell is a line break, not HTML (markdown-cell-breaks.ts).
+  return rawTokenKind(childValues(isTableToken(value) ? withCellBreaks(value) : value));
 }
 
 /**
