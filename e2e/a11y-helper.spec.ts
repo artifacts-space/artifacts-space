@@ -1,6 +1,6 @@
 import { expect, test } from "./support/test";
 
-import { expectNoAxeViolations, unjudgedNote } from "./support/a11y";
+import { expectNoAxeViolations, retakenNote, unjudgedNote } from "./support/a11y";
 
 /*
  * The axe helper itself (e2e/support/a11y.ts), on inline pages with no
@@ -88,6 +88,52 @@ test("should scan every element a locator matches, and nothing outside them", as
   await expect(expectNoAxeViolations(page.locator(".part"))).rejects.toThrow(/button-name/);
   await expectNoAxeViolations(page.locator("section.part").first());
   await expectNoAxeViolations(page.locator("p"));
+});
+
+/**
+ * A page script that changes what sits above the part when the helper names
+ * an element by its place in the tree: once, or every time. `move` is the
+ * change, as page code.
+ */
+const movesWhenNamed = (every: boolean, move = `document.body.prepend(document.createElement("div"))`): string => `<script>
+  const find = Document.prototype.querySelectorAll;
+  let moved = false;
+  Document.prototype.querySelectorAll = function (selector) {
+    const found = find.call(this, selector);
+    if ((${String(every)} || !moved) && String(selector).includes(":nth-child")) {
+      moved = true;
+      queueMicrotask(() => { ${move}; });
+    }
+    return found;
+  };
+</script>`;
+
+const retaken = (): string[] => test.info().annotations.filter((note) => note.type === retakenNote).map((note) => note.description ?? "");
+
+test("should scan the element again when the page moves it between naming it and the scan", async ({ page }) => {
+  // After the move, the first name points at the new empty element: a scan that trusted it would pass.
+  await page.setContent(`<main id="scan">${unnamedButton}</main>${movesWhenNamed(false)}`);
+  await expect(expectNoAxeViolations(page.locator("#scan"))).rejects.toThrow(/button-name/);
+  expect(retaken()).toHaveLength(1);
+});
+
+test("should scan the element again when its first name matches nothing by the time of the scan", async ({ page }) => {
+  // The part is the body's second element; with the first one gone, its name matches nothing and axe refuses the scan.
+  const removesTheFirst = movesWhenNamed(false, `document.getElementById("gone").remove()`);
+  await page.setContent(`<html lang="en"><head><title>Moved</title>${removesTheFirst}</head><body><div id="gone"></div><main id="scan">${unnamedButton}</main></body></html>`);
+  await expect(expectNoAxeViolations(page.locator("#scan"))).rejects.toThrow(/button-name/);
+  expect(retaken()).toHaveLength(1);
+});
+
+test("should fail, and say why, when the page moves the element during every scan", async ({ page }) => {
+  await page.setContent(`<main id="scan"><p>Fine</p></main>${movesWhenNamed(true)}`);
+  await expect(expectNoAxeViolations(page.locator("#scan"))).rejects.toThrow(/moved its elements during each of 3 scans/);
+});
+
+test("should leave no note of a retaken scan when the page holds still", async ({ page }) => {
+  await page.setContent(`<main id="scan"><p>Fine</p></main>`);
+  await expectNoAxeViolations(page.locator("#scan"));
+  expect(retaken()).toHaveLength(0);
 });
 
 test("should scan an element inside a shadow root when a locator matches it", async ({ page }) => {
