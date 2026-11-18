@@ -36,6 +36,12 @@ describe("formatGuide", () => {
     expect(formatGuide()).toContain("A fenced code block with the language `mermaid` draws as a diagram");
   });
 
+  it("should teach br for a line break in a table cell when the kind is markdown", () => {
+    const guide = formatGuide("markdown");
+    expect(guide).toContain("First line<br>second line");
+    expect(guide).toContain("\\| for a pipe");
+  });
+
   it("should teach the color comment and every hue when the kind is markdown", () => {
     const guide = formatGuide("markdown");
     expect(guide).toContain("Ship it on Friday <!-- color: red -->");

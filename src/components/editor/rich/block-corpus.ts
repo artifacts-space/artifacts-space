@@ -123,7 +123,7 @@ export const blockCorpus: Readonly<Record<string, BlockSamples>> = {
   },
   blockquote: { node: "blockquote", rich: true, samples: { quote: "> Quoted text\n> continues here.\n", quoteWithList: "> quote\n>\n> - list in quote\n", quoteListCode: "> Note:\n>\n> - a\n> - b\n>\n> ```sh\n> run\n> ```\n" } },
   horizontalRule: { node: "horizontalRule", rich: true, samples: { rule: "Above\n\n---\n\nBelow\n" } },
-  table: { node: "table", rich: true, samples: { table: "| Name | Role |\n| --- | --- |\n| Ada | Lead |\n| Lin | Dev |\n", alignedTable: "| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |\n" } },
+  table: { node: "table", rich: true, samples: { table: "| Name | Role |\n| --- | --- |\n| Ada | Lead |\n| Lin | Dev |\n", alignedTable: "| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |\n", tableBreaks: "| Step | Notes |\n| --- | --- |\n| 1 | First line<br>second line |\n| 2 | **a**<br/>b<BR />c |\n" } },
   media: {
     node: "media",
     rich: true,

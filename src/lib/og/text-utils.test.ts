@@ -19,6 +19,10 @@ describe("squash", () => {
 });
 
 describe("stripInlineMarkdown", () => {
+  it("should keep the words of a cell apart when it holds a line break tag", () => {
+    expect(stripInlineMarkdown("| one<br>two | a<br />b |")).toBe("one two a b");
+  });
+
   it("should keep link and image text and drop emphasis and code marks", () => {
     expect(stripInlineMarkdown("Read **the** [guide](https://x.dev), run `pnpm check` ![logo](a.png)")).toBe("Read the guide, run pnpm check logo");
   });

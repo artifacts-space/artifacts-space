@@ -77,6 +77,13 @@ export const MARKDOWN_COLOR_GUIDE = [
   "Other Markdown readers hide the comment. Keep it at the end of the line's text: a comment in the middle of text does not color anything. A hue or name not listed here is ignored, and the editor removes it when someone edits that line.",
 ].join("\n");
 
+/** How agents write tables in Markdown (markdown-dialect.md, "Tables"). */
+export const MARKDOWN_TABLE_GUIDE = [
+  "Tables are GitHub-flavored pipe tables. Each row is one line, and every cell holds one line of inline text: bold, italic, strike, code, and links, nested as you like (**Use `min-height`**).",
+  "For a line break inside a cell, write <br>: | Step 1 | First line<br>second line |. It is the only HTML a cell reads; other HTML keeps the table as written.",
+  "Write \\| for a pipe inside a cell, also inside code. Lists, headings, code blocks, and images do not fit in a cell: put them under the table. Merged cells do not exist in Markdown.",
+].join("\n");
+
 function text(value: string) {
   return { content: [{ type: "text" as const, text: value }] };
 }
@@ -86,7 +93,7 @@ export function formatGuide(kind?: FormatKind): string {
   if (kind === "ui") return buildUiGuide();
   if (kind === "canvas") return buildCanvasGuide();
   if (kind === "html") return buildHtmlGuide();
-  if (kind === "markdown") return `${formatInfo.markdown.label} (markdown): ${formatInfo.markdown.agent}\n\n${MARKDOWN_DIAGRAM_GUIDE}\n\n${MARKDOWN_MEDIA_GUIDE}\n\n${MARKDOWN_COLOR_GUIDE}`;
+  if (kind === "markdown") return `${formatInfo.markdown.label} (markdown): ${formatInfo.markdown.agent}\n\n${MARKDOWN_DIAGRAM_GUIDE}\n\n${MARKDOWN_TABLE_GUIDE}\n\n${MARKDOWN_MEDIA_GUIDE}\n\n${MARKDOWN_COLOR_GUIDE}`;
   if (kind) return `${formatInfo[kind].label} (${kind}): ${formatInfo[kind].agent}`;
   const lines = artifactKinds.map((item) => `- ${item}: ${formatInfo[item].agent}`);
   const uiHint = (artifactKinds as readonly string[]).includes("ui")
