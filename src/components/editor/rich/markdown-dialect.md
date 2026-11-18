@@ -337,6 +337,11 @@ lists, each indented under the item's text and set off by blank lines:
   to its text (three spaces under `1.`). Their items go through the same
   list item rule as a bulleted list's, so bold, links, and code inside a
   numbered item are read as formatting (`markdown-schema.ts`).
+- **A numbered list keeps its start.** A list from `0.` is written from
+  `0.` (`fromZero`; Tiptap's list item reads a start of 0 as 1). Under an
+  item's text, only a list that starts at 1 interrupts the text, as
+  CommonMark reads it, so a nested list with any other start is written
+  after a blank line; without one it would read as more of the item's text.
 - **Edits stay in their item.** A list loads as one block, cut into its
   items (`markdown-list-items.ts`). After an edit, every item nobody touched
   is written back as it was, with the blank lines between items; the edited
