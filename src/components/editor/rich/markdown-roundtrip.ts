@@ -4,6 +4,7 @@ import type { Schema } from "@tiptap/pm/model";
 
 import { liftBlockColors } from "./block-color-nodes";
 import { boundedMemo, type BoundedMemo } from "./bounded-memo";
+import { withCodeSpans } from "./code-mark-spans";
 import { commentKeepsAsWritten, commentLiteralMarkdown, commentTextMarkdown } from "./comment-text-markdown";
 import { needsRawBlock, splitBlocks, type LooseToken, type SourceBlock, type SplitSource } from "./markdown-blocks";
 import { markdownSchemaExtensions } from "./markdown-schema";
@@ -164,7 +165,7 @@ function parseNodes(text: string, current: Engine): JSONContent[] | null {
 
 /** Markdown for nodes, without the blank lines a renderer may add around them. */
 function renderNodes(nodes: JSONContent[], current: Engine): string {
-  return current.manager.serialize({ type: "doc", content: nodes }).replace(/^\n+|\n+$/g, "");
+  return current.manager.serialize({ type: "doc", content: withCodeSpans(nodes) }).replace(/^\n+|\n+$/g, "");
 }
 
 /**
