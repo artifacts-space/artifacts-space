@@ -8,6 +8,16 @@ import { safeHref } from "@/lib/link-policy";
  * server checks every upload again: these only give a quick, clear answer.
  */
 
+/**
+ * The file store refused an upload before any byte was sent (its size, the
+ * account's room, a limit). The message is written for people. An image
+ * sent with its own bytes is then redrawn and sent again when the redraw
+ * is smaller (media-uploads.ts).
+ */
+export class UploadRequestRefused extends Error {
+  override name = "UploadRequestRefused";
+}
+
 /** Most uploads one tab sends at a time. The rest wait their turn in their blocks, so a drop of many files never runs into the limit on unfinished uploads (fileLimits.maxPendingPerUser). */
 export const maxUploadsAtOnce = 3;
 

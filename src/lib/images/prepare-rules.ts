@@ -6,7 +6,9 @@ import { ICON_MAX_BYTES } from "@/lib/files/icon-rules";
  * How the browser prepares a picked image before it uploads as a cover, an
  * icon, or an image in a document: scaled down to a sensible size and re-encoded, so a phone photo fits
  * the cap, carries no camera metadata (no GPS in a public page), and is a
- * JPEG or PNG that link previews can draw. Pure, so it is tested without a
+ * JPEG or PNG that link previews can draw. A document sends a small still
+ * image that says nothing of a place with its own bytes instead
+ * (original-rules.ts, src/components/images/document-image.ts). Pure, so it is tested without a
  * browser; src/components/images/prepare-image.ts does the drawing. The
  * server still checks every upload: this only helps honest uploads succeed.
  */
@@ -106,16 +108,15 @@ export function imageOutputType(source: { size: number; type?: string }, hasAlph
 }
 
 /**
- * True when a picked image uploads as it is, without preparing: a GIF that
- * fits the cap keeps its animation, and GIFs carry no camera data. Every
- * other image is redrawn, which drops camera data and caps its size.
+ * True when a picked GIF uploads as it is, without preparing: a GIF that
+ * fits the cap keeps its animation, and GIFs carry no camera data. Covers
+ * and icons redraw every other image, which drops camera data and caps its
+ * size; a document also keeps a small still image's own bytes when it says
+ * nothing of a place (original-rules.ts).
  */
 export function uploadsUnprepared(file: { type: string; size: number }, profile: ImagePrepareProfile): boolean {
   return file.type === "image/gif" && file.size > 0 && file.size <= profile.maxBytes;
 }
-
-/** How many leading bytes say whether a WebP or a PNG is animated. */
-export const animationBytes = 65_536;
 
 /** Whether the ASCII `word` is in `bytes` at `at`. */
 function wordAt(bytes: Uint8Array, at: number, word: string): boolean {
@@ -125,30 +126,57 @@ function wordAt(bytes: Uint8Array, at: number, word: string): boolean {
   return true;
 }
 
-/** Whether a WebP's extended header sets its animation flag. */
-function isAnimatedWebp(start: Uint8Array): boolean {
-  return wordAt(start, 0, "RIFF") && wordAt(start, 8, "WEBPVP8X") && ((start[20] ?? 0) & 0x02) !== 0;
-}
-
-/** Whether a PNG has an `acTL` chunk before its first picture data. */
-function isAnimatedPng(start: Uint8Array): boolean {
-  if (!wordAt(start, 1, "PNG")) return false;
-  const view = new DataView(start.buffer, start.byteOffset, start.byteLength);
-  for (let at = 8; at + 8 <= start.length; at += 12 + view.getUint32(at)) {
-    if (wordAt(start, at + 4, "acTL")) return true;
-    if (wordAt(start, at + 4, "IDAT")) return false;
-  }
-  return false;
+/** The unsigned number in `count` bytes at `at`; 0 past the end. */
+function uintAt(bytes: Uint8Array, at: number, count: number, little: boolean): number {
+  let value = 0;
+  for (let index = 0; index < count; index += 1) value = value * 256 + (bytes[little ? at + count - 1 - index : at + index] ?? 0);
+  return value;
 }
 
 /**
- * True when a file's first bytes say it is an animated WebP or an animated
- * PNG. Redrawing one would keep only its first frame, so it uploads as it
- * is, as a GIF does.
+ * Whether a WebP really moves: its extended header sets the animation
+ * flag, and its chunks hold an `ANIM` and more than one `ANMF` frame.
  */
-export function isAnimatedImage(type: string, start: Uint8Array): boolean {
-  if (type === "image/webp") return isAnimatedWebp(start);
-  return type === "image/png" && isAnimatedPng(start);
+function isAnimatedWebp(bytes: Uint8Array): boolean {
+  if (!wordAt(bytes, 0, "RIFF") || !wordAt(bytes, 8, "WEBPVP8X") || ((bytes[20] ?? 0) & 0x02) === 0) return false;
+  let hasAnim = false;
+  let frames = 0;
+  for (let at = 12; at + 8 <= bytes.length; ) {
+    const size = uintAt(bytes, at + 4, 4, true);
+    if (wordAt(bytes, at, "ANIM")) hasAnim = true;
+    if (wordAt(bytes, at, "ANMF")) frames += 1;
+    at += 8 + size + (size % 2);
+  }
+  return hasAnim && frames > 1;
+}
+
+/**
+ * Whether a PNG really moves: an `acTL` chunk before its first picture
+ * data says it has more than one frame, and the file holds at least two
+ * frame headers (`fcTL`).
+ */
+function isAnimatedPng(bytes: Uint8Array): boolean {
+  if (!wordAt(bytes, 1, "PNG")) return false;
+  let declared = 0;
+  let frames = 0;
+  let seenPicture = false;
+  for (let at = 8; at + 12 <= bytes.length; at += 12 + uintAt(bytes, at, 4, false)) {
+    if (wordAt(bytes, at + 4, "acTL") && !seenPicture) declared = uintAt(bytes, at + 8, 4, false);
+    if (wordAt(bytes, at + 4, "fcTL")) frames += 1;
+    if (wordAt(bytes, at + 4, "IDAT")) seenPicture = true;
+  }
+  return declared > 1 && frames > 1;
+}
+
+/**
+ * True when a whole WebP or PNG file really has more than one frame.
+ * Redrawing one would keep only its first frame, so it uploads as it is,
+ * as a GIF does. A file that declares animation but holds one frame is a
+ * still: a redraw keeps that frame and loses nothing.
+ */
+export function isAnimatedImage(type: string, bytes: Uint8Array): boolean {
+  if (type === "image/webp") return isAnimatedWebp(bytes);
+  return type === "image/png" && isAnimatedPng(bytes);
 }
 
 /** True when RGBA pixel data has any pixel that is not fully opaque. */
