@@ -140,6 +140,30 @@ test("should show the zip being unpacked, and add nothing when Cancel stops it",
   expect(asked.publishes).toEqual([]);
 });
 
+test("should unpack a second zip after the first, and let Cancel stop both while they wait", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-zip-unpack", "1"); });
+  const input = page.locator("[data-slot=add-files-input]");
+  const unpacking = section(page).locator("[data-slot=page-zip-unpacking]");
+  await input.setInputFiles(await zipPayload("a.zip", [{ name: "a.css", data: "a{}" }]));
+  await expect(unpacking).toContainText("Unpacking a.zip");
+  await input.setInputFiles(await zipPayload("b.zip", [{ name: "b.css", data: "b{}" }]));
+  await unpacking.getByRole("button", { name: "Cancel" }).click();
+  await expect(unpacking).toHaveCount(0);
+  await page.evaluate(() => { window.dispatchEvent(new Event("fixture:release-zip-unpack")); });
+  expect((await counts(page)).requests, "neither zip added anything").toEqual([]);
+
+  // Held again: the second waits behind the first, and both land once released, in order.
+  await input.setInputFiles(await zipPayload("c.zip", [{ name: "c.css", data: "c{}" }]));
+  await expect(unpacking).toContainText("Unpacking c.zip");
+  await input.setInputFiles(await zipPayload("d.zip", [{ name: "d.css", data: "d{}" }]));
+  await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-zip-unpack"); window.dispatchEvent(new Event("fixture:release-zip-unpack")); });
+  await expect(unpacking).toHaveCount(0);
+  await expect.poll(async () => (await pathsShown(page)).sort()).toEqual(["c.css", "d.css"]);
+  await expect(fromZip(page)).toContainText("From d.zip: 1 file.");
+  expect((await counts(page)).publishes.flatMap((published) => published.added)).toEqual(["c.css", "d.css"]);
+});
+
 test("should say the browser cannot unpack a zip, and add nothing, when it has no DecompressionStream", async ({ page }) => {
   await page.addInitScript(() => { Reflect.deleteProperty(window, "DecompressionStream"); });
   await open(page);

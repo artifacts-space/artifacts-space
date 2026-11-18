@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { unpacksAsZip } from "@/lib/page-files/zip-rules";
 
 import type { DroppedFile } from "./dropped-files";
-import { browserCanUnpack, unpackDrop, type UnpackedDrop, type ZipReader } from "./unpack-drop";
+import { browserCanUnpack, unpackDrop, unpackFailed, type UnpackedDrop, type ZipReader } from "./unpack-drop";
 
 /** The zip being unpacked, and how far it is, in whole percent. */
 export interface Unpacking {
@@ -38,7 +38,8 @@ export function useZipUnpack(onUnpacked: (drop: UnpackedDrop) => void, read?: Zi
       if (stopped()) return;
       const onProgress = (name: string, fraction: number) => { if (!stopped()) setUnpacking({ name, percent: Math.round(fraction * 100) }); };
       onProgress(dropped.find((entry) => unpacksAsZip({ name: entry.file.name, fromFolder: entry.fromFolder }))?.file.name ?? "", 0);
-      const drop = await unpackDrop(dropped, { signal, onProgress, read: handlers.current.read, canUnpack: browserCanUnpack() }).catch(() => null);
+      // A fault nothing else caught still ends in words: the drop's other files go on, and each zip says it could not be unpacked.
+      const drop = await unpackDrop(dropped, { signal, onProgress, read: handlers.current.read, canUnpack: browserCanUnpack() }).catch(() => unpackFailed(dropped));
       if (drop && !stopped()) handlers.current.onUnpacked(drop);
     };
     const done = () => {

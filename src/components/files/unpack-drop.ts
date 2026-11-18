@@ -60,7 +60,8 @@ function addContents(drop: UnpackedDrop, zip: File, contents: ZipContents): void
   drop.refused.push(...contents.leftOut.map((entry) => ({ name: `${entry.name} (in ${zip.name})`, problem: zipLeftOutWords(entry.reason) })));
   drop.refused.push(...contents.tooLarge.map((entry) => tooLargeRefusal(zip.name, entry)));
   drop.leftOut += contents.skipped;
-  drop.sources.push({ name: zip.name, count: files.length, file: zip });
+  // A zip none of whose files went on says nothing of where they came from: the quiet line and the "Not added" rows say why.
+  if (files.length > 0) drop.sources.push({ name: zip.name, count: files.length, file: zip });
 }
 
 type ZipOutcome = { kind: "read"; contents: ZipContents } | { kind: "refused"; problem: string } | { kind: "cancelled" };
@@ -78,9 +79,24 @@ async function readOne(zip: File, options: UnpackOptions): Promise<ZipOutcome> {
   return result.fault === "cancelled" ? { kind: "cancelled" } : { kind: "refused", problem: zipFaultWords(result.fault, zip.size) };
 }
 
-/** True in a browser that can inflate a zip's entries. */
+/** True in a browser that can inflate a zip's entries: one with DecompressionStream that knows the "deflate-raw" format, which some older ones do not. */
 export function browserCanUnpack(): boolean {
-  return typeof DecompressionStream === "function";
+  try {
+    return typeof DecompressionStream === "function" && new DecompressionStream("deflate-raw") instanceof DecompressionStream;
+  } catch {
+    return false;
+  }
+}
+
+/** A drop whose unpacking failed in a way nothing above caught: its other files go on, and each zip says it could not be unpacked. */
+export function unpackFailed(dropped: readonly DroppedFile[]): UnpackedDrop {
+  const zips = dropped.filter((entry) => unpacksAsZip({ name: entry.file.name, fromFolder: entry.fromFolder }));
+  return {
+    files: dropped.filter((entry) => !zips.includes(entry)),
+    refused: zips.map((entry) => ({ name: entry.file.name, problem: unreadableZipWords })),
+    leftOut: 0,
+    sources: [],
+  };
 }
 
 /**

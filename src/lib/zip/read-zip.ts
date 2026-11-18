@@ -139,8 +139,18 @@ function stopAfter(got: number, record: ZipEntryRecord, tally: Tally, signal: Ab
   return null;
 }
 
-/** Takes a break once enough has come out since the last one. */
-async function breakNow(tally: Tally, length: number): Promise<void> {
+/** A reader of the entry's output, or null on a platform without the "deflate-raw" format, which cannot inflate it. */
+function openOutput(zip: Uint8Array<ArrayBuffer>, record: ZipEntryRecord): ReadableStreamDefaultReader<Uint8Array> | null {
+  try {
+    return outputOf(zip, record).getReader();
+  } catch {
+    return null;
+  }
+}
+
+/** Reports how far the read is, and takes a break once enough has come out since the last one. */
+async function afterChunk(tally: Tally, length: number): Promise<void> {
+  tally.onProgress?.(Math.min(1, tally.out / Math.max(1, tally.declared)));
   tally.sinceBreak += length;
   if (tally.sinceBreak < outputBetweenBreaks) return;
   tally.sinceBreak = 0;
@@ -149,7 +159,8 @@ async function breakNow(tally: Tally, length: number): Promise<void> {
 
 /** Reads one entry's output, counting each chunk before it is kept, and stops the stream the moment a cap is passed. */
 async function unpackEntry(zip: Uint8Array<ArrayBuffer>, record: ZipEntryRecord, tally: Tally, signal: AbortSignal | undefined): Promise<Unpacked> {
-  const reader = outputOf(zip, record).getReader();
+  const reader = openOutput(zip, record);
+  if (!reader) return { ok: false, fault: "method" };
   const parts: Uint8Array[] = [];
   let got = 0;
   let crc = crc32Start;
@@ -163,8 +174,7 @@ async function unpackEntry(zip: Uint8Array<ArrayBuffer>, record: ZipEntryRecord,
       if (stop) { await reader.cancel().catch(() => undefined); return { ok: false, fault: stop }; }
       crc = crc32Update(crc, value);
       parts.push(value);
-      tally.onProgress?.(Math.min(1, tally.out / Math.max(1, tally.declared)));
-      await breakNow(tally, value.length);
+      await afterChunk(tally, value.length);
     }
   } catch {
     // The inflater refused the data: cut short, or not deflate at all.

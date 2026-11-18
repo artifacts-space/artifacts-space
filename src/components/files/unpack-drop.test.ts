@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { routeDrop } from "@/lib/page-files/drop-rules";
-import { cannotUnpackWords, zipFaultWords } from "@/lib/page-files/zip-rules";
+import { cannotUnpackWords, unreadableZipWords, zipFaultWords } from "@/lib/page-files/zip-rules";
 import { buildZip, type TestZipEntry } from "@/lib/zip/test-zip";
 
 import type { DroppedFile } from "./dropped-files";
-import { unpackDrop, type UnpackOptions } from "./unpack-drop";
+import { unpackDrop, unpackFailed, type UnpackOptions } from "./unpack-drop";
 
 async function zipFile(name: string, entries: readonly TestZipEntry[]): Promise<DroppedFile> {
   const zip = await buildZip(entries);
@@ -81,5 +81,18 @@ describe("unpackDrop", () => {
     const inFolder = { ...(await zipFile("archive.zip", site)), relativePath: "site/archive.zip", fromFolder: true };
     const drop = await unpackDrop([inFolder], options());
     expect(drop?.files).toEqual([inFolder]);
+  });
+
+  it("should say nothing of where files came from when none of a zip's files went on", async () => {
+    const drop = await unpackDrop([await zipFile("hidden.zip", [{ name: ".DS_Store", data: "x" }, { name: "__MACOSX/._a.css", data: "y" }])], options());
+    expect(drop?.files).toEqual([]);
+    expect(drop?.leftOut).toBe(2);
+    expect(drop?.sources).toEqual([]);
+  });
+
+  it("should keep a drop's other files and say each zip could not be read when unpacking fails unexpectedly", async () => {
+    const zip = await zipFile("site.zip", site);
+    const other = loose("b.css");
+    expect(unpackFailed([zip, other])).toEqual({ files: [other], refused: [{ name: "site.zip", problem: unreadableZipWords }], leftOut: 0, sources: [] });
   });
 });
