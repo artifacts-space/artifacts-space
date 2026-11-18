@@ -36,6 +36,10 @@ test("should show the agent saving a web page and name no earlier format when th
   expect(words).not.toMatch(/\bcanvas\b/i);
   await expect(demo.locator(".text-kind-ui, .text-kind-canvas")).toHaveCount(0);
   await expect(page.locator("#demo figcaption")).toContainText("web page");
+
+  // The page is plain markup now: no interface renderer (the `ui` container) is drawn anywhere on the landing page.
+  const interfaces = await page.evaluate(() => [...document.querySelectorAll("*")].filter((node) => getComputedStyle(node).containerName === "ui").length);
+  expect(interfaces, "interfaces drawn on the landing page").toBe(0);
 });
 
 test("should list the current formats and leave out interfaces and canvases when the pricing section is read", async ({ page }) => {
