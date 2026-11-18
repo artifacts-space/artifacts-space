@@ -10,6 +10,7 @@ import { diagramViews, type DiagramView } from "@/lib/markdown/fence-info";
 
 import type { CodeBlockAttrs } from "./code-block-attrs";
 import { CodeLanguagePicker } from "./code-language-picker";
+import { useEditorAnnounce } from "./editor-live-region";
 
 const viewLabels: Record<DiagramView, string> = { code: "Code", preview: "Preview", split: "Split" };
 
@@ -52,12 +53,14 @@ export interface CodeBlockToolbarProps {
  * editors only.
  */
 export function CodeBlockToolbar({ language, code, editable, view, wrap, captionShown, onLanguage, onView, onWrap, onCaption }: CodeBlockToolbarProps) {
+  // "Copied" is spoken by the editor's live region, never by one inside the text (editor-live-region.tsx).
+  const announce = useEditorAnnounce();
   return (
     <div contentEditable={false} data-code-toolbar="" className="flex min-h-9 items-center gap-1 border-b border-code-border pr-1.5 pl-1.5 select-none">
       <CodeLanguagePicker language={language} disabled={!editable} onChange={onLanguage} />
       {view ? <DiagramViewPicker view={view} disabled={!editable} onChange={onView} /> : null}
       <div className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover/code:opacity-100 group-focus-within/code:opacity-100 pointer-coarse:opacity-100">
-        <CopyIconButton value={code} label="Copy code" />
+        <CopyIconButton value={code} label="Copy code" announce={announce} />
         {editable ? (
           <IconButton label="Wrap code" pressed={wrap} onClick={() => { onWrap(!wrap); }} className={wrap ? "text-foreground" : undefined}>
             <IconTextWrap />

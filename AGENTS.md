@@ -189,7 +189,17 @@ lint. Nothing renders under the 13px floor.
   mounted by `UiView`): a view hands it words with `useAnnounced`, behind the
   `announce` prop. Never put `role="status"` or `aria-live` on an element
   that arrives later; a screen reader announces that unreliably. Text drawn
-  with the interface is not spoken, and the editor has no region. Words
+  with the interface is not spoken. A rich editor (the document editor and
+  the comment box) has one region of its own, drawn beside its text
+  (`EditorLiveRegion` in `src/components/editor/rich/editor-live-region.tsx`);
+  a block's control speaks through it with `useEditorAnnounce`, as a code
+  block's Copy does (`CopyIconButton`'s `announce`). Never put `aria-live`
+  inside the editor's text: a modal dialog keeps every live region on the
+  page audible by setting `aria-hidden` on everything around it, and on the
+  editor's blocks ProseMirror reads that as an edit and draws them again,
+  which destroys every block view in the range with its state (a diagram
+  opened larger, an open caption field, the image viewer). That was issue
+  #226; `e2e/markdown-mermaid.spec.ts` checks the text holds none. Words
   that follow typing must not be announced: validation warns
   (`announce_follows_typing`, `announcedTypingIssues` in
   `src/lib/ui/validate-fields.ts`) when an announced prop reads state a text

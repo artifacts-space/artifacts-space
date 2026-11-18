@@ -155,6 +155,55 @@ test("should open a diagram larger when a reader clicks it", async ({ page }) =>
   await expect(dialog).toBeVisible();
 });
 
+/**
+ * Opens the editor's diagram larger with a click, checks that it stays open
+ * and that the block's view is the one that was clicked, then closes it with
+ * `close` and checks the focus is back on the diagram's Zoom in.
+ */
+async function expectOpensLargerInEditor(page: Page, block: Locator, close: "Escape" | "Close") {
+  const clicked = await block.elementHandle();
+  await clickInEditor(block.getByRole("img", { name: "Diagram" }));
+  const dialog = page.getByRole("dialog", { name: "Diagram" });
+  await expect(dialog.getByRole("img", { name: "Diagram" })).toBeVisible();
+  // The editor never drew the block again under the dialog: that took the dialog with it (issue #226).
+  expect(await clicked.evaluate((element) => element.isConnected)).toBe(true);
+  await expect(dialog).toBeVisible();
+  if (close === "Escape") await page.keyboard.press("Escape");
+  else await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toBeHidden();
+  const zoom = block.getByRole("button", { name: "Zoom in" });
+  await expect(zoom).toBeFocused();
+  // It shows while it has the focus, after a close with the pointer too.
+  await page.mouse.move(0, 0);
+  await expect(zoom).toHaveCSS("opacity", "1");
+}
+
+test("should open a diagram larger in the editor and keep it open until it is closed, in Preview and in Split", async ({ page }) => {
+  await openFixture(page);
+  const block = await editorBlock(page);
+  // A live region inside the editor's text makes a modal dialog write aria-hidden onto the editor's blocks, and ProseMirror then draws them again (editor-live-region.tsx).
+  await expect(editor(page).locator("[aria-live]")).toHaveCount(0);
+  await expectOpensLargerInEditor(page, block, "Escape");
+  await expect(sourceOf(block)).toBeHidden();
+
+  await pickView(page, block, "Split");
+  await expect(sourceOf(block)).toBeVisible();
+  await expectOpensLargerInEditor(page, block, "Close");
+  // Opening and closing changed nothing in the document.
+  await expect(savedMarkdown(page)).toContainText("```mermaid {view=split}\nflowchart LR\n  Plan --> Build\n```");
+});
+
+test("should say Copied through the editor's own live region, beside its text, when a diagram's source is copied", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await openFixture(page);
+  const block = await editorBlock(page);
+  await block.hover();
+  await block.getByRole("button", { name: "Copy code" }).click();
+  await expect(page.locator("[data-editor-live-region]")).toHaveText("Copied");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("flowchart LR\n  Plan --> Build");
+  await expect(editor(page).locator("[aria-live]")).toHaveCount(0);
+});
+
 test("should show the diagram alone, keeping its source in place, when the view is preview", async ({ page }) => {
   await openFixture(page);
   const block = await editorBlock(page);
@@ -296,6 +345,9 @@ test("should keep the diagram alone in Preview when it is clicked and when every
   await openFixture(page);
   const block = await editorBlock(page);
   await clickInEditor(block.getByRole("img", { name: "Diagram" }));
+  // The click opens the diagram larger; behind the dialog the editor is hidden from the accessibility tree, so close it first.
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Diagram" })).toBeHidden();
   // A click on the diagram never opens the source.
   await expect(sourceOf(block)).toBeHidden();
   await expect(block).not.toHaveAttribute("data-source-open", "");

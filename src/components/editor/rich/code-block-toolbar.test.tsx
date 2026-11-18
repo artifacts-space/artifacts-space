@@ -28,6 +28,11 @@ describe("CodeBlockToolbar", () => {
     expect(html).toContain("Split");
   });
 
+  it("should hold no live region when it is drawn inside the editor's text", () => {
+    // A modal dialog would write aria-hidden onto the editor's blocks to keep it audible, and ProseMirror would draw them again (editor-live-region.tsx).
+    expect(render()).not.toContain("aria-live");
+  });
+
   it("should leave out the view picker when the block is plain code", () => {
     expect(render({ language: "ts", view: null })).not.toContain("Diagram view");
   });

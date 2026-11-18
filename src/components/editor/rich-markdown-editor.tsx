@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { HighlightedTextarea } from "./highlighted-textarea";
 import { BlockHandlesFrame, useBlockHandles } from "./rich/block-menu/block-controls";
 import { TableBubbleMenu, TextBubbleMenu } from "./rich/bubble-menus";
+import { EditorLiveRegion } from "./rich/editor-live-region";
 import { richEditorExtensions } from "./rich/editor-extensions";
 import type { RawKind } from "./rich/markdown-block-details";
 import { parseMarkdown, serializeMarkdown, type SourceMap } from "./rich/markdown-roundtrip";
@@ -141,31 +142,33 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
 
   return (
     <div className="rich-editor">
-      {sourceToggle ? <SourceSwitch markdown={mode === "markdown"} onClick={mode === "rich" ? showMarkdown : showRich} /> : null}
-      {mode === "markdown" ? (
-        <HighlightedTextarea
-          textareaRef={textareaRef}
-          value={value}
-          onChange={(event) => { onChange(event.target.value); }}
-          aria-label={`${label} (Markdown)`}
-          autoFocus
-          spellCheck
-          className="max-h-none min-h-[50dvh]"
-        />
-      ) : null}
-      <div hidden={mode !== "rich"}>
-        {editor ? (
-          <>
-            <RawBlocksNotice count={rawBlocks} kinds={rawKinds} onShowMarkdown={onEditSource ?? showMarkdown} />
-            <MediaRefusedNote shown={mediaRefused} />
-            {coarse ? <TouchToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /> : <TextBubbleMenu editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
-            <TableBubbleMenu editor={editor} />
-          </>
+      <EditorLiveRegion>
+        {sourceToggle ? <SourceSwitch markdown={mode === "markdown"} onClick={mode === "rich" ? showMarkdown : showRich} /> : null}
+        {mode === "markdown" ? (
+          <HighlightedTextarea
+            textareaRef={textareaRef}
+            value={value}
+            onChange={(event) => { onChange(event.target.value); }}
+            aria-label={`${label} (Markdown)`}
+            autoFocus
+            spellCheck
+            className="max-h-none min-h-[50dvh]"
+          />
         ) : null}
-        <BlockHandlesFrame editor={editor} on={blocks.on}>
-          <EditorContent editor={editor} className="min-h-[50dvh]" />
-        </BlockHandlesFrame>
-      </div>
+        <div hidden={mode !== "rich"}>
+          {editor ? (
+            <>
+              <RawBlocksNotice count={rawBlocks} kinds={rawKinds} onShowMarkdown={onEditSource ?? showMarkdown} />
+              <MediaRefusedNote shown={mediaRefused} />
+              {coarse ? <TouchToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /> : <TextBubbleMenu editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
+              <TableBubbleMenu editor={editor} />
+            </>
+          ) : null}
+          <BlockHandlesFrame editor={editor} on={blocks.on}>
+            <EditorContent editor={editor} className="min-h-[50dvh]" />
+          </BlockHandlesFrame>
+        </div>
+      </EditorLiveRegion>
     </div>
   );
 }

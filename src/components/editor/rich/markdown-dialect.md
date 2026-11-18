@@ -220,7 +220,8 @@ flowchart TD
   light, dark, and the artifact's theme. Screen readers get the source as
   text after the image, or from the code block beside it in Split.
 - **Zoom:** a click on a drawn diagram, or its Zoom in button, opens it
-  larger in a dialog.
+  larger in a dialog, in the read view and in the editor (Preview and
+  Split). Escape or Close shuts it, and the focus goes to Zoom in.
 - **A diagram that cannot be drawn** shows a short note ("Couldn’t draw this
   diagram.") and its source as an ordinary code block, never an empty space.
 - **The read view** (`MarkdownView` with `diagrams`) shows each block in its
