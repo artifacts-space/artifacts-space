@@ -147,7 +147,7 @@ describe("frameDocument", () => {
     expect(html.split('window.addEventListener("message", onPing);').length - 1).toBe(2);
     // The listener is added after document.open(), which drops the earlier ones, and before the page is written.
     expect(html.indexOf("document.open()")).toBeLessThan(html.indexOf('window.addEventListener("message", onPing)'));
-    expect(html.indexOf('window.addEventListener("message", onPing)')).toBeLessThan(html.indexOf("document.write(data.html)"));
+    expect(html.indexOf('window.addEventListener("message", onPing)')).toBeLessThan(html.indexOf("document.write(html)"));
   });
 
   it("should never let a value end its script element", () => {
@@ -169,10 +169,10 @@ describe("framingSite", () => {
 });
 
 describe("pageHostResponse", () => {
-  const answer = (pathname: string, method = "GET", host = `${label}.artifacts.link`) => pageHostResponse({ method, pathname, host }, production);
+  const answer = (pathname: string, method = "GET", host = `${label}.artifacts.link`, headers: Record<string, string> = {}) => pageHostResponse({ method, pathname, host, headers: new Headers(headers) }, production);
   /** The answer, for a request the proxy answers itself. */
-  const ask = (pathname: string, method = "GET", host = `${label}.artifacts.link`) => {
-    const response = answer(pathname, method, host);
+  const ask = (pathname: string, method = "GET", host = `${label}.artifacts.link`, headers: Record<string, string> = {}) => {
+    const response = answer(pathname, method, host, headers);
     if (!response) throw new Error(`${pathname} was let through to the page file route.`);
     return response;
   };
@@ -219,14 +219,65 @@ describe("pageHostResponse", () => {
     for (const host of ["www.artifacts.link", "artifacts.space", `${label}.example.com`, `${label}.x.artifacts.link`]) {
       expect(ask(`/f/${token}/site.css`, "GET", host).status, host).toBe(404);
     }
-    expect(pageHostResponse({ method: "GET", pathname: `/f/${token}/site.css`, host: `${label}.artifacts.link` }, { NODE_ENV: "production" })?.status).toBe(404);
+    expect(pageHostResponse({ method: "GET", pathname: `/f/${token}/site.css`, host: `${label}.artifacts.link`, headers: new Headers() }, { NODE_ENV: "production" })?.status).toBe(404);
+  });
+
+  it("should answer a browser that goes to another page of the site with the frame document, its headers, and the header it varies by", async () => {
+    const root = ask("/");
+    for (const page of ["about.html", "docs/guide.html", "docs/index.html", "missing.html"]) {
+      for (const headers of [{}, { "sec-fetch-dest": "iframe", "sec-fetch-mode": "navigate" }, { "x-page-source": "1", "sec-fetch-dest": "iframe" }, { "x-page-source": "1", "sec-fetch-site": "cross-site" }]) {
+        const response = ask(`/f/${token}/${page}`, "GET", `${label}.artifacts.link`, headers);
+        expect(response.status, page).toBe(200);
+        expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
+        expect(response.headers.get("content-security-policy")).toBe(root.headers.get("content-security-policy"));
+        // Only the reader's own browser may keep it: a shared cache never stores an answer under a files address.
+        expect(response.headers.get("cache-control")).toBe("private, max-age=3600");
+        expect(response.headers.get("vary")).toBe("X-Page-Source");
+        expect(await response.text()).toBe(await ask("/").text());
+      }
+    }
+    // Only the frame document's own address keeps the answer it always had.
+    expect(root.headers.get("vary")).toBeNull();
+    expect(ask(`/f/${token}/index.html`).headers.get("vary")).toBeNull();
+  });
+
+  it("should let any cache keep the frame document at the root, and only the reader's browser keep it under a files address", () => {
+    expect(ask("/").headers.get("cache-control")).toBe("public, max-age=3600");
+    for (const page of ["index.html", "about.html", "docs/guide.html"]) {
+      const cacheControl = ask(`/f/${token}/${page}`).headers.get("cache-control") ?? "";
+      expect(cacheControl, page).toBe("private, max-age=3600");
+      expect(cacheControl, page).not.toMatch(/public|s-maxage/);
+    }
+    // Under next dev nothing is kept, as before.
+    const dev = pageHostResponse({ method: "GET", pathname: `/f/${token}/about.html`, host: `${label}.localhost:3000`, headers: new Headers() }, { NODE_ENV: "development" });
+    expect(dev?.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("should let only the frame document's fetch of a page's source through to the route", () => {
+    for (const headers of [{ "x-page-source": "1" }, { "x-page-source": "1", "sec-fetch-dest": "empty", "sec-fetch-site": "same-origin" }]) {
+      expect(answer(`/f/${token}/about.html`, "GET", `${label}.artifacts.link`, headers)).toBeNull();
+      expect(answer(`/f/${token}/about.html`, "HEAD", `${label}.artifacts.link`, headers)).toBeNull();
+      expect(ask(`/f/${token}/about.html`, "POST", `${label}.artifacts.link`, headers).status).toBe(405);
+      // The page's own name is never anything but the frame document.
+      expect(ask(`/f/${token}/index.html`, "GET", `${label}.artifacts.link`, headers).status).toBe(200);
+    }
+  });
+
+  it("should answer a page address 404 on every host that is not a page host of this deployment, with or without the header", () => {
+    for (const host of ["www.artifacts.link", "artifacts.space", `${label}.example.com`, `${label}.x.artifacts.link`]) {
+      expect(ask(`/f/${token}/about.html`, "GET", host).status, host).toBe(404);
+      expect(ask(`/f/${token}/about.html`, "GET", host, { "x-page-source": "1" }).status, host).toBe(404);
+    }
   });
 
   it("should read a path as the frame document, a page file, or nothing", () => {
     expect(pageHostPath("/")).toBe("frame");
     expect(pageHostPath(`/f/${token}/index.html`)).toBe("frame");
     expect(pageHostPath(`/f/${token}/css/site.css`)).toBe("file");
-    expect(pageHostPath(`/f/${token}/css/index.html`)).toBe("file");
+    expect(pageHostPath(`/f/${token}/css/index.html`)).toBe("page");
+    expect(pageHostPath(`/f/${token}/about.html`)).toBe("page");
+    expect(pageHostPath(`/f/${token}/docs/guide.html`)).toBe("page");
+    for (const pathname of [`/f/${token}/about.HTML`, `/f/${token}/about.htm`, `/f/${token}/.hidden.html`, `/f/${token}/a/.b/c.html`, `/f/${token}/..html`, `/f/${token}/a b.html`]) expect(pageHostPath(pathname), pathname).toBe("file");
     for (const pathname of ["", "/f", `/f/${token}`, `/f/${token}/`, "/index.html", `/F/${token}/site.css`, `/x/f/${token}/site.css`]) expect(pageHostPath(pathname), pathname).toBe("none");
   });
 
@@ -265,7 +316,7 @@ describe("hosts under the page domain that are not page hosts", () => {
     const group = /^\/:path\((.*)\)$/.exec(pageDomainRewriteSource)?.[1] ?? "";
     const caught = (pathname: string) => new RegExp(`^${group}$`).test(pathname.slice(1));
     for (const pathname of ["/", "/app", "/sign-in", "/api/auth/get-session", "/f", "/f/", `/f/${token}`, `/f/${token}/`, "/files/x/y", `/x/f/${token}/site.css`, "/_next/static/chunk.js"]) expect(caught(pathname), pathname).toBe(true);
-    for (const pathname of [`/f/${token}/site.css`, `/f/${token}/js/app.js`, `/f/${token}/index.html`]) expect(caught(pathname), pathname).toBe(false);
+    for (const pathname of [`/f/${token}/site.css`, `/f/${token}/js/app.js`, `/f/${token}/index.html`, `/f/${token}/about.html`, `/f/${token}/docs/guide.html`]) expect(caught(pathname), pathname).toBe(false);
   });
 
   it("should hold for a host in capitals and for one that ends with a dot, as the proxy's check does", () => {

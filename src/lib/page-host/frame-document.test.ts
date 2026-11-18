@@ -29,7 +29,7 @@ function loadFrame(pathname: string) {
   const moves: string[] = [];
   const written: string[] = [];
   const host = { postMessage: (message: { type?: string }, target: string) => { posted.push({ message, target }); } };
-  const location = { pathname };
+  const location = { pathname, search: "", hash: "" };
   const frame = {
     parent: host,
     addEventListener: (_type: string, listener: (event: Message) => void) => { listeners.add(listener); },

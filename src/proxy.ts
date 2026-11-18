@@ -40,9 +40,11 @@ import { getTeamForMember } from "@/lib/teams/queries";
  *
  * A request to a page host (`<label>.<PAGE_HOST>`, where an HTML artifact's
  * page runs) is answered here, whole, with the frame document or a 404
- * (src/lib/page-host/respond.ts). One kind goes on: a page file
- * (`/f/<token>/<path>`), to the one route that serves it. The matcher's
- * last entry sends every path of such a host here.
+ * (src/lib/page-host/respond.ts): the frame document is also the answer
+ * at every page address of a site (`/f/<token>/about.html`). One kind goes
+ * on: a page file (`/f/<token>/<path>`), and the frame document's own fetch
+ * of a page's source, to the one route that serves them. The matcher's last
+ * entry sends every path of such a host here.
  *
  * Signed-in visitors skip the landing page and the sign-in pages and go to
  * the workspace (src/lib/auth/entry-rules.ts). Those pages stay static: the
@@ -196,7 +198,7 @@ export function proxy(request: NextRequest) {
   // A page host never reaches the app, whatever the path. Nor does any other host under the page domain: the
   // Next config sends those to a 404 (pageDomainRewrites), and the paths that run this proxy first stop here.
   // The one request that goes on is for a page file, which its route answers (src/app/f): the route checks the host and the token again.
-  if (looksLikePageHost(host) || isUnderPageDomain(host, pageHostBase())) return pageHostResponse({ method: request.method, pathname: request.nextUrl.pathname, host }) ?? NextResponse.next();
+  if (looksLikePageHost(host) || isUnderPageDomain(host, pageHostBase())) return pageHostResponse({ method: request.method, pathname: request.nextUrl.pathname, host, headers: request.headers }) ?? NextResponse.next();
   return siteProxy(request);
 }
 

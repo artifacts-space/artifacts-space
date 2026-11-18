@@ -68,7 +68,8 @@ function isPageName(value: string): value is PageName {
  * A page that loads its own page files by relative path, and reports what
  * arrived: a stylesheet, a picture the stylesheet names, a module that
  * imports its sibling, and data it fetches. It also asks for a file under
- * an address that is not its own, and for the site.
+ * an address that is not its own, and for the site. It links to the other
+ * pages of its site (fixture-source.ts) and to a page it does not have.
  */
 const filesPage = `<!doctype html>
 <html lang="en">
@@ -81,6 +82,7 @@ const filesPage = `<!doctype html>
 <p id="data">No data</p>
 <p id="other-address"></p>
 <p id="site-fetch"></p>
+<p><a id="to-about" href="about.html">About</a> <a id="to-guide" href="docs/guide.html?tab=2#top">Guide</a> <a id="to-missing" href="missing.html">Missing</a></p>
 <img id="image" src="img/dot.svg" alt="A dot">
 <script type="module" src="js/app.js"></script>
 <script>${report}
@@ -96,8 +98,11 @@ const filesPage = `<!doctype html>
 
 /** The fixture page's files as the artifact lists them: the paths that fixture-source.ts serves. */
 const filesPageFiles: readonly FileDto[] = (
-  [["css/site.css", "text/css"], ["js/app.js", "text/javascript"], ["js/message.js", "text/javascript"], ["data.json", "application/json"], ["img/dot.svg", "image/svg+xml"]] as const
-).map(([pagePath, contentType], index) => ({ id: `00000000-0000-4000-8000-00000000000${String(index)}`, filename: pagePath.slice(pagePath.lastIndexOf("/") + 1), contentType, size: 100, createdAt: "2026-11-17T00:00:00.000Z", replacedAt: null, pagePath }));
+  [
+    ["css/site.css", "text/css"], ["js/app.js", "text/javascript"], ["js/message.js", "text/javascript"], ["data.json", "application/json"], ["img/dot.svg", "image/svg+xml"],
+    ["about.html", "text/html"], ["docs/guide.html", "text/html"], ["docs/intro.html", "text/html"], ["docs/guide.css", "text/css"], ["docs/guide.js", "text/javascript"],
+  ] as const
+).map(([pagePath, contentType], index) => ({ id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`, filename: pagePath.slice(pagePath.lastIndexOf("/") + 1), contentType, size: 100, createdAt: "2026-11-17T00:00:00.000Z", replacedAt: null, pagePath }));
 
 /** The files page, through the artifact's own HTML view: it reads the files and asks for the page's files address. */
 function FilesPage() {

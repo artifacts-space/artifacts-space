@@ -28,10 +28,17 @@ describe("pagePathProblem", () => {
     expect(pagePathProblem(path)).toContain(reason);
   });
 
-  it("should refuse a second HTML document, the page's own name included, and say why", () => {
-    for (const path of ["index.html", "about.html", "pages/about.htm", "INDEX.HTML"]) {
-      expect(pagePathProblem(path), path).toContain("cannot be another HTML document");
-    }
+  it("should take another page of the site, at the top or in a folder", () => {
+    for (const path of ["about.html", "docs/guide.html", "docs/index.html", "a/b/c/d/e/f/g/page.html", "Guide-2_x.v1.html"]) expect(pagePathProblem(path), path).toBeNull();
+  });
+
+  it("should refuse the page's own name at the top, in any letter case, and say it is the artifact's content", () => {
+    for (const path of ["index.html", "INDEX.HTML", "Index.html"]) expect(pagePathProblem(path), path).toContain("index.html is the page itself");
+  });
+
+  it("should refuse .htm and an .html name that is not in lowercase, so every page has an address the page host knows", () => {
+    expect(pagePathProblem("pages/about.htm")).toBe("A page of the site ends in .html: name it pages/about.html.");
+    for (const path of ["about.HTML", "docs/Guide.Html", "a..html"]) expect(pagePathProblem(path), path).toContain("ends in .html");
   });
 
   it("should refuse a type no page file may be, and a file without an extension", () => {
@@ -51,12 +58,14 @@ describe("page file types", () => {
     expect(pageFileTypeFor("mod.wasm")?.contentType).toBe("application/wasm");
     expect(pageFileTypeFor("photo.JPG")?.contentType).toBe("image/jpeg");
     expect(pageFileTypeFor("index.html")).toBeNull();
+    expect(pageFileTypeFor("about.html")?.contentType).toBe("text/html");
     expect(pageFileTypeFor("../a.css")).toBeNull();
   });
 
   it("should check a path before an upload starts", () => {
     expect(checkPagePath("css/site.css")).toEqual({ ok: true, contentType: "text/css" });
-    expect(checkPagePath("css/site.html")).toMatchObject({ ok: false });
+    expect(checkPagePath("css/site.html")).toEqual({ ok: true, contentType: "text/html" });
+    expect(checkPagePath("css/site.htm")).toMatchObject({ ok: false });
     expect(checkPagePath("/css/site.css")).toMatchObject({ ok: false });
   });
 
@@ -68,14 +77,18 @@ describe("page file types", () => {
     expect(servedContentType("image/png")).toBe("image/png");
   });
 
-  it("should never store a page file as HTML", () => {
-    for (const type of pageFileContentTypes) expect(type).not.toMatch(/html/);
-    // SVG is the one type here a browser can run as a document; its answer is sandboxed (pageFilePolicy).
+  it("should never serve a page file as HTML: another page of the site is served as plain text", () => {
+    for (const type of pageFileContentTypes) expect(servedContentType(type), type).not.toMatch(/html/);
+    expect(servedContentType("text/html")).toBe("text/plain; charset=utf-8");
+    // The one HTML type is the page's: stored so, for its downloads, and never served so.
+    expect(pageFileContentTypes.filter((type) => type.includes("html"))).toEqual(["text/html"]);
+    // SVG is the one type served here that a browser can run as a document; its answer is sandboxed (pageFilePolicy).
     expect(pageFileContentTypes.filter((type) => type.endsWith("xml"))).toEqual(["image/svg+xml"]);
   });
 
   it("should name a type for people, and a file by the last part of its path", () => {
     expect(pageFileLabel("text/css")).toBe("Stylesheet");
+    expect(pageFileLabel("text/html")).toBe("HTML page");
     expect(pageFileLabel("application/x-unknown")).toBe("File");
     expect(pageFileName("css/site.css")).toBe("site.css");
     expect(pageFileName("site.css")).toBe("site.css");

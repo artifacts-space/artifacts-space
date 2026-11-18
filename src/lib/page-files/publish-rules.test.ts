@@ -35,11 +35,11 @@ describe("planPagePublish", () => {
 
   it("should name every file at fault, not only the first", () => {
     const check = planPagePublish(
-      [{ path: "../secret.css", size: 10 }, { path: "page.html", size: 10 }, { path: "app.exe", size: 10 }, { path: "css/ok.css", size: 0 }, { path: "css/big.css", size: fileLimits.maxBytes + 1 }, { path: "css/fine.css", size: 10 }],
+      [{ path: "../secret.css", size: 10 }, { path: "page.htm", size: 10 }, { path: "app.exe", size: 10 }, { path: "css/ok.css", size: 0 }, { path: "css/big.css", size: fileLimits.maxBytes + 1 }, { path: "css/fine.css", size: 10 }],
       ["js/missing.js"],
       held,
     );
-    expect(faultsOf(check)).toEqual(["../secret.css", "page.html", "app.exe", "css/ok.css", "css/big.css", "js/missing.js"]);
+    expect(faultsOf(check)).toEqual(["../secret.css", "page.htm", "app.exe", "css/ok.css", "css/big.css", "js/missing.js"]);
   });
 
   it("should refuse a path named twice, and twice with different letter case", () => {

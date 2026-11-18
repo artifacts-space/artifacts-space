@@ -13,12 +13,12 @@ const { pageFileContentTypes } = await import("../page-files/rules");
 
 afterEach(() => { vi.clearAllMocks(); });
 
-/** The types only a page file may be: a stylesheet, a script, an SVG, a font, a WebAssembly module. */
+/** The types only a page file may be: another page of the site, a stylesheet, a script, an SVG, a font, a WebAssembly module. */
 const pageOnlyTypes = pageFileContentTypes.filter((type) => !isAllowedFileType(type));
 
 describe("page file types on the site's own file route (/api/files)", () => {
   it("should cover the types a browser could run or apply", () => {
-    expect(pageOnlyTypes).toEqual(expect.arrayContaining(["text/css", "text/javascript", "image/svg+xml", "font/woff2", "application/wasm"]));
+    expect(pageOnlyTypes).toEqual(expect.arrayContaining(["text/html", "text/css", "text/javascript", "image/svg+xml", "font/woff2", "application/wasm"]));
   });
 
   it("should never count a type only a page file may be as safe to show inline", () => {
@@ -55,6 +55,7 @@ describe("an upload requested as a page file", () => {
 
   it("should not be offered Replace in the Files section, which uploads plain files", () => {
     expect(offersReplace({ id: "f1", pagePath: "css/site.css" }, { icon: null, cover: null })).toBe(false);
+    expect(offersReplace({ id: "f1", pagePath: "about.html" }, { icon: null, cover: null })).toBe(false);
     expect(offersReplace({ id: "f1" }, { icon: null, cover: null })).toBe(true);
   });
 });

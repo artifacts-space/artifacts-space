@@ -75,7 +75,44 @@ test("should serve the same frame document as the page's name under a files addr
   expect(named.status()).toBe(200);
   expect(await named.text()).toBe(await root.text());
   expect(named.headers()["content-security-policy"]).toBe(root.headers()["content-security-policy"]);
+  expect(named.headers()["cache-control"]).toBe("private, max-age=3600");
   expect(named.headers()["set-cookie"]).toBeUndefined();
+});
+
+test("should answer a browser that goes to another page of a site with the same frame document and headers, and the header they vary by", async ({ request, baseURL }) => {
+  const site = new URL(baseURL ?? "");
+  const host = `${pageHostLabel}.localhost:${site.port}`;
+  const root = await request.get("/", { headers: { host } });
+  for (const page of ["about.html?tab=2", "docs/guide.html", "missing.html"]) {
+    const response = await request.get(`/f/${pageFilesToken()}/${page}`, { headers: { host, "sec-fetch-dest": "iframe", "sec-fetch-mode": "navigate" }, maxRedirects: 0 });
+    expect(response.status(), page).toBe(200);
+    const headers = response.headers();
+    expect(await response.text(), page).toBe(await root.text());
+    for (const name of ["content-type", "content-security-policy", "x-content-type-options", "referrer-policy", "permissions-policy", "x-robots-tag"]) {
+      expect(headers[name], `${page} ${name}`).toBe(root.headers()[name]);
+    }
+    // The address holds a reader's short-lived token: only that reader's browser may keep the answer, never a shared cache.
+    expect(headers["cache-control"], page).toBe("private, max-age=3600");
+    expect(headers.vary ?? "", page).toMatch(/(^|, )X-Page-Source(,|$)/);
+    expect(headers["x-frame-options"]).toBeUndefined();
+    expect(headers["set-cookie"]).toBeUndefined();
+  }
+});
+
+test("should hand only the frame document's fetch of a page's source to its route, which never answers it as HTML", async ({ request, baseURL }) => {
+  const site = new URL(baseURL ?? "");
+  const host = `${pageHostLabel}.localhost:${site.port}`;
+  const path = `/f/${pageFilesToken()}/about.html`;
+  const fetched = await request.get(path, { headers: { host, "x-page-source": "1", "sec-fetch-dest": "empty", "sec-fetch-site": "same-origin" }, maxRedirects: 0 });
+  // The route ran: with a database it finds no such artifact (404); without one (CI) it cannot look (500). Never the frame document, never HTML.
+  expect(fetched.status()).toBe(localDatabaseEnabled() ? 404 : 500);
+  expect(fetched.headers()["content-type"]).toBe("text/plain; charset=utf-8");
+  expect(fetched.headers()["x-content-type-options"]).toBe("nosniff");
+  expect(await fetched.text()).not.toContain("artifact-page");
+  // The header on a navigation is a navigation: the frame document.
+  const navigated = await request.get(path, { headers: { host, "x-page-source": "1", "sec-fetch-dest": "document" }, maxRedirects: 0 });
+  expect(navigated.status()).toBe(200);
+  expect(await navigated.text()).toContain("artifact-page:opened");
 });
 
 test("should hand a page file's address to its route on a page host, which serves nothing it cannot find", async ({ request, baseURL }) => {
@@ -104,7 +141,7 @@ test("should answer 404 for a page file's address on every host but a page host,
   const site = new URL(baseURL ?? "");
   const path = `/f/${pageFilesToken()}/css/site.css`;
   for (const host of [site.host, `www.localhost:${site.port}`, `${pageHostLabel}.x.localhost:${site.port}`, `${pageHostLabel}.example.com`]) {
-    for (const target of [path, `/f/${pageFilesToken()}/index.html`]) {
+    for (const target of [path, `/f/${pageFilesToken()}/index.html`, `/f/${pageFilesToken()}/about.html`]) {
       const response = await request.get(target, { headers: { host }, maxRedirects: 0 });
       expect(response.status(), `${host} ${target.slice(-10)}`).toBe(404);
       expect(response.headers()["set-cookie"]).toBeUndefined();
@@ -128,7 +165,7 @@ test("should serve nothing at a files address that ends with a slash: it is sent
   expect(await bare.text()).toBe("Not found");
 });
 
-for (const path of ["/preview", "/docs", "/sign-in", "/api/auth/get-session", "/mcp", "/llms.txt", "/_next/static/chunks/none.js", "/f", "/f/short/site.css", `/f/${"A".repeat(120)}`]) {
+for (const path of ["/preview", "/docs", "/sign-in", "/api/auth/get-session", "/mcp", "/llms.txt", "/_next/static/chunks/none.js", "/f", "/f/short/site.css", `/f/${"A".repeat(120)}`, "/about.html", "/f/short/about.html"]) {
   test(`should answer 404 for ${path} on a page host`, async ({ request, baseURL }) => {
     const site = new URL(baseURL ?? "");
     const response = await request.get(path, { headers: { host: `${pageHostLabel}.localhost:${site.port}` }, maxRedirects: 0 });

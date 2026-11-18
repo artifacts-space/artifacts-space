@@ -25,9 +25,18 @@ export function HtmlPageFilesDocs() {
         <ul>
           <li><strong>Paths</strong> are relative to the page, which is <code>index.html</code>: <code>css/site.css</code>, <code>js/app.js</code>, <code>img/logo.png</code>. Folders and a file name of letters, digits, dots, dashes, and underscores, joined by <code>/</code>. No leading slash and no <code>..</code>.</li>
           <li><strong>A path is matched exactly</strong>, letter case included, so use lowercase. Two files whose paths differ only by case are refused.</li>
-          <li><strong>The type comes from the extension.</strong> A second HTML document is refused: one artifact is one page.</li>
+          <li><strong>The type comes from the extension.</strong> An <code>.html</code> file is another page of the site (see below); <code>.htm</code> is refused, so name it <code>.html</code>.</li>
           <li><strong>Readers get the files of the version they are shown.</strong> On a link or public artifact, added and replaced files reach readers outside the team when the change is approved. Removed files stop loading for everyone at once.</li>
           <li><strong>A page left open keeps working.</strong> Its files load under an address that works for {pageAddressLife}; while its tab is visible, and for {hiddenAllowanceWords()} after it was hidden, the page gets the next address before that, without loading again. A tab hidden for longer stops asking, and gets its next address when it is shown again. One limit remains: a module that already loaded keeps its first address for its own later <code>import()</code>, and a stylesheet file for its own <code>url()</code>. Import what a module needs when it starts, or resolve a later import from the document: <code>import(new URL(&quot;js/chart.js&quot;, document.baseURI))</code>.</li>
+        </ul>
+      </Prose>
+      <Prose>
+        <p><strong>A site of several pages.</strong> The artifact&apos;s content is the first page, <code>index.html</code>. Every other page is a page file whose path ends in <code>.html</code>, such as <code>about.html</code> or <code>docs/guide.html</code>, linked with an ordinary relative link: <code>&lt;a href=&quot;about.html&quot;&gt;</code>.</p>
+        <ul>
+          <li><strong>It opens in the same frame.</strong> A link, or <code>location.href</code> in a script, moves the frame to that page, and the browser&apos;s Back and Forward move between the pages. The page host never serves the page as a document of its own: the frame loads its text and writes it in, as it writes the first page.</li>
+          <li><strong>Every page follows the same rules as the first:</strong> the same hosts, the same refusals, and its own files by relative path from its own folder. Start each with <code>&lt;!doctype html&gt;</code>; a page without it still shows, in the browser&apos;s quirks mode.</li>
+          <li><strong>A page that has no file</strong> shows a line that says so, with a link to the first page. A folder&apos;s address, such as <code>docs/</code>, is no page: link to <code>docs/index.html</code>. A link to a folder leaves the frame, which is then closed.</li>
+          <li><strong>What is not there yet:</strong> a link from this site straight to a page inside the frame, a list of the pages beside the frame, and search over the text of pages other than the first.</li>
         </ul>
       </Prose>
       <FactTable head={["Extensions", "Served as", "Name"]} rows={pageFileTypeRows()} mono={[0, 1]} />
@@ -42,7 +51,7 @@ export function HtmlPageFilesDocs() {
           <li><strong>A folder keeps its shape.</strong> Dropping <code>site/</code> that holds <code>css/site.css</code> and <code>img/logo.png</code> adds those two paths. Hidden and system files, such as <code>.DS_Store</code>, are left out.</li>
           <li><strong>A path that cannot be used says why.</strong> A name with a space or capital letters gets a cleaned path to take or change, and nothing is added under a name you did not see.</li>
           <li><strong>One drop is one change.</strong> Up to {pageBatchLimits.maxFilesPerPublish} files land together as one version in History, or not at all. A file at a path the page has replaces it, and the row says so before it happens.</li>
-          <li><strong>The page itself.</strong> An <code>index.html</code> at the top of a dropped folder can become the page&apos;s HTML, after you confirm. The HTML it had stays in History.</li>
+          <li><strong>The page itself.</strong> An <code>index.html</code> at the top of a dropped folder can become the page&apos;s HTML, after you confirm. The HTML it had stays in History. Every other <code>.html</code> file in the drop is another page of the site, added at its path like any page file.</li>
         </ul>
       </Prose>
       <Note>

@@ -247,8 +247,8 @@ describe("proxy", () => {
 describe("proxy on a page host", () => {
   const label = "0123456789abcdef0123456789abcdef";
 
-  function onHost(host: string, path: string, method = "GET") {
-    return new NextRequest(new URL(path, `https://${host}`), { method, headers: new Headers({ host }) });
+  function onHost(host: string, path: string, method = "GET", headers: Record<string, string> = {}) {
+    return new NextRequest(new URL(path, `https://${host}`), { method, headers: new Headers({ host, ...headers }) });
   }
 
   beforeEach(() => {
@@ -288,6 +288,29 @@ describe("proxy on a page host", () => {
     const response = await proxy(onHost(`${label}.artifacts.link`, `/f/${"t".repeat(120)}/index.html`));
     expect(response.status).toBe(200);
     expect(await response.text()).toContain("artifact-page:ready");
+  });
+
+  it("should answer another page of the site with the frame document, whatever query or hash the address carries", async () => {
+    const root = await proxy(onHost(`${label}.artifacts.link`, "/"));
+    for (const path of [`/f/${"t".repeat(120)}/about.html`, `/f/${"t".repeat(120)}/about.html?tab=2#top`, `/f/${"t".repeat(120)}/docs/guide.html?x=<b>`]) {
+      const response = await proxy(onHost(`${label}.artifacts.link`, path));
+      expect(response.status, path).toBe(200);
+      expect(response.headers.get("x-middleware-next"), path).toBeNull();
+      expect(response.headers.get("content-security-policy")).toBe(root.headers.get("content-security-policy"));
+      expect(response.headers.get("vary")).toBe("X-Page-Source");
+      expect(await response.text()).toContain("artifact-page:opened");
+    }
+    expect(mocks.getSession).not.toHaveBeenCalled();
+  });
+
+  it("should let the frame document's fetch of a page's source through to its route, and nothing that navigates", async () => {
+    const path = `/f/${"t".repeat(120)}/about.html?tab=2`;
+    const fetched = await proxy(onHost(`${label}.artifacts.link`, path, "GET", { "x-page-source": "1", "sec-fetch-dest": "empty", "sec-fetch-site": "same-origin" }));
+    expect(fetched.headers.get("x-middleware-next")).toBe("1");
+    const navigated = await proxy(onHost(`${label}.artifacts.link`, path, "GET", { "x-page-source": "1", "sec-fetch-dest": "iframe" }));
+    expect(navigated.headers.get("x-middleware-next")).toBeNull();
+    expect(navigated.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect((await proxy(onHost(`www.artifacts.link`, path, "GET", { "x-page-source": "1" }))).status).toBe(404);
   });
 
   it.each(["www.artifacts.link", "app.artifacts.link", `${label}.x.artifacts.link`])("should answer 404 on %s, a host under the page domain that is no page host, and never run the site's checks", async (host) => {

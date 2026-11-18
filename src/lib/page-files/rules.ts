@@ -1,3 +1,5 @@
+import { pageNamePattern } from "../page-host/rules";
+
 /*
  * Page files: the files of an HTML artifact that its page loads by a
  * relative path, as on any website (`<link href="css/site.css">`, a module's
@@ -5,6 +7,9 @@
  * A page file is an attached file with a page path (`artifact_file.page_path`).
  * The page host serves it under the page's own address
  * (src/lib/page-files/serve.ts); it is never served inline from this site.
+ * Another page of a site (`about.html`) is a page file too: the page host
+ * never serves it as a document, only as text to the frame document, which
+ * writes it in (src/lib/page-host/frame-document.ts).
  *
  * Pure rules, safe for the server and the browser.
  */
@@ -38,6 +43,7 @@ const stored = (contentType: string, label: string): PageFileType => ({ contentT
 
 /** What a page file may be, by the extension of its path. Anything else is refused. */
 const typesByExtension: Readonly<Record<string, PageFileType>> = {
+  html: text("text/html", "HTML page"),
   css: text("text/css", "Stylesheet"),
   js: text("text/javascript", "Script"),
   mjs: text("text/javascript", "Script"),
@@ -73,7 +79,7 @@ const typesByContentType = new Map(Object.values(typesByExtension).map((type) =>
 export const pageFileContentTypes: readonly string[] = [...typesByContentType.keys()];
 
 /** The types a page file may be, as a short list for people and agents. */
-export const pageFileTypesHint = "CSS, JavaScript (.js, .mjs), SVG, JSON, text, CSV, fonts (WOFF2, WOFF, TTF, OTF), WebAssembly, images, MP4, WebM, MP3, and WAV";
+export const pageFileTypesHint = "HTML pages (.html), CSS, JavaScript (.js, .mjs), SVG, JSON, text, CSV, fonts (WOFF2, WOFF, TTF, OTF), WebAssembly, images, MP4, WebM, MP3, and WAV";
 
 const segmentPattern = /^[A-Za-z0-9._-]+$/;
 
@@ -92,13 +98,25 @@ function segmentProblem(segment: string): string | null {
   return null;
 }
 
+/** The page itself: the artifact's content, which no page file may take the place of. */
+const pageItself = "index.html";
+
+/** Why an HTML page file cannot have this path, or null when it can: `index.html` at the top is the artifact's content, and a page's name ends in `.html`, in lowercase. */
+function htmlPathProblem(path: string, extension: string): string | null {
+  if (path.toLowerCase() === pageItself) return "index.html is the page itself: the artifact's content. Save its markup as the artifact, and give another page a name of its own, such as about.html.";
+  if (extension === "htm") return `A page of the site ends in .html: name it ${path.slice(0, -4)}.html.`;
+  return pageNamePattern.test(path) ? null : "A page of the site ends in .html, in lowercase, such as about.html or docs/guide.html.";
+}
+
 /**
  * Why a path cannot name a page file, or null when it can. A path is
  * relative to the page: folders and a file name joined by `/`, each of
- * letters, digits, dots, dashes, and underscores. The page itself is
- * `index.html`, so no file takes that name, and a second HTML document is
- * refused: it would take the page's place in the frame, where the site
- * would close it.
+ * letters, digits, dots, dashes, and underscores. An `.html` page file is
+ * another page of the site (`about.html`, `docs/guide.html`), which the
+ * frame shows when the page links to it. The page itself is `index.html`,
+ * the artifact's content, so no file takes that name at the top; `.htm` is
+ * refused, so every page has an address the page host knows as a page's
+ * (pageNamePattern).
  */
 export function pagePathProblem(path: string): string | null {
   if (path.length === 0) return "Give the page file a path, such as css/site.css.";
@@ -110,7 +128,7 @@ export function pagePathProblem(path: string): string | null {
     if (problem) return problem;
   }
   const extension = extensionOf(path);
-  if (extension === "html" || extension === "htm") return "A page file cannot be another HTML document: the page is the artifact's content, and one artifact is one page. Put the markup in the page, or make a second artifact.";
+  if (extension === "html" || extension === "htm") return htmlPathProblem(path, extension);
   if (!Object.hasOwn(typesByExtension, extension)) return `This file type cannot be a page file. Page files are ${pageFileTypesHint}.`;
   return null;
 }
@@ -133,8 +151,17 @@ export function pageFileLabel(contentType: string): string {
 
 const textTypes = new Set(["text/css", "text/javascript", "application/json", "text/plain", "text/csv", "image/svg+xml"]);
 
-/** The Content-Type header a page file is served with: its stored type, as UTF-8 when it is text. */
+/** The type of another page of the site: stored so, and never served so. */
+export const pageHtmlType = "text/html";
+
+/**
+ * The Content-Type header a page file is served with: its stored type, as
+ * UTF-8 when it is text. An HTML page is served as plain text, never as
+ * HTML: the page host shows no document its author wrote, and only the
+ * frame document reads it, to write it in.
+ */
 export function servedContentType(contentType: string): string {
+  if (contentType === pageHtmlType) return "text/plain; charset=utf-8";
   return textTypes.has(contentType) ? `${contentType}; charset=utf-8` : contentType;
 }
 
