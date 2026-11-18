@@ -71,20 +71,12 @@ cell reads: any other HTML in a table keeps the table as written, and a
 inside inline code, is written `\|`.
 
 The editor keeps every table in that shape after each change
-(`TableShape` in `table-shape.ts`), so it never holds a table the writer
-would change:
-
-- Enter in a cell joins the new paragraph to the old one with a line break.
-- A list, heading, quote, or code block pasted into a cell becomes its
-  lines (a code block's lines keep the code mark); media moves to just
-  after the table.
-- Merged cells, from a paste, are split into the grid: the content stays in
-  the top-left place and the places it covered are empty, so no
-  neighbour moves to another column.
-- Header cells are the first row, and only the first row.
-- A Markdown block trigger typed at the start of a cell's line (`- `,
-  `1. `, `# `, `> `, `` ``` ``, `---`) stays text, and the slash menu does
-  not open in a cell.
+(`TableShape`, `table-shape.ts`): Enter in a cell joins its paragraphs with
+a line break; a pasted block in a cell becomes its lines (code keeps the
+code mark) and media moves after the table; merged cells split into the
+grid, content in the top-left place, so no neighbour changes column; header
+cells are the first row only. Block triggers typed in a cell (`- `, `# `,
+`> `) stay text, and the slash menu does not open in a cell.
 
 ### Media
 
