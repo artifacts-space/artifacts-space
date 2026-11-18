@@ -90,6 +90,31 @@ test("should scan every element a locator matches, and nothing outside them", as
   await expectNoAxeViolations(page.locator("p"));
 });
 
+/** A page script that puts a new element above everything in the body when the helper names an element by its place in the tree: once, or every time. */
+const movesWhenNamed = (every: boolean): string => `<script>
+  const find = Document.prototype.querySelectorAll;
+  let moved = false;
+  Document.prototype.querySelectorAll = function (selector) {
+    const found = find.call(this, selector);
+    if ((${String(every)} || !moved) && String(selector).includes(":nth-child")) {
+      moved = true;
+      queueMicrotask(() => document.body.prepend(document.createElement("div")));
+    }
+    return found;
+  };
+</script>`;
+
+test("should scan the element again when the page moves it between naming it and the scan", async ({ page }) => {
+  // After the move, the first name points at the new empty element: a scan that trusted it would pass.
+  await page.setContent(`<main id="scan">${unnamedButton}</main>${movesWhenNamed(false)}`);
+  await expect(expectNoAxeViolations(page.locator("#scan"))).rejects.toThrow(/button-name/);
+});
+
+test("should fail, and say why, when the page moves the element during every scan", async ({ page }) => {
+  await page.setContent(`<main id="scan"><p>Fine</p></main>${movesWhenNamed(true)}`);
+  await expect(expectNoAxeViolations(page.locator("#scan"))).rejects.toThrow(/moved its elements during each of 3 scans/);
+});
+
 test("should scan an element inside a shadow root when a locator matches it", async ({ page }) => {
   await page.setContent(`<main><div id="host"></div></main><script>document.getElementById("host").attachShadow({ mode: "open" }).innerHTML = '<div class="inner">${unnamedButton}</div>';</script>`);
   await expect(expectNoAxeViolations(page.locator(".inner"))).rejects.toThrow(/button-name/);

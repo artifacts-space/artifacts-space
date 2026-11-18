@@ -249,11 +249,42 @@ async function selectorsFor(scope: Locator): Promise<ScanSelector[]> {
   });
 }
 
-async function analyze(page: Page, target: Locator | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<AxeRuleResult[]> {
-  if (!target) return runRules(page, null, skip, only);
+/** How many times a scan of a part is taken before it gives up on a page that keeps moving its elements. */
+const scopeTries = 3;
+
+/** axe's words when a selector it was given matches nothing. */
+const scopeMatchedNothing = "No elements found for include";
+
+/**
+ * One scan of what `target` matches, or null when the page moved those
+ * elements while it ran. The selectors name elements by their place in the
+ * tree (selectorsFor), so an element added or removed above them between
+ * the naming and the scan (a portal, a toast, a box going to the top layer)
+ * leaves a selector matching nothing, or matching another element. Both are
+ * caught: axe says when a selector matches nothing, and the elements are
+ * named again after the scan and must have the names they had before it.
+ */
+async function scanInPlace(page: Page, target: Locator, skip: SkippedRules, only: readonly string[] | undefined): Promise<AxeRuleResult[] | null> {
   const selectors = await selectorsFor(target);
   if (selectors.length === 0) throw new Error(`Cannot scan ${target.toString()}: it matches no element.`);
-  return runRules(page, selectors, skip, only);
+  let found: AxeRuleResult[];
+  try {
+    found = await runRules(page, selectors, skip, only);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes(scopeMatchedNothing)) return null;
+    throw error;
+  }
+  const after = await selectorsFor(target);
+  return JSON.stringify(after) === JSON.stringify(selectors) ? found : null;
+}
+
+async function analyze(page: Page, target: Locator | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<AxeRuleResult[]> {
+  if (!target) return runRules(page, null, skip, only);
+  for (let attempt = 1; attempt <= scopeTries; attempt += 1) {
+    const found = await scanInPlace(page, target, skip, only);
+    if (found) return found;
+  }
+  throw new Error(`Cannot scan ${target.toString()}: the page moved its elements during each of ${String(scopeTries)} scans.`);
 }
 
 /**
