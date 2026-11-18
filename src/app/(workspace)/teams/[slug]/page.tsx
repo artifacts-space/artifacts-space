@@ -9,6 +9,7 @@ import { siteOrigin } from "@/lib/site-origin";
 import { listPendingSharing, listTeamSharedArtifacts } from "@/lib/sharing/queries";
 import { getTeamAccessForMember, listPendingInvitations, listTeamMembers, type TeamAccess } from "@/lib/teams/queries";
 import { can } from "@/lib/teams/capability-rules";
+import { removalFactsFor } from "@/lib/teams/departure";
 import { listPermissionAudit } from "@/lib/teams/role-store";
 import { parseTeamTabs } from "@/lib/teams/team-tabs-rules";
 import { listPresetsForTeams, loadTeamThemeSettings } from "@/lib/themes/team-presets";
@@ -57,7 +58,9 @@ async function loadTeamPage({ membership: team, roles }: TeamAccess, viewerId: s
     // Loaded for every tab because tabs switch in the browser (team-tabs.tsx), with no new server render.
     when(shared, () => listPermissionAudit(team.id)),
   ]);
-  return { team, viewerId, origin: siteOrigin(), members, agents, invitations, shared: sharedArtifacts, requests, edits, reports, themeNames, themes, roles: [...roles.values()], audit };
+  // What the remove confirm says about each member's artifacts: only for those who may remove people.
+  const removals = shared && can(team, "members.remove") ? await removalFactsFor(team.id, members) : {};
+  return { team, viewerId, origin: siteOrigin(), members, agents, invitations, shared: sharedArtifacts, requests, edits, reports, themeNames, themes, roles: [...roles.values()], audit, removals };
 }
 
 export default async function TeamPage({ params, searchParams }: PageProps<"/teams/[slug]">) {

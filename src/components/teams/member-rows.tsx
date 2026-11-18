@@ -9,6 +9,7 @@ import { PixelAvatar } from "@/components/pixel-avatar";
 import { useCopyToClipboard } from "@/components/use-copy-to-clipboard";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { removalConfirmKind, removalDescription, type RemovalFacts } from "@/lib/teams/departure-rules";
 import { resendableRole, type RoleOption } from "@/lib/teams/member-row-rules";
 import type { PendingInvitationView, TeamMemberView } from "@/lib/teams/queries";
 import { roleLabel } from "@/lib/teams/roles";
@@ -38,9 +39,15 @@ function RoleCell({ member, teamId, options }: { member: TeamMemberView; teamId:
   );
 }
 
-function PersonMenu({ member, teamId }: { member: TeamMemberView; teamId: string }) {
+/**
+ * The ⋯ menu to remove a member. Its confirm says what becomes of their
+ * artifacts in the team (they stay, under the longest-standing owner), and
+ * asks under its own kind when some stay, so "Don't ask again" for plain
+ * removals never skips that.
+ */
+function PersonMenu({ member, teamId, removal }: { member: TeamMemberView; teamId: string; removal: RemovalFacts | null }) {
   const { pending, run } = useTeamAction();
-  const confirmRemove = useConfirm("removeMember");
+  const confirmRemove = useConfirm(removalConfirmKind(removal));
   const name = member.name || "this member";
   return (
     <>
@@ -52,7 +59,7 @@ function PersonMenu({ member, teamId }: { member: TeamMemberView; teamId: string
       <ConfirmDialog
         state={confirmRemove.dialog}
         title={`Remove ${name}?`}
-        description="They lose access to this team at once. Artifacts they shared with the team stay with the team, and its owners take them over. Agents they added go to the team's owner, and their tokens stop working at once."
+        description={removalDescription(removal)}
         confirmLabel="Remove"
         pending={pending !== null}
       />
@@ -61,7 +68,7 @@ function PersonMenu({ member, teamId }: { member: TeamMemberView; teamId: string
 }
 
 /** One person in the Members table, with a role picker and a ⋯ menu when the viewer may change them (member-row-rules.ts). */
-export function PersonRow({ member, teamId, isViewer, roleOptions, canRemove }: { member: TeamMemberView; teamId: string; isViewer: boolean; roleOptions: readonly RoleOption[]; canRemove: boolean }) {
+export function PersonRow({ member, teamId, isViewer, roleOptions, canRemove, removal }: { member: TeamMemberView; teamId: string; isViewer: boolean; roleOptions: readonly RoleOption[]; canRemove: boolean; removal?: RemovalFacts | undefined }) {
   const detail = [member.username ? `@${member.username}` : "", member.email].filter(Boolean).join(" · ");
   return (
     <tr className="border-t" data-member-row="person">
@@ -73,7 +80,7 @@ export function PersonRow({ member, teamId, isViewer, roleOptions, canRemove }: 
       <td className={cell.middle}><RoleCell member={member} teamId={teamId} options={roleOptions} /></td>
       <td className={cell.wide} />
       <td className={`${cell.wide} text-muted-foreground`}>Joined {dateFormat.format(new Date(member.joinedAt))}</td>
-      <td className={cell.last}>{canRemove ? <PersonMenu member={member} teamId={teamId} /> : null}</td>
+      <td className={cell.last}>{canRemove ? <PersonMenu member={member} teamId={teamId} removal={removal ?? null} /> : null}</td>
     </tr>
   );
 }

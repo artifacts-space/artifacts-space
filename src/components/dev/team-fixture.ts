@@ -1,7 +1,9 @@
 import type { TeamPageData } from "@/components/teams/team-page-view";
 import type { TeamAgentView } from "@/lib/agents/queries";
+import { heirAfterLeaving } from "@/lib/sharing/transfer-rules";
 import type { TeamRoleView } from "@/lib/teams/capabilities";
 import { builtInRoleKeys, builtInRoleNames, defaultActor, defaultRoleCapabilities } from "@/lib/teams/capability-rules";
+import type { Heir, RemovalFacts } from "@/lib/teams/departure-rules";
 import type { TeamMemberView } from "@/lib/teams/queries";
 import type { TeamRole } from "@/lib/teams/roles";
 
@@ -38,22 +40,42 @@ function fixtureAudit(): TeamPageData["audit"] {
   ];
 }
 
+/** Who takes over `userId`'s artifacts in the fixture team, by the real rule (heirAfterLeaving). */
+export function fixtureHeir(members: readonly TeamMemberView[], userId: string): Heir | null {
+  const heirId = heirAfterLeaving(members.map((member) => ({ userId: member.userId, role: member.role, joinedAt: new Date(member.joinedAt) })), userId);
+  const heir = members.find((member) => member.userId === heirId);
+  return heir ? { name: heir.name, username: heir.username } : null;
+}
+
+/** Artifacts each fixture member has in the team: Grace two, Lin none, the rest one. */
+const fixtureArtifactCounts: Readonly<Record<string, number>> = { "fixture-grace": 2, "fixture-lin": 0 };
+
+function fixtureRemovals(members: readonly TeamMemberView[]): Record<string, RemovalFacts> {
+  return Object.fromEntries(members.map((member) => [member.memberId, { artifacts: fixtureArtifactCounts[member.userId] ?? 1, heir: fixtureHeir(members, member.userId) }]));
+}
+
+/** The fixture's people: the viewer first, joined first. */
+export function fixtureMembers(role: TeamRole, personal: boolean): TeamMemberView[] {
+  return [
+    { ...person("viewer", "Dev User", role, 1), userId: viewerId, email: "dev@example.com", username: "dev" },
+    ...(personal ? [] : [
+      person("ada", "Ada Lovelace", "owner", 2),
+      person("grace", "Grace Hopper", "admin", 3),
+      person("long", "Bartholomew Longname-Featherstonehaugh", "member", 4),
+      person("lin", "Lin Designer", "member", 5, { key: "designer", name: "Designer" }),
+    ]),
+  ];
+}
+
 /** The fixture team page as a viewer with `role`; a personal team when `personal` is set. */
 export function teamFixture(role: TeamRole, personal: boolean): TeamPageData {
   const manager = role !== "member" && !personal;
+  const members = fixtureMembers(role, personal);
   return {
     team: { id: "fixture-team", slug: "fixture", name: personal ? "Dev User" : "Fixture team", personal, teamSharingNeedsApproval: true, createdBy: viewerId, role, memberId: "fixture-member-viewer", userId: viewerId, ...defaultActor(role), roleName: builtInRoleNames[role], iconUrl: null },
     viewerId,
     origin: "http://localhost:3000",
-    members: [
-      { ...person("viewer", "Dev User", role, 1), userId: viewerId, email: "dev@example.com", username: "dev" },
-      ...(personal ? [] : [
-        person("ada", "Ada Lovelace", "owner", 2),
-        person("grace", "Grace Hopper", "admin", 3),
-        person("long", "Bartholomew Longname-Featherstonehaugh", "member", 4),
-        person("lin", "Lin Designer", "member", 5, { key: "designer", name: "Designer" }),
-      ]),
-    ],
+    members,
     agents: personal ? [] : [
       agentRow({ userId: "fixture-agent-reviewer", handle: "reviewer", name: "Code reviewer", tokens: [{ id: "fixture-token", name: "CI runner", prefix: "as_fx12", lastUsedAt: at(6), createdAt: at(2) }] }),
       agentRow({ userId: "fixture-agent-muted", handle: "scribe", name: "Meeting scribe", muted: true, ownerName: "Ada Lovelace" }),
@@ -78,5 +100,6 @@ export function teamFixture(role: TeamRole, personal: boolean): TeamPageData {
     themes: personal ? null : { presets: [], defaultTheme: null, defaultSetBy: null, defaultSetAt: null },
     roles: fixtureRoles(),
     audit: personal ? [] : fixtureAudit(),
+    removals: manager ? fixtureRemovals(members) : {},
   };
 }
