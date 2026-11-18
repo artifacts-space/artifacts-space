@@ -42,10 +42,12 @@ const bodies: Record<TestArtifactKind, ((mark: string) => string) | null> = {
   canvas: null,
 };
 
-/** The formats the /app editor draws, each with its own view or editor. */
-const paneKinds = ["markdown", "text", "svg", "ui", "json", "code", "csv", "mermaid", "html"] as const;
-/** The artifact page draws documents and interfaces in place, and every other format as its read view. */
-const pageKinds = ["markdown", "text", "svg", "ui", "html"] as const;
+/**
+ * The formats the /app editor and the artifact page draw, each with its own
+ * view or editor (the page edits documents and interfaces in place and shows
+ * every other format as its read view).
+ */
+const shownKinds = ["markdown", "text", "svg", "ui", "json", "code", "csv", "mermaid", "html"] as const;
 
 function versionsOf(kind: TestArtifactKind, name: string): { older: SeededText; newer: SeededText } {
   const body = bodies[kind];
@@ -91,8 +93,24 @@ async function shown(body: Locator): Promise<string> {
 
 /** Waits until the body shows `mark` and not the other version's. */
 async function expectBodyShows(body: Locator, mark: string, other: string) {
-  await expect.poll(() => shown(body), { message: `the body shows ${mark}` }).toContain(mark);
-  expect(await shown(body)).not.toContain(other);
+  await expect
+    .poll(async () => {
+      const text = await shown(body);
+      return text.includes(mark) && !text.includes(other);
+    }, { message: `the body shows ${mark} and not ${other}` })
+    .toBe(true);
+}
+
+const keptMark = "kept";
+
+/** Leaves a mark on the page's window, which only a reload or a new page load can remove. */
+async function markPageLoad(page: Page) {
+  await page.evaluate((value) => Reflect.set(window, "restoreTestMark", value), keptMark);
+}
+
+/** Fails when the page loaded again since `markPageLoad`: the restore must show without a reload. */
+async function expectNoReload(page: Page) {
+  expect(await page.evaluate(() => Reflect.get(window, "restoreTestMark") as unknown)).toBe(keptMark);
 }
 
 /** Restores the older of the two versions from an open History dialog, and closes it once the restore is done. */
@@ -112,7 +130,7 @@ async function openPageHistory(page: Page) {
   await page.getByRole("menuitem", { name: "History" }).click();
 }
 
-for (const kind of paneKinds) {
+for (const kind of shownKinds) {
   test(`should show the restored version of a ${kind} artifact in the /app editor without a reload`, async ({ page }, testInfo) => {
     const { publicId, older, newer } = await seed(page, kind, `Pane restore ${kind} ${testInfo.project.name}`);
     await page.goto(`/app?artifact=${publicId}`);
@@ -121,16 +139,19 @@ for (const kind of paneKinds) {
     await expect(title).toHaveValue(newer.title);
     await expectBodyShows(body, newerMark, olderMark);
 
+    await markPageLoad(page);
+
     await page.getByRole("button", { name: "History", exact: true }).click();
     await restoreOlder(page);
 
     await expect.poll(async () => (await storedArtifactText(publicId)).content).toBe(older.content);
     await expect(title).toHaveValue(older.title);
     await expectBodyShows(body, olderMark, newerMark);
+    await expectNoReload(page);
   });
 }
 
-for (const kind of pageKinds) {
+for (const kind of shownKinds) {
   test(`should show the restored version of a ${kind} artifact on its page while editing, without a reload`, async ({ page }, testInfo) => {
     const { publicId, older, newer } = await seed(page, kind, `Page restore ${kind} ${testInfo.project.name}`);
     await page.goto(`/artifact/${publicId}`);
@@ -139,12 +160,15 @@ for (const kind of pageKinds) {
     await expect(title).toHaveValue(newer.title);
     await expectBodyShows(body, newerMark, olderMark);
 
+    await markPageLoad(page);
+
     await openPageHistory(page);
     await restoreOlder(page);
 
     await expect.poll(async () => (await storedArtifactText(publicId)).content).toBe(older.content);
     await expect(title).toHaveValue(older.title);
     await expectBodyShows(body, olderMark, newerMark);
+    await expectNoReload(page);
   });
 }
 
@@ -183,11 +207,14 @@ for (const kind of ["markdown", "svg"] as const) {
     await expectBodyShows(body, newerMark, olderMark);
     await expect(page.getByRole("textbox", { name: "Title" })).toHaveCount(0);
 
+    await markPageLoad(page);
+
     await openPageHistory(page);
     await restoreOlder(page);
 
     await expect.poll(async () => (await storedArtifactText(publicId)).content).toBe(older.content);
     await expect(heading).toHaveText(older.title);
     await expectBodyShows(body, olderMark, newerMark);
+    await expectNoReload(page);
   });
 }
