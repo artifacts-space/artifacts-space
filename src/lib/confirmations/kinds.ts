@@ -15,6 +15,8 @@ export const confirmationActions = [
   // Removing an agent that would delete artifacts only it (and its owner) can read.
   "removeAgentWithArtifacts",
   "removeMember",
+  // Removing a person whose artifacts stay with the team, under a new owner (departure-rules.ts).
+  "removeMemberWithArtifacts",
   "restoreVersion",
   "discardEdits",
   "deleteProject",

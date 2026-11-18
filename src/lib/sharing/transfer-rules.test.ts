@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { agentsToHandOver, artifactsToTransfer, pickTransferOwner, transferredOwnership, type TransferArtifact } from "./transfer-rules";
+import { agentsToHandOver, artifactsToTransfer, heirAfterLeaving, pickTransferOwner, transferredOwnership, type TransferArtifact } from "./transfer-rules";
 
 const day = (n: number) => new Date(Date.UTC(2026, 0, n));
 
@@ -21,6 +21,29 @@ describe("pickTransferOwner", () => {
 
   it("should return null when only members are left", () => {
     expect(pickTransferOwner([{ userId: "m", role: "member", joinedAt: day(1) }])).toBeNull();
+  });
+});
+
+describe("heirAfterLeaving", () => {
+  const team = [
+    { userId: "first-owner", role: "owner" as const, joinedAt: day(1) },
+    { userId: "second-owner", role: "owner" as const, joinedAt: day(4) },
+    { userId: "early-admin", role: "admin" as const, joinedAt: day(2) },
+    { userId: "member", role: "member" as const, joinedAt: day(3) },
+  ];
+
+  it("should name the longest-standing owner when a member leaves", () => {
+    expect(heirAfterLeaving(team, "member")).toBe("first-owner");
+  });
+
+  it("should pass over the departing person when they are that owner", () => {
+    expect(heirAfterLeaving(team, "first-owner")).toBe("second-owner");
+  });
+
+  it("should agree with pickTransferOwner over the members who stay", () => {
+    for (const departing of team) {
+      expect(heirAfterLeaving(team, departing.userId)).toBe(pickTransferOwner(team.filter((member) => member.userId !== departing.userId)));
+    }
   });
 });
 
