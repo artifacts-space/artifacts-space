@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 
 import { Button } from "@/components/ui/button";
 import type { PageAddress, PageAddressRequest } from "@/lib/page-files/address";
+import { endOnThisClock } from "@/lib/page-files/renew-rules";
 import { askAgainOnFailure } from "@/lib/page-files/rules";
 import { PAGE_ANSWER_MS, pageFramePath, pageLabelFor, pageMessages, pageOrigin, pageSandbox } from "@/lib/page-host/rules";
 import { cn } from "@/lib/utils";
@@ -84,7 +85,13 @@ interface HeldAddress {
   /** The load of the page this address was last found good for. */
   load: string;
   token: string | null;
-  /** When the token ends, in milliseconds; 0 for no token. */
+  /** When the token ends on this browser's clock, in milliseconds (its life counted from when the answer arrived); 0 for no token. */
+  endsAt: number;
+}
+
+/** The address of a load that has files: its token, and when it ends on this browser's clock (HeldAddress.endsAt). */
+interface HeldEnd {
+  token: string;
   endsAt: number;
 }
 
@@ -111,7 +118,7 @@ function usePagePath(pageKey: string, filesKey: string | undefined, load: string
 }
 
 /** What a running page's renewal needs (usePassRenewal): when the address this load started on ends, and how to ask for the next. Null without an address. */
-function usePagePass(pageKey: string, held: { token: string; endsAt: number } | null): PagePass | null {
+function usePagePass(pageKey: string, held: HeldEnd | null): PagePass | null {
   const { address } = useContext(PageHostContext);
   const versionId = useContext(PageVersionContext);
   const token = held?.token ?? null;
@@ -119,12 +126,12 @@ function usePagePass(pageKey: string, held: { token: string; endsAt: number } | 
   // One object per address, so the renewal starts once per load and not on every render.
   return useMemo(() => {
     if (!address || token === null) return null;
-    return { endsAt, ask: () => address({ pageKey, ...(versionId === null ? {} : { versionId }) }) };
+    return { token, endsAt, ask: () => address({ pageKey, ...(versionId === null ? {} : { versionId }) }) };
   }, [address, token, endsAt, pageKey, versionId]);
 }
 
 /** The path one load of the page starts on, and the files address behind it, once settled (see usePagePath). */
-function useSettledAddress(pageKey: string, filesKey: string | undefined, load: string): { path: string | null; address: { token: string; endsAt: number } | null } {
+function useSettledAddress(pageKey: string, filesKey: string | undefined, load: string): { path: string | null; address: HeldEnd | null } {
   const { address } = useContext(PageHostContext);
   const versionId = useContext(PageVersionContext);
   const [held, setHeld] = useState<HeldAddress | null>(null);
@@ -138,7 +145,7 @@ function useSettledAddress(pageKey: string, filesKey: string | undefined, load: 
     // The address in hand still has time: this load uses it too. Otherwise the server makes a new one.
     const inHand = mine && mine.endsAt - ADDRESS_MARGIN_MS > Date.now() ? Promise.resolve({ token: mine.token, endsAt: mine.endsAt }) : null;
     // A request that fails on the way is sent once more; a refusal (no address) is an answer and is not.
-    const next = inHand ?? askAgainOnFailure(() => address({ pageKey, ...(versionId === null ? {} : { versionId }) })).then((made) => ({ token: made?.token ?? null, endsAt: made ? Date.parse(made.expiresAt) : 0 }));
+    const next = inHand ?? askAgainOnFailure(() => address({ pageKey, ...(versionId === null ? {} : { versionId }) })).then((made) => ({ token: made?.token ?? null, endsAt: made ? endOnThisClock(made.lifeMs, Date.now()) : 0 }));
     next
       .then((found) => { if (alive) setHeld({ key, load, ...found }); })
       // Both tries failed: this load runs without its files, like a refusal. The next load asks again.
@@ -150,7 +157,7 @@ function useSettledAddress(pageKey: string, filesKey: string | undefined, load: 
 }
 
 /** Where a load starts once its address is settled (`held`): the path, and the files address behind it when one was made. Nothing until then. */
-function startOf(held: HeldAddress | null): { path: string | null; address: { token: string; endsAt: number } | null } {
+function startOf(held: HeldAddress | null): { path: string | null; address: HeldEnd | null } {
   if (!held) return { path: null, address: null };
   return { path: pageFramePath(held.token), address: held.token === null ? null : { token: held.token, endsAt: held.endsAt } };
 }

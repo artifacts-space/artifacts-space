@@ -5,6 +5,13 @@
  * for 10 to 15 minutes (pageTokenLimits); the page gets the next one
  * without loading again.
  *
+ * Every time here is on the browser's own clock. The server tells a browser
+ * how long an address still works (`lifeMs`, measured on the server), and
+ * the browser holds the address until that long after the answer reached
+ * it. It never compares the server's time of day with its own, so a device
+ * whose clock is an hour ahead or behind renews at the same moments as one
+ * that is right.
+ *
  * Pure rules, safe for the server and the browser.
  */
 
@@ -25,6 +32,12 @@ export const passRenewal = {
    * abandoned tab never asks the server for ever.
    */
   hiddenMs: 60 * 60_000,
+  /**
+   * An answer is taken as a later address only when the next renewal is at
+   * least this far away. A shorter wait would start a new ask at once, so
+   * an answer can never set off a loop.
+   */
+  minWaitMs: 60_000,
 } as const;
 
 /** The hidden allowance in words, for the guide and the docs: "one hour". */
@@ -41,7 +54,18 @@ export interface HeldPass {
   renewAt: number;
 }
 
-/** The address a page holds from `receivedAt` on: it is renewed close to its end (passRenewal). */
+/**
+ * When an address ends on this browser's clock: `lifeMs` after `receivedAt`,
+ * the moment its answer reached the browser (`Date.now()` there). The wait
+ * the answer took only makes this a little late, which the lead covers.
+ * A `lifeMs` that is missing, not a number, or not positive counts as no
+ * life: the address has ended already.
+ */
+export function endOnThisClock(lifeMs: number, receivedAt: number): number {
+  return receivedAt + (Number.isFinite(lifeMs) && lifeMs > 0 ? lifeMs : 0);
+}
+
+/** The address a page holds from `receivedAt` on, with its end on this browser's clock (endOnThisClock): it is renewed close to its end (passRenewal). */
 export function heldPass(endsAt: number, receivedAt: number): HeldPass {
   const life = Math.max(0, endsAt - receivedAt);
   return { endsAt, renewAt: endsAt - Math.min(passRenewal.leadMs, life / passRenewal.lastShare) };
@@ -84,13 +108,25 @@ export type RenewalOutcome =
   | { kind: "renewed"; token: string; pass: HeldPass }
   /** No address: the reader may not read the artifact any more, or none could be made. The page keeps running without its files, and is not asked for again. */
   | { kind: "refused" }
-  /** The same address, or an earlier one: nothing to hand over. Asked again only when the tab is next shown. */
+  /** Nothing to hand over: the same address, an address that does not end later, or one that gives no real wait. Asked again only when the tab is next shown or the browser comes back online. */
   | { kind: "same" };
 
-/** Reads the answer to a renewal against the address in hand. Only an address that ends later counts as new, so an answer never sets a second timer for the same address. */
-export function renewalOutcome(current: HeldPass, answer: { token: string; expiresAt: string } | null, now: number): RenewalOutcome {
+/**
+ * Reads the answer to a renewal against the address in hand (`currentToken`,
+ * and `current` for when it ends on this clock). The server makes the same
+ * token for the same page within one step, so an answer with the token in
+ * hand is the same address. A different token counts as new only when its
+ * life is a number above zero, it ends later than the one in hand on this
+ * clock, and its own renewal is at least `passRenewal.minWaitMs` away. An
+ * answer that fails any of these is "same", never "renewed": handing over
+ * an address that is due again at once would make the page ask again at
+ * once, and keep asking until the hourly limit refused it. Nothing here
+ * reads the server's time of day.
+ */
+export function renewalOutcome(current: HeldPass, currentToken: string, answer: { token: string; lifeMs: number } | null, now: number): RenewalOutcome {
   if (!answer) return { kind: "refused" };
-  const endsAt = Date.parse(answer.expiresAt);
-  if (!Number.isFinite(endsAt) || endsAt <= current.endsAt) return { kind: "same" };
-  return { kind: "renewed", token: answer.token, pass: heldPass(endsAt, now) };
+  if (answer.token === currentToken) return { kind: "same" };
+  const pass = heldPass(endOnThisClock(answer.lifeMs, now), now);
+  if (pass.endsAt <= current.endsAt || pass.renewAt - now < passRenewal.minWaitMs) return { kind: "same" };
+  return { kind: "renewed", token: answer.token, pass };
 }

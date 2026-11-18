@@ -2,7 +2,7 @@
 
 import type { PageAddress, PageAddressRequest } from "@/lib/page-files/address";
 import { fixturePageArtifactId } from "@/lib/page-files/serve-rules";
-import { mintPageToken, mintShorterPageToken } from "@/lib/page-files/token";
+import { answerFor, mintPageToken, mintShorterPageToken, type PageToken } from "@/lib/page-files/token";
 import { pageLabelFor } from "@/lib/page-host/rules";
 
 /**
@@ -14,8 +14,7 @@ import { pageLabelFor } from "@/lib/page-host/rules";
 export async function fixturePageAddressAction(request: PageAddressRequest): Promise<PageAddress | null> {
   if (process.env.NODE_ENV !== "development") return null;
   try {
-    const { token, expiresAt } = mintPageToken({ artifactId: fixturePageArtifactId, label: await pageLabelFor(request.pageKey), asOf: null, stamp: 0 });
-    return { token, expiresAt: expiresAt.toISOString() };
+    return answerFor(mintPageToken({ artifactId: fixturePageArtifactId, label: await pageLabelFor(request.pageKey), asOf: null, stamp: 0 }));
   } catch {
     return null;
   }
@@ -28,7 +27,7 @@ const SHORT_PASS_MS = 8_000;
 const FIRST_ASKS_MS = 3_000;
 
 /** The first, short address each fixture page got, by the `run` in the page's address. Development only, in memory. */
-const firstPasses = new Map<string, { askedAt: number; address: PageAddress }>();
+const firstPasses = new Map<string, { askedAt: number; made: PageToken }>();
 
 /** The modes of the fixture's short-pass address (`?pass=`): the next address is a usual one, or none. */
 export type FixturePassMode = "short" | "refused";
@@ -48,17 +47,15 @@ export async function fixtureShortPassAction(mode: FixturePassMode, run: string,
     const grant = { artifactId: fixturePageArtifactId, label: await pageLabelFor(request.pageKey), asOf: null, stamp: 0 };
     const now = Date.now();
     const first = firstPasses.get(run);
-    if (first && now - first.askedAt < FIRST_ASKS_MS) return first.address;
+    if (first && now - first.askedAt < FIRST_ASKS_MS) return answerFor(first.made);
     if (first) {
       if (mode === "refused") return null;
-      const { token, expiresAt } = mintPageToken(grant);
-      return { token, expiresAt: expiresAt.toISOString() };
+      return answerFor(mintPageToken(grant));
     }
     if (firstPasses.size > 200) firstPasses.clear();
-    const { token, expiresAt } = mintShorterPageToken(grant, new Date(now + SHORT_PASS_MS));
-    const address = { token, expiresAt: expiresAt.toISOString() };
-    firstPasses.set(run, { askedAt: now, address });
-    return address;
+    const made = mintShorterPageToken(grant, new Date(now + SHORT_PASS_MS));
+    firstPasses.set(run, { askedAt: now, made });
+    return answerFor(made);
   } catch {
     return null;
   }

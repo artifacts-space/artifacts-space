@@ -48,6 +48,25 @@ export interface PageToken {
   expiresAt: Date;
 }
 
+/**
+ * A token as the site hands it to a browser: the token, when it ends as a
+ * time of day (`expiresAt`, ISO), and how long it still works, measured on
+ * the server when the answer is made (`lifeMs`). A browser must time its
+ * renewal from `lifeMs` on its own clock, never by comparing `expiresAt`
+ * with its own time of day: a device clock that is wrong would ask again at
+ * once after every answer, or too late (src/lib/page-files/renew-rules.ts).
+ */
+export interface PageTokenAnswer {
+  token: string;
+  expiresAt: string;
+  lifeMs: number;
+}
+
+/** A made token as the answer to a browser, with its life counted from `now` (the server's clock, when it is made). Never negative. */
+export function answerFor(made: PageToken, now: Date = new Date()): PageTokenAnswer {
+  return { token: made.token, expiresAt: made.expiresAt.toISOString(), lifeMs: Math.max(0, made.expiresAt.getTime() - now.getTime()) };
+}
+
 /** Thrown when no token can be made or opened safely: the server secret is missing. */
 export class MissingPageTokenSecretError extends Error {
   constructor() {
