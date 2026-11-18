@@ -93,5 +93,5 @@ jq -r '.uploads[] | [.path, .headers["Content-Type"], .url] | @tsv' uploads.json
 
 /** What a refused set looks like: one error that names every file at fault. */
 export const refusedSetExample = `No upload was started. Fix these, then ask again with the whole set:
-- about.html: A page file cannot be another HTML document: the page is the artifact's content, and one artifact is one page. Put the markup in the page, or make a second artifact.
+- about.htm: A page of the site ends in .html: name it about.html.
 - Img/Logo.PNG: The page already has img/logo.png, which differs only by upper and lower case. Use that exact path to replace it, or remove it in a call of its own first.`;

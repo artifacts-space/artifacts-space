@@ -47,6 +47,18 @@ describe("buildHtmlGuide", () => {
     expect(section).toContain("each path in remove is deleted");
   });
 
+  it("should say how a site of several pages is made, with page paths the server takes and the first page's name it keeps", () => {
+    const section = guide.slice(guide.indexOf("A site of several pages"), guide.indexOf("What goes in the document"));
+    expect(section).toContain("index.html is the artifact's content");
+    expect(section).toContain('<a href="about.html">');
+    expect(section).toContain("same rules as the first");
+    expect(section).toContain("<!doctype html>");
+    for (const path of ["about.html", "docs/guide.html"]) expect(pagePathProblem(path), path).toBeNull();
+    expect(pagePathProblem("index.html")).not.toBeNull();
+    expect(pagePathProblem("about.htm")).not.toBeNull();
+    expect(guide).not.toContain("one artifact is one page");
+  });
+
   it("should say when weight belongs in files, with the document's limit from its constant", () => {
     const section = guide.slice(guide.indexOf("What goes in the document"), guide.indexOf("A page that stays open"));
     expect(section).toContain(`at most ${artifactSizeLimits.maxContentBytes.toLocaleString("en-US")} bytes`);

@@ -6,11 +6,14 @@ import { permissionsPolicy } from "../security-header-rules";
  * scripts, so it never runs on this site's own origin. Each artifact gets
  * its own host, `<label>.<PAGE_HOST>`, on a second domain that holds no
  * session. It serves one small frame document
- * (src/lib/page-host/frame-document.ts) and, under an address the site
- * made for a viewer it checked, that artifact's own page files
- * (src/lib/page-files). The site shows the frame document in a sandboxed
- * iframe and hands it the page's HTML with postMessage, so the access check
- * stays where it is today: whoever was given the content can run it.
+ * (src/lib/page-host/frame-document.ts), at `/` and at every page address
+ * of a site, and, under an address the site made for a viewer it checked,
+ * that artifact's own page files (src/lib/page-files). It never serves a
+ * document its author wrote. The site shows the frame document in a
+ * sandboxed iframe and hands it the page's HTML with postMessage, so the
+ * access check stays where it is today: whoever was given the content can
+ * run it. Another page of the site (`about.html`) is a page file, which the
+ * frame document fetches from its own address as text and writes in.
  *
  * Pure rules, safe for the proxy, the server, and the browser.
  */
@@ -89,28 +92,69 @@ export const pageDocumentName = "index.html";
 /** `/f/<token>/<rest>`: the token's shape is openPageToken's (src/lib/page-files/token.ts); the rest is at least one character. */
 const filesAddress = /^\/f\/[A-Za-z0-9_-]{60,400}\/(.+)$/;
 
-/** What a path on a page host is: the frame document, a page file (for the route to answer), or nothing. */
-export type PageHostPath = "frame" | "file" | "none";
+/** A page's path in a site: at most eight parts of letters, digits, dots, dashes, and underscores, none starting with a dot, ending in `.html` in lowercase. */
+const pageName = String.raw`(?:(?!\.)[A-Za-z0-9._-]+\/){0,7}(?!\.)[A-Za-z0-9._-]*[A-Za-z0-9_-]\.html`;
+
+/**
+ * The path of a page of a site, relative to its files address:
+ * `index.html`, or the path an `.html` page file gives (`about.html`,
+ * `docs/guide.html`). src/lib/page-files/rules.ts holds an HTML page file's
+ * path to it, so every stored page has an address of this shape.
+ */
+export const pageNamePattern = new RegExp(`^${pageName}$`);
+
+/** A page of a site under its files address, `/f/<token>/<page>`: the groups are the token and the page (pageNamePattern). */
+export const pageAddressPattern = new RegExp(String.raw`^\/f\/([A-Za-z0-9_-]{60,400})\/(${pageName})$`);
+
+/**
+ * What a path on a page host is: the frame document, another page of the
+ * site (the frame document to a browser that goes there, the page's source
+ * to the frame document that asks for it), a page file (for the route to
+ * answer), or nothing.
+ */
+export type PageHostPath = "frame" | "page" | "file" | "none";
 
 /**
  * Reads a path on a page host. The frame document is at `/`, and at
- * `/f/<token>/index.html` for a page that has files. Any other path under
- * `/f/<token>/` names a page file. The token is not checked here: the
- * frame document is the same for everyone, and the route checks a file's.
+ * `/f/<token>/index.html` for a page that has files. Another `.html` page
+ * under `/f/<token>/` (pageAddressPattern) is a page of the site. Any other
+ * path under `/f/<token>/` names a page file. The token is not checked here:
+ * the frame document is the same for everyone, and the route checks a file's.
  */
 export function pageHostPath(pathname: string): PageHostPath {
   if (pathname === "/") return "frame";
   const rest = filesAddress.exec(pathname)?.[1];
   if (rest === undefined) return "none";
-  return rest === pageDocumentName ? "frame" : "file";
+  if (rest === pageDocumentName) return "frame";
+  return pageAddressPattern.test(pathname) ? "page" : "file";
 }
-
-/** The frame document's path under a files address, whole: what a renewal may move the frame document's address to, and nothing else. */
-export const pageFramePathPattern = /^\/f\/[A-Za-z0-9_-]{60,400}\/index\.html$/;
 
 /** The path the frame loads: `/`, or the page's name under its files address when the page has files (`token` from the site). */
 export function pageFramePath(token: string | null): string {
   return token === null ? "/" : `/f/${token}/${pageDocumentName}`;
+}
+
+/**
+ * The header the frame document sets on its own fetch of a page's source
+ * (frame-document.ts). A browser never sends it when it goes to an address,
+ * and another site cannot send it here without a preflight, which a page
+ * host refuses (405), so it tells the frame document's fetch from a
+ * navigation. Answers that differ by it name it in `Vary`.
+ */
+export const pageSourceHeader = "X-Page-Source";
+
+/**
+ * Whether a request asks for a page's source (the frame document's own
+ * fetch) rather than going to the page: it carries `X-Page-Source: 1`, and
+ * whatever the browser says of it with `Sec-Fetch-Dest` and
+ * `Sec-Fetch-Site`, when it says anything, is a same-origin fetch. Those two
+ * can only take the answer away: older browsers send neither.
+ */
+export function isPageSourceRequest(headers: Pick<Headers, "get">): boolean {
+  if (headers.get(pageSourceHeader) !== "1") return false;
+  const destination = headers.get("sec-fetch-dest");
+  const site = headers.get("sec-fetch-site");
+  return (destination === null || destination === "empty") && (site === null || site === "same-origin");
 }
 
 /** A Host header without its port, in lower case, and without the dot a fully qualified name may end with. */
@@ -218,9 +262,16 @@ export function pageContentPolicy(siteOrigin: string): string {
  */
 export const pageSandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups";
 
-/** Headers of the frame document. No session exists on the page host, so the response is the same for everyone. */
-export function pageHostHeaders(siteOrigin: string, cache: boolean): Record<string, string> {
+/**
+ * Headers of the frame document. No session exists on the page host, so the
+ * response is the same for everyone. At another page's address (`page`) the
+ * same address answers the frame document's fetch with the page's source,
+ * so the answer names the header that tells the two apart (`Vary`), and no
+ * cache gives one for the other.
+ */
+export function pageHostHeaders(siteOrigin: string, cache: boolean, page = false): Record<string, string> {
   return {
+    ...(page ? { Vary: pageSourceHeader } : {}),
     "Content-Type": "text/html; charset=utf-8",
     "Content-Security-Policy": pageContentPolicy(siteOrigin),
     "X-Content-Type-Options": "nosniff",
@@ -243,8 +294,15 @@ export const pageHostRefusalHeaders: Record<string, string> = {
 
 /** Messages between the site's page and the frame document. */
 export const pageMessages = {
-  /** Frame document to site: loaded, and waiting for the page. */
+  /** Frame document to site: loaded at `/` or at `index.html`, and waiting for the page. */
   ready: "artifact-page:ready",
+  /**
+   * Frame document to site: loaded at another page of the site's files
+   * (`about.html`), which it loads from its own address. The site answers
+   * with `renew` and the newest files address, so the page's source is asked
+   * for, and its own relative requests go, under an address that still works.
+   */
+  opened: "artifact-page:opened",
   /** Site to frame document: the page's HTML. */
   render: "artifact-page:render",
   /** Frame document to site: the page was written. */
@@ -256,8 +314,10 @@ export const pageMessages = {
   /**
    * Site to frame document: the page's files have a new address. Carries
    * `path`, the frame document's path under it (pageFramePath). The frame
-   * document moves its own address there without loading anything, so what
-   * the page asks for by relative path from then on uses the new address.
+   * document takes only the token from it and moves its own address to the
+   * same page, query, and hash under that token, without loading anything,
+   * so what the page asks for by relative path from then on uses the new
+   * address.
    */
   renew: "artifact-page:renew",
 } as const;

@@ -176,6 +176,8 @@ interface Handshake {
   onLeft: () => void;
   /** The frame document loaded (again) and waits for the page: called before the page is sent. */
   onReady: () => void;
+  /** The frame document loaded at another page of the site, which it loads itself: it waits for the newest files address. */
+  onOpened: () => void;
 }
 
 /** A question the site asked the frame and still waits on: its id, and the timer that closes the frame. */
@@ -197,13 +199,17 @@ interface OpenQuestion {
  * another address, and `onLeft` closes it. Whatever else the frame posts is
  * the page's word: it is read for nothing but "ready" and "shown".
  *
- * The page is sent on each "ready" (a page that reloads itself loads the
- * frame document again), and on the frame's first load when nothing was
- * sent by then: the first "ready" is the only one that can come before
- * this listens. The listener is added in a layout effect, so even a frame
- * document from the browser's cache cannot answer first.
+ * The page is sent on each "ready" (a page that reloads itself, or comes
+ * back to index.html from another page of its site, loads the frame
+ * document again), and on the frame's first load when nothing was sent by
+ * then: the first "ready" is the only one that can come before this
+ * listens. The listener is added in a layout effect, so even a frame
+ * document from the browser's cache cannot answer first. "opened" is the
+ * frame document at another page of the site (`about.html`): that page is
+ * not this HTML, so nothing is sent but the newest files address
+ * (`onOpened`).
  */
-function usePageHandshake({ frameRef, origin, html, onLeft, onReady }: Handshake) {
+function usePageHandshake({ frameRef, origin, html, onLeft, onReady, onOpened }: Handshake) {
   const [shown, setShown] = useState(false);
   const questionRef = useRef<OpenQuestion | null>(null);
 
@@ -236,11 +242,16 @@ function usePageHandshake({ frameRef, origin, html, onLeft, onReady }: Handshake
         ask();
       }
       if (message.type === pageMessages.pong && questionRef.current !== null && message.id === questionRef.current.id) settle();
-      if (message.type === pageMessages.shown) setShown(true);
+      onPageMessage(message.type);
+    };
+    /** "opened" and "shown": the frame document opened another page of the site, or wrote a page. */
+    const onPageMessage = (type: unknown) => {
+      if (type === pageMessages.opened) onOpened();
+      if (type === pageMessages.shown) setShown(true);
     };
     window.addEventListener("message", onMessage);
     return () => { window.removeEventListener("message", onMessage); };
-  }, [frameRef, origin, send, ask, settle, onReady]);
+  }, [frameRef, origin, send, ask, settle, onReady, onOpened]);
   useEffect(() => settle, [settle]);
 
   const onLoad = useCallback(() => {
@@ -266,12 +277,20 @@ interface PageWindowProps {
  * the address this load started on and stays that for the whole load
  * (usePagePath settles it once): a new `src` would load the page again. A
  * later files address reaches the page through the frame document instead
- * (usePassRenewal), and is never put in `src`.
+ * (usePassRenewal), and is never put in `src`. A link of the page to
+ * another page of its site moves the frame by itself; `src` stays.
  */
 function PageWindow({ origin, path, pass, html, title, onLeft }: PageWindowProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const onReady = usePassRenewal({ frameRef, origin, pass });
-  const { shown, onLoad } = usePageHandshake({ frameRef, origin, html, onLeft, onReady });
+  const resend = usePassRenewal({ frameRef, origin, pass });
+  const onReady = useCallback(() => { resend(); }, [resend]);
+  // Another page of the site waits for an address to load from: the newest one, or, before any renewal, the one this load started on.
+  const hasFiles = pass !== null;
+  const onOpened = useCallback(() => {
+    if (resend() || !hasFiles) return;
+    frameRef.current?.contentWindow?.postMessage({ type: pageMessages.renew, path }, origin);
+  }, [resend, hasFiles, path, origin]);
+  const { shown, onLoad } = usePageHandshake({ frameRef, origin, html, onLeft, onReady, onOpened });
   return (
     <iframe
       ref={frameRef}

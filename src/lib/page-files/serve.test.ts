@@ -19,8 +19,8 @@ function tokenFor(grant: { label?: string; asOf?: Date | null; artifactId?: stri
   return mintPageToken({ artifactId: grant.artifactId ?? "artifact-1", label: grant.label ?? label, asOf: grant.asOf ?? null, stamp: 1 }, at, secret).token;
 }
 
-function ask(input: { token?: string; path?: string; host?: string | null; method?: "GET" | "HEAD"; range?: string; at?: Date } = {}) {
-  const headers = new Headers({ "x-forwarded-for": "203.0.113.7", ...(input.range ? { range: input.range } : {}) });
+function ask(input: { token?: string; path?: string; host?: string | null; method?: "GET" | "HEAD"; range?: string; at?: Date; headers?: Record<string, string> } = {}) {
+  const headers = new Headers({ "x-forwarded-for": "203.0.113.7", ...(input.range ? { range: input.range } : {}), ...input.headers });
   return pageFileResponse({ method: input.method ?? "GET", host: input.host === undefined ? host : input.host, headers, token: input.token ?? tokenFor(), segments: (input.path ?? "css/site.css").split("/") }, input.at ?? now);
 }
 
@@ -160,5 +160,85 @@ describe("pageFileResponse", () => {
     const response = await ask({ token: tokenFor({ artifactId: "fixture:page-files" }), path: "data.json" });
     expect(response.status).toBe(404);
     expect(mocks.findPageFile).toHaveBeenCalledWith("fixture:page-files", "data.json", null);
+  });
+});
+
+/*
+ * Another page of the site (`about.html`) is a page file, served to the
+ * frame document's own fetch of its source only, and as plain text. A
+ * browser that goes to its address gets the frame document from the proxy
+ * (src/lib/page-host/respond.ts); this route never gives it the page.
+ */
+describe("pageFileResponse for another page of the site", () => {
+  const page = { key: "files/abc/about.html", contentType: "text/html", size: 27 };
+  const source = { "x-page-source": "1", "sec-fetch-dest": "empty", "sec-fetch-site": "same-origin" };
+  const html = "<!doctype html><p>About</p>";
+
+  beforeEach(() => {
+    mocks.findPageFile.mockResolvedValue(page);
+    mocks.openObject.mockImplementation(() => Promise.resolve({ state: "open", object: { status: 200, body: new Blob([html]).stream(), length: 27, contentRange: null } }));
+  });
+
+  it("should answer the frame document's fetch with the page as plain text, never sniffed, and say the answer depends on the header", async () => {
+    const response = await ask({ path: "docs/guide.html", headers: source });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("vary")).toBe("X-Page-Source");
+    expect(response.headers.get("content-security-policy")).toMatch(/; sandbox$/);
+    expect(await response.text()).toBe(html);
+    expect(mocks.findPageFile).toHaveBeenCalledWith("artifact-1", "docs/guide.html", null);
+  });
+
+  it("should take the source header from an older browser that names no destination", async () => {
+    expect((await ask({ path: "about.html", headers: { "x-page-source": "1" } })).headers.get("content-type")).toBe("text/plain; charset=utf-8");
+  });
+
+  it.each([
+    ["no source header", {}],
+    ["the header with another value", { "x-page-source": "true" }],
+    ["the header on a navigation", { ...source, "sec-fetch-dest": "document" }],
+    ["the header on a frame's navigation", { ...source, "sec-fetch-dest": "iframe" }],
+    ["the header on a script load", { ...source, "sec-fetch-dest": "script" }],
+    ["the header from another site", { ...source, "sec-fetch-site": "cross-site" }],
+    ["the header from another page host of the same domain", { ...source, "sec-fetch-site": "same-site" }],
+  ])("should answer 404 with nothing of the page for %s, before the token or any lookup", async (_name, headers) => {
+    for (const method of ["GET", "HEAD"] as const) {
+      const response = await ask({ path: "about.html", headers, method });
+      expect(response.status).toBe(404);
+      expect(response.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+      expect(await response.text()).not.toContain("About");
+    }
+    expect(mocks.hitRateLimits).not.toHaveBeenCalled();
+    expect(mocks.findPageFile).not.toHaveBeenCalled();
+  });
+
+  it("should never answer with text/html, whatever the request", async () => {
+    for (const headers of [{}, source, { ...source, "sec-fetch-dest": "document" }, { accept: "text/html" }]) {
+      const response = await ask({ path: "about.html", headers });
+      expect(response.headers.get("content-type") ?? "", JSON.stringify(headers)).not.toContain("html");
+    }
+  });
+
+  it.each([
+    ["a token made for another artifact's page host", () => tokenFor({ label: otherLabel })],
+    ["a token that has ended", () => tokenFor({}, new Date(now.getTime() - 20 * 60_000))],
+    ["a token with a changed character", () => `${tokenFor().slice(0, 30)}${tokenFor()[30] === "A" ? "B" : "A"}${tokenFor().slice(31)}`],
+  ])("should answer the fetch 404 for %s, as for any page file", async (_name, token) => {
+    const response = await ask({ path: "about.html", headers: source, token: token() });
+    expect(response.status).toBe(404);
+    expect(mocks.findPageFile).not.toHaveBeenCalled();
+  });
+
+  it.each(["artifacts.space", "www.artifacts.link", `${label}.x.artifacts.link`])("should answer the fetch 404 on %s, which is no page host of this deployment", async (wrongHost) => {
+    expect((await ask({ path: "about.html", headers: source, host: wrongHost })).status).toBe(404);
+    expect(mocks.findPageFile).not.toHaveBeenCalled();
+  });
+
+  it("should answer the fetch 404 when the site has no such page, and for the page's own name or an .htm path", async () => {
+    mocks.findPageFile.mockResolvedValueOnce(null);
+    expect((await ask({ path: "missing.html", headers: source })).status).toBe(404);
+    for (const path of ["index.html", "INDEX.HTML", "about.htm", "About.HTML"]) expect((await ask({ path, headers: source })).status, path).toBe(404);
+    expect(mocks.findPageFile).toHaveBeenCalledTimes(1);
   });
 });

@@ -54,7 +54,7 @@ describe("suggestPagePath", () => {
   });
 
   it("should give a path the rules accept for ordinary names", () => {
-    for (const name of ["My Page Styles.css", "Données.json", "logo@2x.png"]) expect(pagePathProblem(suggestPagePath(name))).toBeNull();
+    for (const name of ["My Page Styles.css", "Données.json", "logo@2x.png", "About Us.HTML", "old.htm"]) expect(pagePathProblem(suggestPagePath(name))).toBeNull();
   });
 });
 
@@ -72,10 +72,17 @@ describe("routeDrop", () => {
     expect(routeDrop([inFolder("site/index.html"), inFolder("site/app.js")])[0]).toEqual({ kind: "page-html", path: "index.html" });
   });
 
-  it("should refuse any other HTML file with the rule's reason", () => {
-    const [nested, other] = routeDrop([inFolder("site/pages/index.html"), inFolder("site/about.html")]);
-    expect(nested).toEqual({ kind: "refused", problem: pagePathProblem("about.html") });
-    expect(other).toEqual({ kind: "refused", problem: pagePathProblem("about.html") });
+  it("should make every other HTML file another page of the site, at its path in the drop", () => {
+    const routes = routeDrop([inFolder("site/index.html"), inFolder("site/about.html"), inFolder("site/docs/guide.html"), inFolder("site/docs/index.html")]);
+    expect(routes).toEqual([{ kind: "page-html", path: "index.html" }, { kind: "page", path: "about.html" }, { kind: "page", path: "docs/guide.html" }, { kind: "page", path: "docs/index.html" }]);
+  });
+
+  it("should keep an .htm page in its row with a path to fix, and refuse a second index.html at the top", () => {
+    expect(routeDrop([loose("Old Page.htm")])).toEqual([{ kind: "page", path: "Old Page.htm" }]);
+    expect(suggestPagePath("Old Page.htm")).toBe("old-page.html");
+    const [first, second] = routeDrop([loose("index.html"), loose("INDEX.HTML")]);
+    expect(first).toEqual({ kind: "refused", problem: pagePathProblem("index.html") });
+    expect(second?.kind).toBe("refused");
   });
 
   it("should refuse a type the site does not take, an empty file, and a file over the limit", () => {

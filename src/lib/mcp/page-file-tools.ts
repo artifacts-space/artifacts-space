@@ -32,6 +32,9 @@ const artifactField = (userId: string) => artifactRefField(userId, `An HTML arti
 const pathField = z.string().min(1).max(pageFileLimits.maxPathLength);
 const removeField = z.array(pathField).max(pageBatchLimits.maxFilesPerPublish).optional();
 
+/** How a site of several pages is made, in the words the guide uses (buildHtmlGuide). */
+const siteNote = "A site of several pages: index.html is the artifact's content; every other page is a page file whose path ends in .html (about.html, docs/guide.html), linked with ordinary relative links such as <a href=\"about.html\">, and it opens in the same frame under the same rules as the first page.";
+
 const limitsNote = `A page file may be ${pageFileTypesHint}, up to ${formatBytes(fileLimits.maxBytes)} each. One artifact holds at most ${String(pageFileLimits.maxFiles)} page files, ${formatBytes(pageFileLimits.maxTotalBytes)} in all.`;
 
 /** A shell loop over the saved result that PUTs every file from the folder the paths are relative to. */
@@ -42,12 +45,12 @@ function registerRequestUploads(server: ToolServer, userId: string) {
     "page_files_request_uploads",
     {
       title: "Start the uploads of a page's files",
-      description: `Starts the uploads of many page files of an HTML artifact in one call: the stylesheets, scripts, images, fonts, and data its page loads by relative path, such as <link rel="stylesheet" href="css/site.css">. Name every file by its path and exact size, up to ${String(pageBatchLimits.maxUploadsPerRequest)} in a call; for a larger site, call again for the rest and publish them all together. The whole set is checked before any upload starts: each path and type, and the page's limits as the set would leave it. If anything is wrong, nothing is started and one refusal names every file to fix. The result gives, for each file, its path, a fileId, a PUT url, and the headers to send. PUT each file's bytes (the urls work for ${String(fileLimits.uploadUrlSeconds / 60)} minutes), then call page_files_publish once with the fileIds. A path the page already has is fine: publishing replaces that file. ${limitsNote} Paths match letter for letter, so prefer lowercase.`,
+      description: `Starts the uploads of many page files of an HTML artifact in one call: the stylesheets, scripts, images, fonts, and data its page loads by relative path, such as <link rel="stylesheet" href="css/site.css">. Name every file by its path and exact size, up to ${String(pageBatchLimits.maxUploadsPerRequest)} in a call; for a larger site, call again for the rest and publish them all together. The whole set is checked before any upload starts: each path and type, and the page's limits as the set would leave it. If anything is wrong, nothing is started and one refusal names every file to fix. The result gives, for each file, its path, a fileId, a PUT url, and the headers to send. PUT each file's bytes (the urls work for ${String(fileLimits.uploadUrlSeconds / 60)} minutes), then call page_files_publish once with the fileIds. A path the page already has is fine: publishing replaces that file. ${siteNote} ${limitsNote} Paths match letter for letter, so prefer lowercase.`,
       inputSchema: {
         artifact: artifactField(userId),
         files: z
           .array(z.object({
-            path: pathField.describe('The relative path the page loads the file by, such as "css/site.css" or "img/logo.png": folders and a file name of letters, digits, dots, dashes, and underscores, joined by /. The type comes from the extension.'),
+            path: pathField.describe('The relative path the page loads the file by, such as "css/site.css", "img/logo.png", or "about.html" for another page: folders and a file name of letters, digits, dots, dashes, and underscores, joined by /. The type comes from the extension.'),
             size: z.number().int().positive().describe("Exact size in bytes. The PUT must send exactly this many bytes."),
           }))
           .min(1)

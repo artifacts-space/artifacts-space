@@ -44,11 +44,12 @@ interface Renewal {
  * tab to be shown again or the browser to come back online. Nothing repeats
  * on an interval.
  *
- * Returns `resend`: posts the newest address again. The frame calls it when
- * the frame document loads again (a page that reloads itself starts at the
- * address the frame first loaded, which may have ended).
+ * Returns `resend`: posts the newest address again, and says whether it had
+ * one to post (false before the first renewal). The frame calls it when the
+ * frame document loads again (a page that reloads itself, or goes to
+ * another page of its site, starts at an address that may have ended).
  */
-export function usePassRenewal({ frameRef, origin, pass }: Renewal): () => void {
+export function usePassRenewal({ frameRef, origin, pass }: Renewal): () => boolean {
   const newestRef = useRef<string | null>(null);
   const post = useCallback((token: string) => {
     frameRef.current?.contentWindow?.postMessage({ type: pageMessages.renew, path: pageFramePath(token) }, origin);
@@ -122,6 +123,8 @@ export function usePassRenewal({ frameRef, origin, pass }: Renewal): () => void 
   }, [pass, post]);
 
   return useCallback(() => {
-    if (newestRef.current !== null) post(newestRef.current);
+    if (newestRef.current === null) return false;
+    post(newestRef.current);
+    return true;
   }, [post]);
 }

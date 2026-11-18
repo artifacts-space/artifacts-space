@@ -49,7 +49,7 @@ describe("matchesPageFileSignature", () => {
   it("should refuse a page file whose first bytes are another kind of file", async () => {
     const { matchesPageFileSignature } = await import("./signature");
     const exe = new Uint8Array([0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00]);
-    for (const type of ["text/css", "text/javascript", "image/svg+xml", "font/woff2", "font/woff", "font/ttf", "font/otf", "application/wasm", "image/png"]) {
+    for (const type of ["text/html", "text/css", "text/javascript", "image/svg+xml", "font/woff2", "font/woff", "font/ttf", "font/otf", "application/wasm", "image/png"]) {
       expect(matchesPageFileSignature(type, exe), type).toBe(false);
     }
     expect(matchesPageFileSignature("font/woff2", ascii("wOFF\u0000\u0001"))).toBe(false);
@@ -57,7 +57,12 @@ describe("matchesPageFileSignature", () => {
 
   it("should refuse a type no page file is stored as", async () => {
     const { matchesPageFileSignature } = await import("./signature");
-    expect(matchesPageFileSignature("text/html", ascii("<!doctype html>"))).toBe(false);
+    expect(matchesPageFileSignature("application/xhtml+xml", ascii("<!doctype html>"))).toBe(false);
     expect(matchesPageFileSignature("application/pdf", ascii("%PDF-1.7"))).toBe(false);
+  });
+
+  it("should check another page of the site as text", async () => {
+    const { matchesPageFileSignature } = await import("./signature");
+    expect(matchesPageFileSignature("text/html", ascii("<!doctype html><p>About</p>"))).toBe(true);
   });
 });

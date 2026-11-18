@@ -6,7 +6,8 @@ import { pageFileExtensions, pagePathProblem } from "./rules";
 /*
  * What a person's drop (or pick) of files on an HTML artifact's page turns
  * into, decided from each file's name, size, and place in the drop: a page
- * file at a path, a plain attachment, the page itself (index.html), a file
+ * file at a path (another page of the site, `about.html`, is one), a plain
+ * attachment, the page itself (index.html), a file
  * that is refused with a reason, or a hidden or system file that is left
  * out. Every rule about what a page file may be is in rules.ts and
  * publish-rules.ts; this only routes files to them.
@@ -85,15 +86,17 @@ function cleanSegment(segment: string): string {
 /**
  * A path the page can take, made from one it cannot: each part lowercase,
  * white space and other characters a path cannot hold turned into dashes,
- * leading dots dropped, and empty, `.`, and `..` parts left out. The person
- * sees it in the row before anything is added. Empty when nothing is left.
+ * leading dots dropped, and empty, `.`, and `..` parts left out; a page
+ * named `.htm` ends in `.html`. The person sees it in the row before
+ * anything is added. Empty when nothing is left.
  */
 export function suggestPagePath(path: string): string {
-  return path
+  const cleaned = path
     .split("/")
     .map(cleanSegment)
     .filter((segment) => segment !== "" && segment !== "." && segment !== "..")
     .join("/");
+  return cleaned.endsWith(".htm") ? `${cleaned}l` : cleaned;
 }
 
 function isHtmlName(name: string): boolean {
@@ -101,9 +104,10 @@ function isHtmlName(name: string): boolean {
   return extension === "html" || extension === "htm";
 }
 
-/** The words for an HTML file that is not the page itself: the rule's own reason. */
-function htmlRefusal(path: string): string {
-  return pagePathProblem(suggestPagePath(path) || "page.html") ?? "A page file cannot be another HTML document.";
+/** Where an HTML file of a drop goes: the page itself (one index.html at the top), or another page of the site at its path, which the path rules may still ask to fix. */
+function htmlRoute(entry: DroppedEntry, path: string, pageAt: boolean): DropRoute {
+  if (path.toLowerCase() === "index.html") return pageAt ? { kind: "page-html", path } : { kind: "refused", problem: pagePathProblem(path) ?? "" };
+  return pageRoute(entry, path);
 }
 
 /** Why a file of this size cannot be a page file, in a person's words, or null when it can. */
@@ -130,8 +134,9 @@ function plainRoute(entry: DroppedEntry): DropRoute {
  * takes is a plain attachment, as on every other format; the rest are
  * refused with the reason. An `index.html` at the top of the drop, when it
  * is the only one there, is the page itself; any other HTML file is
- * refused, since one artifact is one page. Hidden and system files are
- * left out (leftOutOfDrop).
+ * another page of the site, a page file at its path like any other (an
+ * `.htm` one waits in its row for a path that ends in `.html`). Hidden and
+ * system files are left out (leftOutOfDrop).
  */
 export function routeDrop(entries: readonly DroppedEntry[]): DropRoute[] {
   const paths = pathsInDrop(entries.map((entry) => entry.relativePath));
@@ -139,7 +144,7 @@ export function routeDrop(entries: readonly DroppedEntry[]): DropRoute[] {
   return entries.map((entry, index): DropRoute => {
     const path = paths[index] ?? entry.name;
     if (leftOutOfDrop(entry)) return { kind: "left-out" };
-    if (isHtmlName(entry.name)) return pageAt && path.toLowerCase() === "index.html" ? { kind: "page-html", path } : { kind: "refused", problem: htmlRefusal(path) };
+    if (isHtmlName(entry.name)) return htmlRoute(entry, path, pageAt);
     if (pageExtensions.has(fileExtension(entry.name))) return pageRoute(entry, path);
     return plainRoute(entry);
   });

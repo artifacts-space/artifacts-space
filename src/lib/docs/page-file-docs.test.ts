@@ -41,7 +41,7 @@ describe("page file docs", () => {
 
   it("should show a refusal in the server's own words", () => {
     const held = [{ id: "held", pagePath: "img/logo.png", size: 10 }];
-    const check = planPagePublish([{ path: "about.html", size: 10 }, { path: "Img/Logo.PNG", size: 10 }], [], held);
+    const check = planPagePublish([{ path: "about.htm", size: 10 }, { path: "Img/Logo.PNG", size: 10 }], [], held);
     if (check.ok) throw new Error("The set was taken.");
     expect(refusedSetExample).toBe(faultsMessage("No upload was started. Fix these, then ask again with the whole set:", check.faults));
   });

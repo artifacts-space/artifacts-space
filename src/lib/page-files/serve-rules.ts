@@ -1,7 +1,7 @@
-import { pageContentPolicy } from "@/lib/page-host/rules";
+import { pageContentPolicy, pageSourceHeader } from "@/lib/page-host/rules";
 import { permissionsPolicy } from "@/lib/security-header-rules";
 
-import { servedContentType } from "./rules";
+import { pageHtmlType, servedContentType } from "./rules";
 
 /*
  * How a page file is answered on a page host: the headers, the Range a
@@ -65,10 +65,13 @@ export function pageFilePolicy(site: string): string {
  * gave it and may not be sniffed as another, under pageFilePolicy. Only
  * the page's own origin may load it (Cross-Origin-Resource-Policy), and
  * only the viewer's browser may keep it, for no longer than its address
- * works.
+ * works. Another page of the site is plain text here, and its address gives
+ * a browser that goes there the frame document, so its answer names the
+ * header that tells the two apart (`Vary`).
  */
 export function pageFileHeaders(input: { site: string; contentType: string; body: ServedBody; expiresAt: Date; now: Date }): Record<string, string> {
   return {
+    ...(input.contentType === pageHtmlType ? { Vary: pageSourceHeader } : {}),
     "Content-Type": servedContentType(input.contentType),
     "Content-Length": String(input.body.length),
     ...(input.body.contentRange ? { "Content-Range": input.body.contentRange } : {}),

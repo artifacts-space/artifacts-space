@@ -3,9 +3,9 @@ import { hitRateLimits } from "@/lib/abuse/rate-limit";
 import { tooManyRequests } from "@/lib/abuse/responses";
 import { openObject, r2ConfigFromEnv, type ObjectOpening } from "@/lib/files/r2";
 import { framingSite, pageHostRefusal } from "@/lib/page-host/respond";
-import { pageHostBase, pageHostRefusalHeaders, pageLabelOf } from "@/lib/page-host/rules";
+import { isPageSourceRequest, pageHostBase, pageHostRefusalHeaders, pageLabelOf } from "@/lib/page-host/rules";
 
-import { pagePathProblem } from "./rules";
+import { pageFileTypeFor, pageHtmlType, pagePathProblem } from "./rules";
 import { fixturePageArtifactId, pageFileHeaders, passedRange, type ServedPageFile } from "./serve-rules";
 import { findPageFile } from "./store";
 import { openPageToken, type OpenedPageToken } from "./token";
@@ -17,6 +17,12 @@ import { openPageToken, type OpenedPageToken } from "./token";
  * (token.ts). A request is answered only on a page host of this
  * deployment, and only for a token made for that same host. Everything
  * else gets the page host's plain 404, the same for every reason.
+ *
+ * Another page of the site (`about.html`) is answered here only to the
+ * frame document's own fetch of its source (isPageSourceRequest), and then
+ * as plain text (servedContentType). A browser that goes to that address
+ * gets the frame document from the proxy instead; should such a request
+ * ever reach this route, it gets the 404, never the page.
  */
 
 /** Where page files come from: the lookup, and the bytes. */
@@ -73,13 +79,24 @@ function grantOf(request: PageFileRequest, label: string, now: Date): OpenedPage
 
 async function serve(request: PageFileRequest, grant: OpenedPageToken, path: string, now: Date, source: PageFileSource): Promise<Response> {
   const file = await source.find(grant, path);
-  if (!file) return pageHostRefusal(404);
+  if (!file || !mayServe(file.contentType, request)) return pageHostRefusal(404);
   const opening = await source.open(file, { range: passedRange(request.headers.get("range")), head: request.method === "HEAD" });
   if (opening.state === "missing") return pageHostRefusal(404);
   if (opening.state === "bad-range") return new Response("Range not satisfiable", { status: 416, headers: { ...pageHostRefusalHeaders, "Content-Range": `bytes */${String(file.size)}` } });
   const { object } = opening;
   const headers = pageFileHeaders({ site: framingSite(request.host), contentType: file.contentType, body: object, expiresAt: grant.expiresAt, now });
   return new Response(object.body, { status: object.status, headers });
+}
+
+/** Whether a file of this type may answer this request: another page of the site answers only the frame document's fetch of its source. */
+function mayServe(contentType: string, request: PageFileRequest): boolean {
+  return contentType !== pageHtmlType || isPageSourceRequest(request.headers);
+}
+
+/** Whether a page file at this path may answer this request at all, before the token is opened: a path a page file can have, and asked for in a way its type may answer. */
+function mayAsk(path: string, request: PageFileRequest): boolean {
+  if (pagePathProblem(path) !== null) return false;
+  return mayServe(pageFileTypeFor(path)?.contentType ?? "", request);
 }
 
 /**
@@ -93,7 +110,7 @@ async function serve(request: PageFileRequest, grant: OpenedPageToken, path: str
 export async function pageFileResponse(request: PageFileRequest, now: Date = new Date(), source?: PageFileSource): Promise<Response> {
   const label = pageLabelOf(request.host, pageHostBase());
   const path = request.segments.join("/");
-  if (!label || pagePathProblem(path) !== null) return pageHostRefusal(404);
+  if (!label || !mayAsk(path, request)) return pageHostRefusal(404);
   const grant = grantOf(request, label, now);
   if (!grant) return pageHostRefusal(404);
   const refusal = await overLimit(request.headers);
