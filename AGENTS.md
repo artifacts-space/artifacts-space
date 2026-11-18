@@ -963,6 +963,14 @@ path, as on any website: `<link href="css/site.css">`, a module's
   a folder where the browser allows it, and a dropped folder is read
   through its entries (`readDrop` in `dropped-files.ts`, at most
   `maxFilesReadFromDrop` files).
+  - A `.zip` dropped or picked by itself is unpacked in the browser and
+    goes on exactly as the folder it holds would (`unpackDrop` in
+    `unpack-drop.ts`, before `routeDrop`), with the reader in
+    `src/lib/zip` (no dependency; stored and deflate only, caps in
+    `pageZipLimits` in `src/lib/page-files/zip-rules.ts`, counted on what
+    actually comes out). Entries become `File` objects and nothing else;
+    the server checks every file as for any upload. Agents use the batch
+    tools instead.
   - One gesture, the right result (`routeDrop` in `drop-rules.ts`, pure):
     a type in `typesByExtension` becomes a page file at its path in the
     drop; any other type the site takes is a plain attachment through
@@ -1007,8 +1015,11 @@ path, as on any website: `<link href="css/site.css">`, a module's
     frame loads again with the new files (`usePageFilesKey`).
   - Tests: `drop-rules.test.ts`, `batch-rules.test.ts`,
     `page-file-actions.test.ts` (session, input, and edit access before
-    any service call), `dropped-files.test.ts`, and
-    `e2e/page-files-web.spec.ts` on `/dev/editor?kind=html` (`&files=1`
+    any service call), `dropped-files.test.ts`, the zip's
+    `read-zip.test.ts` (on zips built by hand with `test-zip.ts`),
+    `unpack-drop.test.ts`, and `zip-rules.test.ts`, and
+    `e2e/page-files-web.spec.ts` and `e2e/page-files-zip.spec.ts` on
+    `/dev/editor?kind=html` (`&files=1`
     starts with two page files), whose stand-in keeps page files in the
     tab (`src/components/dev/fixture-page-files.ts`).
 - Sites of several pages (owner's decision, 18 Nov 2026). `index.html` is
@@ -1062,7 +1073,7 @@ path, as on any website: `<link href="css/site.css">`, a module's
     `PAGE_ANSWER_MS` with "Show the page again".
   - Known limits: no link from this site to a page inside the frame, no
     list of pages beside the frame, no search or link preview over pages
-    other than the first, no folder index, no `.htm`, and no zip. The frame
+    other than the first, no folder index, and no `.htm`. The frame
     document does not scroll to a `#fragment` itself after writing a page.
   - Tests: `frame-document-pages.test.ts` (the script in a VM: nothing
     fetched or shown in a tab of its own, only the site's renew moves it,

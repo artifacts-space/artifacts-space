@@ -3,6 +3,7 @@ import { uploadCancelled } from "@/components/files/put-file";
 import type { ArtifactDto } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
 import { pageFileTypeFor } from "@/lib/page-files/rules";
+import { readZip } from "@/lib/zip/read-zip";
 
 /*
  * Development only: an HTML artifact's page files kept in the tab, for the
@@ -20,6 +21,9 @@ import { pageFileTypeFor } from "@/lib/page-files/rules";
  * - `fixture:hold-page-publish` "1": every publish waits until the test
  *   dispatches `fixture:release-page-publish`.
  * - `fixture:next-page-publish` "refuse": the next publish is refused.
+ * - `fixture:hold-zip-unpack` "1": a dropped zip waits before it is read
+ *   until the test dispatches `fixture:release-zip-unpack`, or Cancel
+ *   stops it.
  * A file whose name starts with `broken` fails the server's check.
  */
 
@@ -30,6 +34,8 @@ export interface FixturePageCounts {
   aborts: number;
   publishes: { added: string[]; replaced: string[]; removed: string[] }[];
   discards: number;
+  /** The text of each file sent, by its path, so a test can compare it with what it dropped. */
+  sent: Record<string, string>;
 }
 
 declare global {
@@ -39,7 +45,7 @@ declare global {
 }
 
 function counts(): FixturePageCounts {
-  window.fixturePageFiles ??= { requests: [], puts: 0, aborts: 0, publishes: [], discards: 0 };
+  window.fixturePageFiles ??= { requests: [], puts: 0, aborts: 0, publishes: [], discards: 0, sent: {} };
   return window.fixturePageFiles;
 }
 
@@ -130,9 +136,10 @@ export function memoryPageFilesApi(storeFor: (artifactId: string) => FixturePage
       });
       return Promise.resolve({ success: true, data: tickets });
     },
-    put: async (_ticket, _file, onProgress, signal) => {
+    put: async (ticket, file, onProgress, signal) => {
       counts().puts += 1;
       await held(signal);
+      counts().sent[ticket.path] = await file.text();
       onProgress(100);
     },
     finalize: async (fileId) => {
@@ -162,6 +169,17 @@ export function memoryPageFilesApi(storeFor: (artifactId: string) => FixturePage
       counts().discards += 1;
       uploads.delete(fileId);
       return Promise.resolve();
+    },
+    readZip: async (bytes, options) => {
+      if (flag("fixture:hold-zip-unpack") === "1") {
+        const released = await new Promise<boolean>((resolve) => {
+          if (options.signal?.aborted) { resolve(false); return; }
+          options.signal?.addEventListener("abort", () => { resolve(false); }, { once: true });
+          window.addEventListener("fixture:release-zip-unpack", () => { resolve(true); }, { once: true });
+        });
+        if (!released) return { ok: false, fault: "cancelled", bytesOut: 0 };
+      }
+      return readZip(bytes, options);
     },
   };
 }
