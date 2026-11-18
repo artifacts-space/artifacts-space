@@ -76,7 +76,7 @@ function loadPage(pathname: string, options: { answer?: Answer; alone?: boolean;
     asked.push({ url, init });
     if (answer === "fails") return Promise.reject(new TypeError("Failed to fetch"));
     const type = answer.type ?? "text/plain; charset=utf-8";
-    return Promise.resolve({ ok: answer.status >= 200 && answer.status <= 299, headers: { get: (name: string) => (name === "content-type" ? type : null) }, text: () => Promise.resolve(answer.body) });
+    return Promise.resolve({ ok: answer.status >= 200 && answer.status <= 299, status: answer.status, headers: { get: (name: string) => (name === "content-type" ? type : null) }, text: () => Promise.resolve(answer.body) });
   };
   runInNewContext(frameScript(site), { window: frame, document, history, location, fetch, RegExp, JSON });
   const deliver = (message: Message) => { for (const listener of [...listeners]) listener(message); };
@@ -123,18 +123,22 @@ describe("the frame document at another page of the site", () => {
     expect(loaded.written).toEqual([]);
   });
 
+  const noFile = "This page has no file at docs/missing.html.";
+  const notLoaded = "This page could not be loaded: docs/missing.html. Load it again.";
+
   it.each([
-    ["a page that has no file there", { status: 404, body: "Not found" }],
-    ["a fetch that fails on the way", "fails"],
-    ["an answer served as HTML, such as the frame document from a cache", { status: 200, body: "<!doctype html><script>frame</script>", type: "text/html; charset=utf-8" }],
-    ["an answer with no type", { status: 200, body: "<p>x</p>", type: "" }],
-  ] as const)("should show its own line, built from text, for %s", async (_name, answer) => {
+    ["a page that has no file there", { status: 404, body: "Not found" }, noFile],
+    ["a fetch that fails on the way", "fails", notLoaded],
+    ["an answer of the server's own failure", { status: 500, body: "The file could not be loaded. Try again." }, notLoaded],
+    ["an answer served as HTML, such as the frame document from a cache", { status: 200, body: "<!doctype html><script>frame</script>", type: "text/html; charset=utf-8" }, notLoaded],
+    ["an answer with no type", { status: 200, body: "<p>x</p>", type: "" }, notLoaded],
+  ] as const)("should show its own line, built from text, for %s", async (_name, answer, words) => {
     const loaded = loadPage(pageAt("A", "docs/missing.html"), { answer });
     loaded.fromSite({ type: pageMessages.renew, path: pageAt("A", "index.html") });
     await settled();
     expect(loaded.written).toEqual([]);
     const [note, back] = loaded.body.children;
-    expect(note).toMatchObject({ tag: "p", textContent: "This page has no file at docs/missing.html." });
+    expect(note).toMatchObject({ tag: "p", textContent: words });
     expect(back?.children[0]).toMatchObject({ tag: "a", href: "../index.html", textContent: "Go to the first page" });
     expect(loaded.posted.at(-1)).toEqual({ type: pageMessages.shown });
   });

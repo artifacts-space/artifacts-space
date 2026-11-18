@@ -1020,9 +1020,10 @@ path, as on any website: `<link href="css/site.css">`, a module's
     document from a cache), with
     the same `document.open()` / `write()` / `close()` steps, its ping and
     renew listeners added after `open()` and before the page's scripts, and
-    says "shown". A 404 or a failed fetch gets a line built from elements
-    and text: "This page has no file at <path>." and a link to the first
-    page by relative path. At `/` and `index.html` it says "ready" and
+    says "shown". A 404 gets a line built from elements and text: "This
+    page has no file at <path>." (an address that ended answers 404 too),
+    and a link to the first page by relative path; any other failure says
+    "This page could not be loaded", with the same link. At `/` and `index.html` it says "ready" and
     waits for the HTML, as before, so the site answers every "ready" with
     the HTML (a return to the first page is a new load).
   - That fetch is told from a navigation by the header

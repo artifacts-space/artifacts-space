@@ -13,10 +13,11 @@ import { pageAddressPattern, pageDocumentName, pageMessages, pageSourceHeader } 
  * ("renew"), fetches its own address with the source header
  * (`X-Page-Source: 1`), which the page host answers with that page file as
  * plain text, and writes it in with the same steps; an answer of any other
- * type is never written. When there is no such file, or the fetch fails,
- * it shows a line of its own instead: "This page
- * has no file at <path>", the path set as text, and a link to the first
- * page. The page is never served to the browser as a document: only this
+ * type is never written. When there is no such file (a 404) it shows a
+ * line of its own instead: "This page has no file at <path>", the path set
+ * as text, and a link to the first page; any other failure says the page
+ * could not be loaded, with the same link. The page is never served to
+ * the browser as a document: only this
  * script reads it.
  *
  * It also answers the site's question "is a document of the page host still
@@ -64,7 +65,8 @@ export function frameScript(siteOrigin: string): string {
   var own = pageAddress.exec(location.pathname);
   // Another page of the site: written from its own address once the site sent the newest one. Null at "/" and at index.html.
   var page = own && own[2] !== ${JSON.stringify(pageDocumentName)} ? own[2] : null;
-  var waiting = page !== null;
+  // True until the first renewal: that one asks for this page's source, and every later one only moves the address.
+  var notYetAsked = page !== null;
   function onPing(event) {
     if (event.origin !== site || event.source !== host) return;
     if (event.data && event.data.type === ${type("ping")}) host.postMessage({ type: ${type("pong")}, id: event.data.id }, site);
@@ -78,8 +80,8 @@ export function frameScript(siteOrigin: string): string {
     var here = pageAddress.exec(location.pathname);
     if (!next || !here) return;
     try { history.replaceState(history.state, "", "/f/" + next[1] + "/" + here[2] + location.search + location.hash); } catch (error) { /* The page keeps the address it has. */ }
-    if (waiting) {
-      waiting = false;
+    if (notYetAsked) {
+      notYetAsked = false;
       load();
     }
   }
@@ -92,9 +94,10 @@ export function frameScript(siteOrigin: string): string {
     document.close();
     host.postMessage({ type: ${type("shown")} }, site);
   }
-  function missing() {
+  // A 404 is a page with no file there (or an address that ended); anything else, a failed fetch included, is a page that could not load.
+  function missing(status) {
     var note = document.createElement("p");
-    note.textContent = "This page has no file at " + page + ".";
+    note.textContent = status === 404 ? "This page has no file at " + page + "." : "This page could not be loaded: " + page + ". Load it again.";
     var link = document.createElement("a");
     link.href = "../".repeat(page.split("/").length - 1) + ${JSON.stringify(pageDocumentName)};
     link.textContent = "Go to the first page";
@@ -111,8 +114,8 @@ export function frameScript(siteOrigin: string): string {
   }
   function load() {
     fetch(location.pathname, { headers: { ${JSON.stringify(pageSourceHeader)}: "1" }, credentials: "same-origin", redirect: "error" })
-      .then(function (response) { return isSource(response) ? response.text() : null; })
-      .then(function (html) { if (html === null) missing(); else write(html); }, missing);
+      .then(function (response) { return isSource(response) ? response.text().then(write) : missing(response.status); })
+      .then(null, function () { missing(0); });
   }
   function onMessage(event) {
     if (event.origin !== site || event.source !== host) return;
