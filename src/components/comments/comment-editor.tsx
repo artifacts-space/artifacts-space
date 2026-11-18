@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { TableBubbleMenu, TextBubbleMenu } from "@/components/editor/rich/bubble-menus";
 import { richEditorExtensions } from "@/components/editor/rich/editor-extensions";
+import { EditorLiveRegion } from "@/components/editor/rich/editor-live-region";
 import { MarkdownLinkInput } from "@/components/editor/rich/markdown-link-input";
 import type { SourceMap } from "@/components/editor/rich/markdown-roundtrip";
 import { useCoarsePointer } from "@/components/editor/rich/use-coarse-pointer";
@@ -182,7 +183,9 @@ export default function CommentEditor({ onChange, label, placeholder, hidden, on
             <TableBubbleMenu editor={editor} />
           </>
         ) : null}
-        <EditorContent editor={editor} />
+        <EditorLiveRegion>
+          <EditorContent editor={editor} />
+        </EditorLiveRegion>
       </div>
       {/* Kept in the page, so screen readers hear the note when it appears. */}
       <p role="status" className={cn("mt-2 text-xs text-muted-foreground", !filesRefused && "sr-only")}>{filesRefused ? FILES_REFUSED : ""}</p>

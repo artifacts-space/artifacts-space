@@ -222,6 +222,27 @@ test.describe("in the editor", () => {
     await expect(savedMarkdown(page)).toContainText(`![Dusk over the hills](/api/files/${dusk}#width=50 "A preset caption")`);
   });
 
+  test("should keep the viewer open when the document also holds a code block", async ({ page }) => {
+    await openEditor(page);
+    await editor(page).getByText("End paragraph.").click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("```ts ");
+    await page.keyboard.type("const answer = 42;");
+    await expect(editor(page).locator("[data-code-toolbar]")).toHaveCount(1);
+    const image = editor(page).getByRole("img", { name: "Dusk over the hills" });
+    const block = await image.elementHandle();
+    await image.dblclick();
+    const dialog = viewer(page);
+    await expect(dialog.getByRole("heading", { name: "Dusk over the hills" })).toBeVisible();
+    // A code block's Copy once kept a live region in the text: the viewer's dialog then made the editor draw every block again, and the new image block opened the viewer again from the address, without end (issue #226).
+    expect(await block.evaluate((element) => element.isConnected)).toBe(true);
+    await expect(dialog.getByText("A preset caption")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    expect(await hash(page)).toBe("");
+  });
+
   test("should resize an image from the left edge, from a corner, and with the keyboard", async ({ page, isMobile }) => {
     test.skip(isMobile, "Phones always use the full column, so the handles are not drawn there.");
     await openEditor(page);
