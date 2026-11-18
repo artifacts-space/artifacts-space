@@ -199,11 +199,11 @@ test("should keep an open page loading its files after its first address ended, 
   expect(drawn).toBe(24);
 });
 
-/** Gives the page a tab whose visibility the test sets, and a clock the test can move forward (`setClockSkew`): the hook reads `Date.now()` when a timer fires. */
-async function controlTabAndClock(page: Page) {
-  await page.addInitScript(() => {
+/** Gives the page a tab whose visibility the test sets, and a device clock that starts `startSkewMs` off and that the test can move (`setClockSkew`): the page reads `Date.now()` when it receives an address and when a timer fires. */
+async function controlTabAndClock(page: Page, startSkewMs = 0) {
+  await page.addInitScript((startSkew) => {
     let state: DocumentVisibilityState = "visible";
-    let skewMs = 0;
+    let skewMs = startSkew;
     const realNow = Date.now.bind(Date);
     Date.now = () => realNow() + skewMs;
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
@@ -213,7 +213,7 @@ async function controlTabAndClock(page: Page) {
       state = shown ? "visible" : "hidden";
       document.dispatchEvent(new Event("visibilitychange"));
     };
-  });
+  }, startSkewMs);
 }
 
 test("should keep a hidden tab's page loading its files, by renewing its address while the tab stays hidden", async ({ page, request, baseURL }) => {
@@ -256,6 +256,21 @@ test("should ask for nothing in a tab hidden past its hour, and renew at once wh
   expect(shown.kept).toBe("since the first load");
   expect(asks.count - loaded).toBe(1);
 });
+
+for (const [words, skewMs] of [["an hour ahead", 60 * 60_000], ["an hour behind", -60 * 60_000]] as const) {
+  test(`should renew once, on time, and keep the page's files when the device clock is ${words}`, async ({ page, request, baseURL }) => {
+    await controlTabAndClock(page, skewMs);
+    const { frame, asks, loaded, first } = await openShortPassPage(page, "short");
+    await firstAddressEnded(request, baseURL, first);
+
+    // The address is timed from when it arrived, on the device's own clock: one ask, as a right clock makes, and the files load under the next address.
+    await expect.poll(async () => (await pageState(frame)).status).toBe(200);
+    const state = await pageState(frame);
+    expect(state.path, "the frame document moved to the next address").not.toBe(first.pathname);
+    expect(state.kept).toBe("since the first load");
+    expect(asks.count - loaded, "the site asked more often than a right clock would").toBe(1);
+  });
+}
 
 test("should give a reader who lost access no new address, and keep the page running without its files", async ({ page, request, baseURL }) => {
   const { frame, asks, loaded, first } = await openShortPassPage(page, "refused");

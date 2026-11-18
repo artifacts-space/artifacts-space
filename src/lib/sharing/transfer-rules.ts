@@ -22,13 +22,23 @@ const rolePriority: Record<TeamRole, number> = { owner: 0, admin: 1, member: 2 }
  * longest-standing owner, else the longest-standing admin. Null when the team
  * has neither, which Better Auth's owner checks should prevent.
  */
-export function pickTransferOwner(members: TransferMember[]): string | null {
+export function pickTransferOwner(members: readonly TransferMember[]): string | null {
   let best: TransferMember | null = null;
   for (const member of members) {
     if (member.role === "member") continue;
     if (!best || isBefore(member, best)) best = member;
   }
   return best?.userId ?? null;
+}
+
+/**
+ * Who will take over `departingUserId`'s artifacts in the team once they
+ * leave or are removed: pickTransferOwner over the members who stay, which
+ * is the set reconcileTeamArtifacts reads after the departure. The leave and
+ * remove confirms name this person before anything happens.
+ */
+export function heirAfterLeaving(members: readonly TransferMember[], departingUserId: string): string | null {
+  return pickTransferOwner(members.filter((member) => member.userId !== departingUserId));
 }
 
 function isBefore(a: TransferMember, b: TransferMember) {

@@ -9,7 +9,9 @@ import { pageFramePath, pageMessages } from "@/lib/page-host/rules";
 
 /** The files address a load of a page started on, and how to ask the server for the next one. */
 export interface PagePass {
-  /** When the address the frame loaded under ends, in milliseconds. */
+  /** The address the frame loaded under. */
+  token: string;
+  /** When that address ends on this browser's clock, in milliseconds (endOnThisClock, from when its answer arrived). Never the server's time of day. */
   endsAt: number;
   /** Asks the server for this viewer's next address. Null when they may not read the artifact any more, or none could be made. */
   ask: () => Promise<PageAddress | null>;
@@ -38,7 +40,13 @@ interface Renewal {
  * timer and asks nothing. A tab shown again with an address that ended or
  * is close to its end asks at once, and hiding it again starts a new hour.
  * Browsers slow the timers of hidden tabs, so every timer decides from the
- * clock when it fires, never from the delay it was set for. A refusal ends
+ * clock when it fires, never from the delay it was set for. The clock is
+ * this browser's own: the server says how long an address works (`lifeMs`),
+ * and the end held here is that long after the answer arrived, so a device
+ * whose clock is wrong renews at the same moments as one that is right. A
+ * page that comes back from the back/forward cache, or a device that slept,
+ * decides from the clock at once: an address past its renew time is asked
+ * for as soon as the tab is shown (or its late timer fires). A refusal ends
  * it for this load: the page keeps running without its files. A request
  * that failed twice, or an answer that is no later address, waits for the
  * tab to be shown again or the browser to come back online. Nothing repeats
@@ -59,6 +67,7 @@ export function usePassRenewal({ frameRef, origin, pass }: Renewal): () => boole
     if (!pass) return undefined;
     const { ask } = pass;
     let held: HeldPass | null = heldPass(pass.endsAt, Date.now());
+    let heldToken = pass.token;
     let timer: number | null = null;
     let asking = false;
     // Set after an answer that brought nothing new: the next ask waits for the tab to be shown again, or the browser to come back online.
@@ -73,11 +82,12 @@ export function usePassRenewal({ frameRef, origin, pass }: Renewal): () => boole
     };
     const take = (answer: PageAddress | null) => {
       if (ended || !held) return;
-      const outcome = renewalOutcome(held, answer, Date.now());
+      const outcome = renewalOutcome(held, heldToken, answer, Date.now());
       if (outcome.kind === "refused") held = null;
       if (outcome.kind === "same") resting = true;
       if (outcome.kind !== "renewed") return;
       held = outcome.pass;
+      heldToken = outcome.token;
       newestRef.current = outcome.token;
       post(outcome.token);
     };

@@ -832,10 +832,29 @@ path, as on any website: `<link href="css/site.css">`, a module's
   access again (`pageAddress`, 3,600 an hour per person, about 6 requests
   for a tab renewing an hour). A refusal (the reader lost access,
   or no address could be made) ends it for that load: the page keeps
-  running without its files. Only an address that ends later counts as new
-  (`renewalOutcome`), so one address never sets two timers. Never add an
-  interval here, and never renew in a tab that has been hidden longer than
-  its hour.
+  running without its files. Never add an interval here, and never renew in
+  a tab that has been hidden longer than its hour.
+- Renewal runs on the browser's own clock, never the server's time of day
+  (tripwire, found 17 Nov 2026). An address answer carries `expiresAt` and
+  also `lifeMs`, how long it still works, measured on the server when the
+  answer is made (`answerFor` in `token.ts`). The browser holds the address
+  until `lifeMs` after the answer reached it (`endOnThisClock`: the first
+  address in `page-frame.tsx`, each renewal in `renewalOutcome`), so
+  `heldPass`, `renewStep`, and the timers compare only browser times. Never
+  compare `expiresAt` with `Date.now()`: a device clock an hour ahead asked
+  again after every answer until the hourly limit refused it and the page
+  lost its files, and one an hour behind renewed too late. A `lifeMs` that
+  is missing, not a number, or not above zero counts as no life.
+  `renewalOutcome` takes an answer as a later address only when its token
+  differs from the one in hand (the same grant gives the same token within
+  a step), it ends later on this clock, and its own renewal is at least
+  `passRenewal.minWaitMs` away; anything else is "same" (nothing handed
+  over, asked again when the tab is shown or the browser is back online),
+  so an answer can never set off an immediate new ask. After a sleep or a
+  return from the back/forward cache the decision is still taken from the
+  clock, so an address past its renew time is asked for at once. Known
+  limit: the clock is `Date.now()`, so a device clock changed by hand
+  while a page is open still moves the end held for that load.
 - The frame document takes `renew` only from the window that frames it,
   only from the site's origin, and only when both the message's path and
   its own are a page's under a files address (`pageAddressPattern`:
@@ -1986,8 +2005,8 @@ public artifact approved by the personal team stays Personal.
   the author's Personal list, so it is never in no list. Leaving a team
   hands such artifacts to the team's longest-standing owner
   (`src/lib/sharing/transfer.ts`), so this is only a row left behind. What
-  should happen to an artifact when its author leaves the team that is its
-  home is not decided; do not build a rule for it.
+  happens when an author and a home come apart is decided: see the next
+  section.
 - Views may cross the line; places may not. The one row that can be from
   another workspace is an artifact a link opened here: it names its
   workspace ("In Design", `elsewhereName`), and it is never counted.
@@ -2006,6 +2025,58 @@ public artifact approved by the personal team stays Personal.
 - `e2e/workspace-home.spec.ts` runs the move, Open in, Undo, the approval
   case, and the row's label on `/dev/workspace?scopes=1`, whose sharing is
   an in-memory stand-in (`src/components/dev/fixture-sharing.ts`).
+
+### When an author and a home come apart
+
+Decided by the owner on 18 Nov 2026 (#219). "Their artifacts in a team" are
+the rows `homeInTeamCondition` (`src/lib/sharing/transfer.ts`) matches: the
+team is the home (any visibility but private) and the person is the author.
+These four outcomes are the rule; whoever builds account deletion or team
+deletion builds to them.
+
+1. **An account is deleted:** its artifacts whose home is a team go to that
+   team first, by the same rule as leaving (2), before any of the account's
+   rows are deleted. `artifact.user_id` cascades on delete, so deleting a
+   user row today deletes those artifacts with it: an account deletion path
+   MUST run the hand-over (`reconcileTeamArtifacts` for each of its shared
+   teams, after its memberships are gone) before it deletes the user. The
+   rule says nothing about the account's own Personal artifacts.
+2. **Leaving a team, or being removed:** the team's longest-standing owner
+   takes the person's artifacts there, with the person kept as the first
+   author (`reconcileTeamArtifacts`, run after every departure by
+   `reconcileAfterDeparture`). Who that is comes from one rule,
+   `heirAfterLeaving` in `transfer-rules.ts` (`pickTransferOwner` over the
+   members who stay); any screen that names the new owner uses it, never a
+   copy.
+3. **Before leaving:** the person sees which of their artifacts stay behind,
+   who becomes their owner, and can move some or all to Personal first
+   (`LeaveTeamButton`, `LeaveChoiceDialog`, actions in
+   `src/app/(workspace)/teams/leave-actions.ts`, words in
+   `src/lib/teams/departure-rules.ts`). A move is the Share dialog's private
+   choice (`requestArtifactSharing`, visibility private), so every rule of
+   that path applies; a move that waits is never shown as done. With
+   artifacts to choose about, the dialog has no "Don't ask again" and shows
+   even when the plain leave confirm was turned off; with none, the plain
+   confirm stays. The remove confirm tells the owner or admin what becomes
+   of the member's artifacts and asks under its own kind
+   (`removeMemberWithArtifacts`). Being removed sends no notification today.
+4. **A team is deleted:** each artifact whose home is the team returns to
+   its author's Personal workspace as private. `artifact.team_id` is set to
+   null on team delete while `visibility` stays `team`, so a team deletion
+   path MUST first make each such artifact private (through the sharing
+   service, as a move to Personal does) before it deletes the team. Team
+   deletion is off today (`disableOrganizationDeletion`).
+
+No code deletes a person's account or a team today. Removing an agent
+(`removeAgent` in `src/lib/agents/service.ts`) is the one path that deletes
+a user row, and it hands over first. The safety net is
+`listUnfindableArtifacts` (`src/lib/sharing/unfindable.ts`): artifacts no
+signed-in person can find in a workspace, or a `team` artifact with no team.
+`unfindable.db.test.ts` runs it in the CI **Database tests** job and expects
+none; `departure.db.test.ts` runs the preview, the move, and the hand-over.
+`e2e/team-leave.spec.ts` runs both dialogs on `/dev/team` (`?leaving=<n>`,
+`?move=wait|refuse`), whose leave actions are an in-memory stand-in
+(`src/components/dev/fixture-leave.tsx`).
 
 ### Agent harnesses
 

@@ -1,5 +1,6 @@
 import type { TeamAgentView } from "@/lib/agents/queries";
 import { can } from "@/lib/teams/capability-rules";
+import type { RemovalFacts } from "@/lib/teams/departure-rules";
 import { memberRowControls, type RoleOption } from "@/lib/teams/member-row-rules";
 import type { PendingInvitationView, TeamMemberView, TeamMembership } from "@/lib/teams/queries";
 import { inviteProblem } from "@/lib/teams/role-admin-rules";
@@ -22,6 +23,8 @@ export interface MembersTableProps {
   /** Every role in the team, for the role pickers. */
   roles: readonly RoleOption[];
   origin: string;
+  /** What removing each member hands over, by member id (departure-rules.ts). */
+  removals: Readonly<Record<string, RemovalFacts>>;
 }
 
 function Head() {
@@ -59,7 +62,7 @@ function HeaderActions({ teamId, inviteRoles, canAddAgents }: { teamId: string; 
  * the same rules as the server). "Invite people" and "Add agent" open
  * dialogs from the card's header.
  */
-export function MembersTable({ viewer, members, agents, invitations, roles, origin }: MembersTableProps) {
+export function MembersTable({ viewer, members, agents, invitations, roles, origin, removals }: MembersTableProps) {
   const ownerCount = members.filter((member) => member.roleKey === "owner").length;
   const shared = !viewer.personal && viewer.kind === "person";
   const canInvite = shared && can(viewer, "members.invite");
@@ -77,7 +80,7 @@ export function MembersTable({ viewer, members, agents, invitations, roles, orig
           <tbody>
             {members.map((member) => {
               const controls = memberRowControls({ viewer, member, roles, ownerCount });
-              return <PersonRow key={member.memberId} member={member} teamId={viewer.id} isViewer={member.userId === viewer.userId} roleOptions={controls.roleOptions} canRemove={controls.canRemove} />;
+              return <PersonRow key={member.memberId} member={member} teamId={viewer.id} isViewer={member.userId === viewer.userId} roleOptions={controls.roleOptions} canRemove={controls.canRemove} removal={removals[member.memberId]} />;
             })}
             {agents.map((agent) => <AgentMemberRow key={agent.userId} agent={agent} canManage={canAddAgents} origin={origin} />)}
             {invitations.map((invitation) => (

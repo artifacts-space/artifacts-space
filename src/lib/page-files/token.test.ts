@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MissingPageTokenSecretError, mintPageToken, mintShorterPageToken, openPageToken, pageTokenLimits, pageTokenPattern, pageTokenSecret, type PageGrant } from "./token";
+import { answerFor, MissingPageTokenSecretError, mintPageToken, mintShorterPageToken, openPageToken, pageTokenLimits, pageTokenPattern, pageTokenSecret, type PageGrant } from "./token";
 
 const secret = "unit-test-secret-0123456789-abcdefghijklmnop";
 const label = "0123456789abcdef0123456789abcdef";
@@ -104,5 +104,22 @@ describe("a token that ends sooner", () => {
     expect(mintShorterPageToken(grant, usual, at, secret).expiresAt).toEqual(usual);
     expect(() => mintShorterPageToken(grant, new Date(usual.getTime() + 1_000), at, secret)).toThrow(RangeError);
     expect(() => mintShorterPageToken(grant, new Date(at.getTime() + 24 * 3_600_000), at, secret)).toThrow(RangeError);
+  });
+});
+
+describe("answerFor", () => {
+  it("should say how long the token still works, counted on the server's clock when the answer is made", () => {
+    const made = mintPageToken(grant, at, secret);
+    const answer = answerFor(made, at);
+    expect(answer.token).toBe(made.token);
+    expect(answer.expiresAt).toBe(made.expiresAt.toISOString());
+    expect(answer.lifeMs).toBe(made.expiresAt.getTime() - at.getTime());
+    expect(answer.lifeMs).toBeGreaterThanOrEqual((pageTokenLimits.lifeSeconds - pageTokenLimits.stepSeconds) * 1000);
+    expect(answer.lifeMs).toBeLessThanOrEqual(pageTokenLimits.lifeSeconds * 1000);
+  });
+
+  it("should never report a negative life", () => {
+    const made = mintPageToken(grant, at, secret);
+    expect(answerFor(made, new Date(made.expiresAt.getTime() + 5_000)).lifeMs).toBe(0);
   });
 });

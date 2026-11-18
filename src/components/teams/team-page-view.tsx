@@ -5,6 +5,7 @@ import type { PendingSharingView, TeamSharedView } from "@/lib/sharing/queries";
 import type { PendingInvitationView, TeamMemberView, TeamMembership } from "@/lib/teams/queries";
 import type { TeamRoleView } from "@/lib/teams/capabilities";
 import { can } from "@/lib/teams/capability-rules";
+import type { RemovalFacts } from "@/lib/teams/departure-rules";
 import type { PermissionAuditView } from "@/lib/teams/role-store";
 import { availableArtifactViews, availableTeamTabs, type ArtifactView, type TeamTab, type TeamTabAccess, type TeamTabSelection } from "@/lib/teams/team-tabs-rules";
 import type { TeamThemeSettings } from "@/lib/themes/team-presets";
@@ -45,6 +46,8 @@ export interface TeamPageData {
   roles: TeamRoleView[];
   /** The newest role changes. */
   audit: PermissionAuditView[];
+  /** What the remove confirm says about each member's artifacts, by member id. Empty for viewers who cannot remove people. */
+  removals: Readonly<Record<string, RemovalFacts>>;
 }
 
 /** What the viewer may see, which decides the tabs and views. Reports show only while some are open. */
@@ -125,7 +128,7 @@ function tabPanels(data: TeamPageData, tabs: TeamTab[], approvals: number): TabP
   const panels: Record<TeamTab, TabPanel<TeamTab>> = {
     members: {
       id: "members",
-      content: <MembersTable viewer={team} members={data.members} agents={data.agents} invitations={data.invitations} roles={data.roles} origin={data.origin} />,
+      content: <MembersTable viewer={team} members={data.members} agents={data.agents} invitations={data.invitations} roles={data.roles} origin={data.origin} removals={data.removals} />,
     },
     permissions: { id: "permissions", content: <PermissionsPanel team={team} roles={data.roles} audit={data.audit} /> },
     artifacts: { id: "artifacts", count: approvals, content: null },

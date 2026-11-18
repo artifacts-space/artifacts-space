@@ -48,7 +48,7 @@ export const artifact = pgTable(
   "artifact",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }), // Cascades: hand team-home artifacts over before an account is deleted (AGENTS.md, "When an author and a home come apart").
     title: text("title").notNull(),
     // Optional page icon beside the title: one emoji, or "tabler:<name>" from src/lib/artifact-icons.ts.
     icon: text("icon"),
@@ -94,7 +94,7 @@ export const artifact = pgTable(
     shareId: text("share_id").notNull(),
     // 22-character random base58 id. The canonical URL is /artifact/<publicId>.
     publicId: text("public_id").notNull().default(sql`generate_public_id()`),
-    // The team the artifact is shared with (team), or whose admins approved it (link, public).
+    // The team the artifact is shared with (team), or whose admins approved it (link, public). Set null on team delete, visibility kept: make each private first (AGENTS.md, "When an author and a home come apart").
     teamId: text("team_id").references(() => team.id, { onDelete: "set null" }),
     // Set when the author left the team and a team owner took the artifact over.
     originalAuthorId: text("original_author_id").references(() => user.id, { onDelete: "set null" }),

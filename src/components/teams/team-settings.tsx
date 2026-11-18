@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { leaveTeamAction, updateSharingRuleAction } from "@/app/(workspace)/teams/actions";
+import { updateSharingRuleAction } from "@/app/(workspace)/teams/actions";
 import { ConfirmDialog, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { leaveConfirmKind, type LeavePreview } from "@/lib/teams/departure-rules";
 
+import { LeaveChoiceDialog } from "./leave-choice-dialog";
+import { useLeaveActions } from "./leave-actions";
 import { SharingRulePicker, sharingRuleFootnote } from "./sharing-rule-picker";
 import { useTeamAction } from "./use-team-action";
 
@@ -35,20 +38,29 @@ export function SharingRuleSetting({ teamId, needsApproval, canEdit }: { teamId:
   );
 }
 
-/** Leave the team. Artifacts the viewer shared with it stay with the team; agents they added go to a team owner. */
+/**
+ * Leave the team. It first asks what stays behind (leavePreviewAction): with
+ * none of the viewer's artifacts in the team, the plain confirm, which "Don't
+ * ask again" may skip; with some, the choice dialog (LeaveChoiceDialog),
+ * which always shows. Agents they added go to a team owner.
+ */
 export function LeaveTeamButton({ teamId, teamName }: { teamId: string; teamName: string }) {
   const router = useRouter();
-  const [pending, setPending] = useState(false);
+  const actions = useLeaveActions();
+  const [checking, setChecking] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [choice, setChoice] = useState<LeavePreview | null>(null);
   const confirmLeave = useConfirm("leaveTeam");
 
   async function leave() {
-    setPending(true);
+    setLeaving(true);
     try {
-      const result = await leaveTeamAction(teamId);
+      const result = await actions.leave(teamId);
       if (!result.success) {
         toast.error(result.error);
         return false;
       }
+      setChoice(null);
       toast.success("You left the team.");
       router.push("/teams");
       return true;
@@ -56,22 +68,52 @@ export function LeaveTeamButton({ teamId, teamName }: { teamId: string; teamName
       toast.error("Something went wrong. Check your connection and try again.");
       return false;
     } finally {
-      setPending(false);
+      setLeaving(false);
     }
   }
 
+  async function start() {
+    setChecking(true);
+    try {
+      const result = await actions.preview(teamId);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+      if (leaveConfirmKind(result.data.total) === "choice") setChoice(result.data);
+      else confirmLeave.request(leave);
+    } catch {
+      toast.error("Something went wrong. Check your connection and try again.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  const busy = checking || leaving;
   return (
     <>
-      <Button variant="outline" size="sm" disabled={pending} onClick={() => { confirmLeave.request(leave); }} className="text-xs">
-        {pending ? <IconLoader2 className="animate-spin" /> : <IconLogout />} Leave team
+      <Button variant="outline" size="sm" disabled={busy} onClick={() => void start()} className="text-xs">
+        {busy ? <IconLoader2 className="animate-spin" /> : <IconLogout />} Leave team
       </Button>
       <ConfirmDialog
         state={confirmLeave.dialog}
         title={`Leave ${teamName}?`}
-        description="Artifacts you shared with this team stay with the team, and its owners take them over. Agents you added go to the team's owner, and their tokens stop working at once. Your private artifacts stay yours."
+        description="None of your artifacts live in this team, so nothing of yours stays behind. Agents you added go to the team's owner, and their tokens stop working at once. Your private artifacts stay yours."
         confirmLabel="Leave team"
-        pending={pending}
+        pending={leaving}
       />
+      {choice ? (
+        <LeaveChoiceDialog
+          open
+          teamName={teamName}
+          preview={choice}
+          onPreview={setChoice}
+          move={(ids) => actions.moveToPersonal(teamId, ids)}
+          onCancel={() => { setChoice(null); }}
+          onLeave={() => void leave()}
+          leaving={leaving}
+        />
+      ) : null}
     </>
   );
 }
