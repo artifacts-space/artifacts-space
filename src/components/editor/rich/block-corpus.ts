@@ -26,6 +26,7 @@ export const blockCorpus: Readonly<Record<string, BlockSamples>> = {
     rich: true,
     samples: {
       emphasis: "This has **bold**, _italic_, *star italic*, __under bold__, ~~strike~~, and `code`.\n",
+      codeInMarks: "**Set `color-scheme`,** then *see `h-10`*, ~~drop `x`~~, [read `docs`](https://example.com), and ***`all`***.\n",
       links: "Read [the docs](https://example.com/docs) or mail [us](mailto:team@example.com).\n",
       hardBreak: "Line one  \nLine two\n",
       hardBreakBackslash: "Line one\\\nLine two\n",
@@ -123,7 +124,7 @@ export const blockCorpus: Readonly<Record<string, BlockSamples>> = {
   },
   blockquote: { node: "blockquote", rich: true, samples: { quote: "> Quoted text\n> continues here.\n", quoteWithList: "> quote\n>\n> - list in quote\n", quoteListCode: "> Note:\n>\n> - a\n> - b\n>\n> ```sh\n> run\n> ```\n" } },
   horizontalRule: { node: "horizontalRule", rich: true, samples: { rule: "Above\n\n---\n\nBelow\n" } },
-  table: { node: "table", rich: true, samples: { table: "| Name | Role |\n| --- | --- |\n| Ada | Lead |\n| Lin | Dev |\n", alignedTable: "| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |\n" } },
+  table: { node: "table", rich: true, samples: { table: "| Name | Role |\n| --- | --- |\n| Ada | Lead |\n| Lin | Dev |\n", alignedTable: "| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |\n", tableCodeInBold: "| # | Finding | Fix goes in |\n|---|---|---|\n| V1 | **The prompt never asks for `color-scheme`,** so dark sites keep light controls. | Prompt |\n| V2 | **Fixed heights** (`h-10`, `h-12`) clip text. | Starters: `min-height` instead. |\n" } },
   media: {
     node: "media",
     rich: true,
