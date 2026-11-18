@@ -26,6 +26,7 @@ import { serverPageFilesApi, type PageFilesApi } from "./page-files-api";
 import { usePageBatch } from "./use-page-batch";
 import { usePageFilesIntake } from "./use-page-files-intake";
 import { useReplaceFile } from "./use-replace-file";
+import { FromZips, UnpackingZip } from "./zip-notes";
 
 type PageFile = FileDto & { pagePath: string };
 
@@ -136,7 +137,7 @@ function useSection({ artifact, files, onUpdated, api = serverApi, onUseAsPage }
   const held = useMemo<HeldPageFile[]>(() => artifact.files.flatMap((file) => (file.pagePath === undefined ? [] : [{ id: file.id, pagePath: file.pagePath, size: file.size }])), [artifact.files]);
   const batch = usePageBatch({ artifactId: artifact.id, held, api: pageApi, onUpdated });
   const uploads = useAttachingUploads(artifact.id, api, onUpdated);
-  const intake = usePageFilesIntake(batch, uploads.addFiles);
+  const intake = usePageFilesIntake(batch, uploads.addFiles, pageApi.readZip);
   const pickers = usePickers((picked) => { intake.take(picked.map(asDropped)); });
   const plainReplace = useReplaceFile({ artifactId: artifact.id, api, onUpdated });
   const replacer = useReplacePicker(intake.replaceAt, (target, picked) => void plainReplace.replace(target, picked));
@@ -163,7 +164,7 @@ type Section = ReturnType<typeof useSection>;
 /** True when the section has nothing to show: it then draws only its pickers, so "Add files" and a drop still have somewhere to go. */
 function showsNothing(section: Section, files: readonly FileDto[], dragging: boolean): boolean {
   const { notes } = section.intake;
-  const noNotes = notes.refused.length === 0 && notes.page === null && notes.leftOut === 0;
+  const noNotes = notes.refused.length === 0 && notes.page === null && notes.leftOut === 0 && notes.sources.length === 0 && section.intake.unpacking === null;
   return files.length === 0 && section.batch.rows.length === 0 && section.uploads.items.length === 0 && noNotes && !dragging;
 }
 
@@ -227,6 +228,8 @@ export function PageFilesSection(props: PageFilesSectionProps) {
   return (
     <FilesFrame quiet={{ files, dragging }} heading="Files" hint={dropHint("html")} column={column} className={className} count={looseFilesWords(files)} actions={actions}>
       {section.pageFiles.length > 0 || batch.rows.length > 0 ? <p className="text-xs text-muted-foreground" data-slot="page-files-room">{pageFilesTotalsWords(section.held)}</p> : null}
+      <UnpackingZip unpacking={section.intake.unpacking} onCancel={section.intake.cancelUnpacking} />
+      <FromZips sources={section.intake.notes.sources} onAttach={section.intake.attachZip} />
       <PageBatchList batch={batch} held={section.held} />
       <NotAdded section={section} />
       {leftOut ? <p className="text-xs text-muted-foreground" data-slot="page-files-left-out">{leftOut}</p> : null}

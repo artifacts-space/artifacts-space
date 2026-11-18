@@ -4,6 +4,7 @@ import type { ActionResult } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
 
 import { putFile } from "./put-file";
+import type { ZipReader } from "./unpack-drop";
 
 /**
  * Where an HTML artifact's page files go from the web app: the batch
@@ -21,6 +22,8 @@ export interface PageFilesApi {
   publish: (input: { artifactId: string; uploadIds: string[]; remove: string[] }) => Promise<ActionResult<PublishedPageFiles>>;
   /** Deletes an upload that never reached the page. A file already in an artifact is left alone. */
   discard: (fileId: string) => Promise<unknown>;
+  /** Reads a dropped zip's entries in the browser; readZip unless a fixture hands its own. */
+  readZip?: ZipReader;
 }
 
 export const serverPageFilesApi: PageFilesApi = {

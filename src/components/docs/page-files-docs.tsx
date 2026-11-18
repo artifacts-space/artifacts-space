@@ -49,6 +49,7 @@ export function HtmlPageFilesDocs() {
         <ul>
           <li><strong>Each file goes where its type belongs.</strong> A type in the table above becomes a page file. Any other file the site takes, such as a PDF, is attached beside the page as before.</li>
           <li><strong>A folder keeps its shape.</strong> Dropping <code>site/</code> that holds <code>css/site.css</code> and <code>img/logo.png</code> adds those two paths. Hidden and system files, such as <code>.DS_Store</code>, are left out.</li>
+          <li><strong>A zip is unpacked.</strong> A <code>.zip</code> you drop or pick is unpacked in your browser and added exactly as the folder it holds would be.</li>
           <li><strong>A path that cannot be used says why.</strong> A name with a space or capital letters gets a cleaned path to take or change, and nothing is added under a name you did not see.</li>
           <li><strong>One drop is one change.</strong> Up to {pageBatchLimits.maxFilesPerPublish} files land together as one version in History, or not at all. A file at a path the page has replaces it, and the row says so before it happens.</li>
           <li><strong>The page itself.</strong> An <code>index.html</code> at the top of a dropped folder can become the page&apos;s HTML, after you confirm. The HTML it had stays in History. Every other <code>.html</code> file in the drop is another page of the site, added at its path like any page file.</li>
