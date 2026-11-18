@@ -70,6 +70,10 @@ export const blockCorpus: Readonly<Record<string, BlockSamples>> = {
       orderedLoose: "1. First\n\n2. Second\n",
       orderedWithCode: "1. Install:\n\n   ```sh\n   pnpm install\n   ```\n\n2. Run it.\n",
       headingThenOrdered: "## Steps\n1. a\n2. b\n",
+      orderedFromZero: "0. zero\n1. one\n2. two\n",
+      orderedFromZeroNested: "0. a\n\n   0. nested\n   1. more\n1. b\n",
+      orderedFromThreeUnderItem: "- x\n\n  3. a\n  4. b\n",
+      orderedFromZeroUnderTask: "- [ ] x\n\n  0. a\n  1. b\n",
     },
   },
   taskList: {

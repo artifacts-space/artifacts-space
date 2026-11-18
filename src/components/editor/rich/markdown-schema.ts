@@ -191,6 +191,19 @@ const MarkdownTaskList = TaskList.extend({
   parseMarkdown: () => [],
 });
 
+const itemNumber = /^(\d+)(?=[.)] )/gm;
+
+/**
+ * A numbered list written from 1 renumbered from 0. Tiptap's list item reads
+ * its list's start as `start || 1`, so a list that starts at `0.` was
+ * written from `1.` and stayed as written. Only the list's own markers
+ * start a line here: its items' other lines, nested lists among them, are
+ * indented under their marker.
+ */
+export function fromZero(written: string): string {
+  return written.replace(itemNumber, (number) => String(Number(number) - 1));
+}
+
 /**
  * Numbered lists read by marked's own list rule, as CommonMark reads them.
  * Tiptap's numbered list rule indents an item's blocks by two spaces, not
@@ -211,6 +224,14 @@ const MarkdownOrderedList = OrderedList.extend({
     const start = typeof token.start === "number" ? token.start : 1;
     const items = (Array.isArray(token.items) ? token.items : []) as ItemToken[];
     return helpers.createNode("orderedList", start === 1 ? {} : { start }, helpers.parseChildren(items.map((item) => withParagraphs(item))));
+  },
+  renderMarkdown(node, helpers, context) {
+    const parent = this.parent?.(node, helpers, context) ?? "";
+    const start: unknown = node.attrs?.start;
+    const written = start === 0 ? fromZero(parent) : parent;
+    // Under an item's text, only a list that starts at 1 interrupts it; any other start needs a blank line, or it reads as more of the text.
+    const underItem = context.parentType === "listItem" || context.parentType === "taskItem";
+    return start !== 1 && start !== undefined && underItem ? `\n${written}` : written;
   },
 });
 
