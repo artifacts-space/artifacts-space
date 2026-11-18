@@ -996,7 +996,9 @@ path, as on any website: `<link href="css/site.css">`, a module's
     with the newest address (`onOpened` in `PageWindow`: the newest renewal,
     else the address the load started on; `usePassRenewal`'s `resend`
     returns whether it had one), moves to it, and fetches its own path
-    with `X-Page-Source: 1`, `redirect: "error"`. It writes the answer with
+    with `X-Page-Source: 1`, `redirect: "error"`. It writes only an answer
+    of type `text/plain` (never one served as HTML, such as the frame
+    document from a cache), with
     the same `document.open()` / `write()` / `close()` steps, its ping and
     renew listeners added after `open()` and before the page's scripts, and
     says "shown". A 404 or a failed fetch gets a line built from elements

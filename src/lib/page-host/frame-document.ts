@@ -12,8 +12,9 @@ import { pageAddressPattern, pageDocumentName, pageMessages, pageSourceHeader } 
  * site ("opened"), takes the newest files address the site answers with
  * ("renew"), fetches its own address with the source header
  * (`X-Page-Source: 1`), which the page host answers with that page file as
- * plain text, and writes it in with the same steps. When there is no such
- * file, or the fetch fails, it shows a line of its own instead: "This page
+ * plain text, and writes it in with the same steps; an answer of any other
+ * type is never written. When there is no such file, or the fetch fails,
+ * it shows a line of its own instead: "This page
  * has no file at <path>", the path set as text, and a link to the first
  * page. The page is never served to the browser as a document: only this
  * script reads it.
@@ -104,9 +105,13 @@ export function frameScript(siteOrigin: string): string {
     document.body.appendChild(back);
     host.postMessage({ type: ${type("shown")} }, site);
   }
+  // Only the page host's answer for a page's source is written: plain text. Anything else, the frame document itself from a cache included, is no page.
+  function isSource(response) {
+    return response.ok && (response.headers.get("content-type") || "").indexOf("text/plain") === 0;
+  }
   function load() {
     fetch(location.pathname, { headers: { ${JSON.stringify(pageSourceHeader)}: "1" }, credentials: "same-origin", redirect: "error" })
-      .then(function (response) { return response.ok ? response.text() : null; })
+      .then(function (response) { return isSource(response) ? response.text() : null; })
       .then(function (html) { if (html === null) missing(); else write(html); }, missing);
   }
   function onMessage(event) {

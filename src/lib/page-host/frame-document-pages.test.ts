@@ -38,8 +38,8 @@ function element(tag: string): Element {
   return made;
 }
 
-/** What the stand-in fetch answers: a status and a body, or a failure on the way. */
-type Answer = { status: number; body: string } | "fails";
+/** What the stand-in fetch answers: a status, a body, and its type (plain text unless named), or a failure on the way. */
+type Answer = { status: number; body: string; type?: string } | "fails";
 
 interface Asked {
   url: string;
@@ -75,7 +75,8 @@ function loadPage(pathname: string, options: { answer?: Answer; alone?: boolean;
   const fetch = (url: string, init: Asked["init"]) => {
     asked.push({ url, init });
     if (answer === "fails") return Promise.reject(new TypeError("Failed to fetch"));
-    return Promise.resolve({ ok: answer.status >= 200 && answer.status <= 299, text: () => Promise.resolve(answer.body) });
+    const type = answer.type ?? "text/plain; charset=utf-8";
+    return Promise.resolve({ ok: answer.status >= 200 && answer.status <= 299, headers: { get: (name: string) => (name === "content-type" ? type : null) }, text: () => Promise.resolve(answer.body) });
   };
   runInNewContext(frameScript(site), { window: frame, document, history, location, fetch, RegExp, JSON });
   const deliver = (message: Message) => { for (const listener of [...listeners]) listener(message); };
@@ -125,6 +126,8 @@ describe("the frame document at another page of the site", () => {
   it.each([
     ["a page that has no file there", { status: 404, body: "Not found" }],
     ["a fetch that fails on the way", "fails"],
+    ["an answer served as HTML, such as the frame document from a cache", { status: 200, body: "<!doctype html><script>frame</script>", type: "text/html; charset=utf-8" }],
+    ["an answer with no type", { status: 200, body: "<p>x</p>", type: "" }],
   ] as const)("should show its own line, built from text, for %s", async (_name, answer) => {
     const loaded = loadPage(pageAt("A", "docs/missing.html"), { answer });
     loaded.fromSite({ type: pageMessages.renew, path: pageAt("A", "index.html") });
