@@ -70,6 +70,14 @@ cell reads: any other HTML in a table keeps the table as written, and a
 `<br>` outside a table is raw HTML as before. A `|` inside a cell, also
 inside inline code, is written `\|`.
 
+The editor keeps every table in that shape after each change
+(`TableShape`, `table-shape.ts`): Enter in a cell joins its paragraphs with
+a line break; a pasted block in a cell becomes its lines (code keeps the
+code mark) and media moves after the table; merged cells split into the
+grid, content in the top-left place, so no neighbour changes column; header
+cells are the first row only. Block triggers typed in a cell (`- `, `# `,
+`> `) stay text, and the slash menu does not open in a cell.
+
 ### Media
 
 An uploaded file shows in a document as image syntax, alone in its

@@ -11,6 +11,7 @@ import { BlockColorComment, withColorableText } from "./block-color-nodes";
 import { isTableToken, withCellBreaks } from "./markdown-cell-breaks";
 import { MediaNode } from "./media-node";
 import { RawMarkdown } from "./raw-markdown-node";
+import { TableShape } from "./table-shape";
 
 const fenceRuns = { "`": /^ {0,3}(`{3,})/gm, "~": /^ {0,3}(~{3,})/gm } as const;
 
@@ -305,6 +306,7 @@ export function markdownSchemaExtensions(views: SchemaViews = {}): AnyExtension[
     TableRow,
     TableHeader,
     TableCell,
+    TableShape,
     media ? MediaNode.extend({ addNodeView: () => media }) : MediaNode,
     rawMarkdown ? RawMarkdown.extend({ addNodeView: () => rawMarkdown }) : RawMarkdown,
     BlockColorComment,
