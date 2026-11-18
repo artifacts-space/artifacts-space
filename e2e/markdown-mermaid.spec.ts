@@ -171,7 +171,11 @@ async function expectOpensLargerInEditor(page: Page, block: Locator, close: "Esc
   if (close === "Escape") await page.keyboard.press("Escape");
   else await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toBeHidden();
-  await expect(block.getByRole("button", { name: "Zoom in" })).toBeFocused();
+  const zoom = block.getByRole("button", { name: "Zoom in" });
+  await expect(zoom).toBeFocused();
+  // It shows while it has the focus, after a close with the pointer too.
+  await page.mouse.move(0, 0);
+  await expect(zoom).toHaveCSS("opacity", "1");
 }
 
 test("should open a diagram larger in the editor and keep it open until it is closed, in Preview and in Split", async ({ page }) => {

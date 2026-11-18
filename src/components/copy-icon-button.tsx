@@ -29,7 +29,7 @@ export function CopyIconButton({ value, label = "Copy", className, announce }: C
   };
   return (
     <>
-      <IconButton label={label} tooltip={copied ? "Copied" : label} onClick={() => { onCopy().catch(() => undefined); }} className={className}>
+      <IconButton label={label} tooltip={copied ? "Copied" : label} onClick={() => void onCopy()} className={className}>
         {copied ? <IconCheck /> : <IconCopy />}
       </IconButton>
       {announce ? null : <span className="sr-only" aria-live="polite">{copied ? "Copied" : ""}</span>}

@@ -15,18 +15,19 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
  * below it) and scrolls when it is bigger than the screen. Closing it puts
  * the focus on Zoom in, the diagram's own control, so the keyboard carries
  * on from the diagram (in the editor too, where the focus was in the text
- * before the click).
+ * before the click). Zoom in shows while it has the focus, however the
+ * dialog was closed.
  */
 export function DiagramZoom({ src, width, height, label, children }: { src: string; width: number; height: number; label: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const frame = useRef<HTMLDivElement>(null);
   const show = () => { setOpen(true); };
-  const zoomButton = () => frame.current?.querySelector<HTMLElement>(":scope > button") ?? true;
+  const zoomButton = () => frame.current?.querySelector<HTMLElement>('button[aria-label="Zoom in"]') ?? true;
   return (
     <div ref={frame} className="group/zoom relative flex min-w-0 justify-center-safe">
       {/* The image keeps its own role and name; the button below is the keyboard path. */}
       <div className="flex min-w-0 cursor-zoom-in justify-center-safe" onClick={show}>{children}</div>
-      <IconButton label="Zoom in" onClick={show} className="absolute -top-4 -right-2 bg-card opacity-0 group-hover/zoom:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100 sm:-right-4">
+      <IconButton label="Zoom in" onClick={show} className="absolute -top-4 -right-2 bg-card opacity-0 group-hover/zoom:opacity-100 focus:opacity-100 pointer-coarse:opacity-100 sm:-right-4">
         <IconZoomIn />
       </IconButton>
       <Dialog open={open} onOpenChange={setOpen}>
