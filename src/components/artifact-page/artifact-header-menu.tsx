@@ -19,7 +19,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ATTACH_FILE_LABEL } from "@/lib/files/loose-rules";
 import { FULL_WIDTH_LABEL } from "@/lib/page-width/rules";
 import { siteDefaultTheme } from "@/lib/themes/resolve";
 import type { Theme } from "@/lib/themes/schema";
@@ -117,8 +116,8 @@ function SourceItem({ source }: { source: PageEditorChrome["source"] | undefined
 }
 
 /** "Attach file", once the editable copy has loaded, for a format that keeps attachments beside its content. */
-function AttachItem({ attach }: { attach: (() => void) | null | undefined }) {
-  return attach ? <DropdownMenuItem onClick={attach} className="py-2"><IconPaperclip /> {ATTACH_FILE_LABEL}</DropdownMenuItem> : null;
+function AttachItem({ attach }: { attach: PageEditorChrome["attach"] | undefined }) {
+  return attach ? <DropdownMenuItem onClick={attach.run} className="py-2"><IconPaperclip /> {attach.label}</DropdownMenuItem> : null;
 }
 
 /** "Made with", once the editable copy has loaded. */

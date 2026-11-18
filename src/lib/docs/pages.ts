@@ -131,6 +131,7 @@ export const docsPages = [
       h2("markdown", "Markdown"),
       h2("html", "HTML"),
       h3("page-files", "Page files"),
+      h3("page-files-web", "Adding page files in the web app"),
       h2("code", "Code"),
       h2("text", "Text"),
       h2("json", "JSON"),

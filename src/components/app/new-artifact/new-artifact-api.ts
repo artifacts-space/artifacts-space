@@ -1,6 +1,7 @@
 import { loadArtifactAction, updateArtifactAction } from "@/app/(workspace)/app/actions";
 import { attachFilesAction, createArtifactWithFilesAction, discardUploadAction, replaceFileAction } from "@/app/(workspace)/app/file-actions";
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
+import type { PageFilesApi } from "@/components/files/page-files-api";
 import { sendToServer, type SendFile } from "@/components/files/use-file-uploads";
 import type { ActionResult, ArtifactDto, ArtifactInput } from "@/lib/artifact-types";
 
@@ -24,6 +25,8 @@ export interface NewArtifactApi {
   discard: (fileId: string) => Promise<unknown>;
   /** The stored artifact as it is now, by public id: the workspace's own loader (loadArtifactAction), used when an answer was lost. */
   load: (publicId: string) => Promise<ActionResult<ArtifactDto>>;
+  /** Where a web page's page files go; the server actions when left out (page-files-api.ts). */
+  page?: PageFilesApi | undefined;
 }
 
 /** The server actions behind the blank page. */

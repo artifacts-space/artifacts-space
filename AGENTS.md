@@ -898,9 +898,62 @@ path, as on any website: `<link href="css/site.css">`, a module's
   milliseconds, and the account's storage quota still holds. Closing it
   means moving the page files of `files_attach` onto the publish statement.
 - `buildHtmlGuide` tells agents the rules from the same constants: the
-  batch flow first, what belongs in files, and the limit above. The list
-  of attached files on the artifact's page shows a page file by its path
-  (`looseFilesWords`); adding one in the web app is not built yet.
+  batch flow first, what belongs in files, and the limit above.
+- People, in the web app (`PageFilesSection` in
+  `src/components/files/page-files-section.tsx`, mounted for an `html`
+  artifact by the /app pane's `FilesSlot` and the artifact page's
+  `PageAttachedFiles`, editors only). The controls say "Add files"
+  (`attachLabel`) and the drop hint "Drop to add them to this page"
+  (`dropHint`); every other format keeps "Attach file". "Add folder" picks
+  a folder where the browser allows it, and a dropped folder is read
+  through its entries (`readDrop` in `dropped-files.ts`, at most
+  `maxFilesReadFromDrop` files).
+  - One gesture, the right result (`routeDrop` in `drop-rules.ts`, pure):
+    a type in `typesByExtension` becomes a page file at its path in the
+    drop; any other type the site takes is a plain attachment through
+    `attachFiles`, as before; the rest are refused with the reason in the
+    "Not added" list. A folder that holds the whole drop is the page's own
+    folder and is left out of the paths (`pathsInDrop`); single files land
+    at the top level. System files anywhere, and hidden files inside a
+    dropped folder, are left out with one quiet line (`leftOutOfDrop`).
+  - A path that cannot be used (the path rules, a case twin of a held
+    path, a path two files of the set share: `reviewBatch` in
+    `batch-rules.ts`, on `planPagePublish`) waits in its row with the
+    reason and a field prefilled with `pathSuggestion`; it uploads only
+    once the person takes a path. Nothing is renamed unseen.
+  - A set goes the batch tools' way (`usePageBatch`): the server actions
+    in `src/app/(workspace)/app/page-file-actions.ts` start the uploads
+    in requests of at most `pageBatchLimits.maxUploadsPerRequest`
+    (`requestPageUploads`, the hourly limit counted per file), the
+    browser PUTs three at a time (`maxUploadsAtOnce`) and finishes each
+    upload (`finalizeUploadAction`, so a refusal names its file in its
+    row), and one `publishPageFilesAction` (`publishPageFiles`, actor
+    `person`, no base) publishes the whole set as one version. A set
+    publishes by itself unless it replaces a held file: then each row says
+    "Replaces <path>" and the set waits for the person's button
+    (`batchStep`); Replace on a page file's row is that word already.
+    Cancel aborts every request and deletes the uploads; nothing is
+    published. The tab asks before it closes while a set is on its way.
+  - Rows of the page's files are sorted by path (`inPathOrder`), with
+    Copy path, Open, Replace (a file of the same type, at the same path:
+    `replacementPickProblem`), and Remove (a publish with `remove`, so it
+    is a version like any change), under the room line
+    ("12 of 100 files, 1.4 MB of 16 MB", `pageFilesTotalsWords`).
+    Attachments follow, each marked "Attachment".
+  - An `index.html` alone at the top of a drop is the page itself: its row
+    offers "Use as this page's HTML", which puts the file's text into the
+    editor's draft (the normal save path: a version, approval on a shared
+    artifact) after the `usePageHtml` confirm. Any other HTML file is
+    refused with the path rule's reason.
+  - After a publish the editor takes the artifact the action returns
+    (`onUpdated`), so autosave rebases on the files-only version and the
+    frame loads again with the new files (`usePageFilesKey`).
+  - Tests: `drop-rules.test.ts`, `batch-rules.test.ts`,
+    `page-file-actions.test.ts` (session, input, and edit access before
+    any service call), `dropped-files.test.ts`, and
+    `e2e/page-files-web.spec.ts` on `/dev/editor?kind=html` (`&files=1`
+    starts with two page files), whose stand-in keeps page files in the
+    tab (`src/components/dev/fixture-page-files.ts`).
 - Tests without a database: under `next dev` only, a token for the stand-in
   artifact id `fixture:page-files` is answered from files held in memory
   (`fixture-source.ts`), so `e2e/page-files.spec.ts` on
@@ -1329,9 +1382,11 @@ files. A file goes into its text, as a block, where it was put.
   attaches through `attachFiles`, so approval and versions are as for any
   attach. A file that is refused says why in its own row, never in a
   toast. The artifact page mounts the list for editors only
-  (`PageAttachedFiles`). For a web page the file is a plain attachment:
-  page files keep their own path (`pagePath`) and are not added here. A
-  document has none of this: its files go into its text. A Files artifact,
+  (`PageAttachedFiles`). A web page gets its own list instead
+  (`PageFilesSection`, see Page files): there the controls say "Add
+  files", a file whose type can be a page file becomes one at its path,
+  and any other file is a plain attachment, as here. A document has none
+  of this: its files go into its text. A Files artifact,
   an interface, and a canvas keep the Files section with its upload box
   (`filesPanel`): a Files artifact's files are its content, and an Image or
   File element names a file by the id copied from its row.

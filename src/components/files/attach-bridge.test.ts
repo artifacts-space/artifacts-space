@@ -12,7 +12,12 @@ describe("readAttachRequest", () => {
   });
 
   it("should read dropped files, keeping only real files", () => {
-    expect(readAttachRequest(event({ artifactId: "a1", files: [file, "b.png", null] }), "a1")).toEqual({ artifactId: "a1", files: [file] });
+    expect(readAttachRequest(event({ artifactId: "a1", files: [file, "b.png", null] }), "a1")).toEqual({ artifactId: "a1", files: [{ file, relativePath: "notes.pdf", fromFolder: false }] });
+  });
+
+  it("should keep each dropped file's place in its folder", () => {
+    const dropped = { file, relativePath: "site/docs/notes.pdf", fromFolder: true };
+    expect(readAttachRequest(event({ artifactId: "a1", files: [dropped] }), "a1")).toEqual({ artifactId: "a1", files: [dropped] });
   });
 
   it("should not take a request for another artifact", () => {

@@ -43,7 +43,7 @@ export interface PageEditorChrome {
   /** "Made with": the agent harness the artifact shows; null while the editable copy loads. */
   harness: HarnessControl | null;
   /** "Attach file": opens the file picker of the page's list of attached files; null while the editable copy loads, and for a format that has no attachments beside its content. */
-  attach: (() => void) | null;
+  attach: { label: string; run: () => void } | null;
 }
 
 const ChromeContext = createContext<PageEditorChrome | null>(null);

@@ -7,20 +7,30 @@
  * place that shows progress and refusals. Nothing reaches into the list.
  */
 
+import { asDropped, type DroppedFile } from "./dropped-files";
+
 /** The event that carries a request. The list cancels it when it took the request. */
 export const attachFilesEvent = "artifact:attach-files";
 
-/** What is asked: attach these files, or, with none, let the person choose some. */
+/** What is asked: attach these files (each with its place in a dropped folder), or, with none, let the person choose some. */
 export interface AttachRequest {
   artifactId: string;
-  files: File[] | null;
+  files: DroppedFile[] | null;
+}
+
+/** One file a request carries: a file, or a file with its place in a drop. */
+function droppedOf(sent: unknown): DroppedFile | null {
+  if (sent instanceof File) return asDropped(sent);
+  if (typeof sent !== "object" || sent === null || !("file" in sent) || !(sent.file instanceof File)) return null;
+  const relativePath = "relativePath" in sent && typeof sent.relativePath === "string" ? sent.relativePath : sent.file.name;
+  return { file: sent.file, relativePath, fromFolder: "fromFolder" in sent && sent.fromFolder === true };
 }
 
 /** The files a request carries: null when it asks to choose some, undefined when what it carries is not a list of files. */
-function filesOf(sent: unknown): File[] | null | undefined {
+function filesOf(sent: unknown): DroppedFile[] | null | undefined {
   if (sent === null || sent === undefined) return null;
   if (!Array.isArray(sent)) return undefined;
-  const files = sent.filter((file): file is File => file instanceof File);
+  const files = sent.flatMap((entry) => droppedOf(entry) ?? []);
   return files.length > 0 ? files : undefined;
 }
 
@@ -38,8 +48,8 @@ export function readAttachRequest(event: Event, artifactId: string): AttachReque
  * open its file picker when none are given. False when no list on the page
  * took the request (the artifact is not open for editing here).
  */
-export function askToAttach(artifactId: string, files?: readonly File[]): boolean {
+export function askToAttach(artifactId: string, files?: readonly (File | DroppedFile)[]): boolean {
   if (typeof document === "undefined") return false;
-  const detail: AttachRequest = { artifactId, files: files ? [...files] : null };
+  const detail: AttachRequest = { artifactId, files: files ? files.map((file) => (file instanceof File ? asDropped(file) : file)) : null };
   return !document.dispatchEvent(new CustomEvent<AttachRequest>(attachFilesEvent, { detail, cancelable: true }));
 }

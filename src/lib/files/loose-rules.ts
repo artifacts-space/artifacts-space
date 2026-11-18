@@ -29,6 +29,19 @@ export function filesPanel(kind: string): FilesPanel {
 /** The name of every control that attaches a file beside an artifact's content: both More menus, and the list's heading. */
 export const ATTACH_FILE_LABEL = "Attach file";
 
+/** The name of the same controls on a web page (`html`), where a file goes to the page or beside it by its type. */
+export const ADD_FILES_LABEL = "Add files";
+
+/** The name of the controls that take files beside an artifact's content, for its format. */
+export function attachLabel(kind: string): string {
+  return kind === "html" ? ADD_FILES_LABEL : ATTACH_FILE_LABEL;
+}
+
+/** What the list says while files are held over the page: where a drop will put them. */
+export function dropHint(kind: string): string {
+  return kind === "html" ? "Drop to add them to this page" : "Drop to attach it to this artifact";
+}
+
 /** A file as the list needs it. */
 interface ListedFile {
   id: string;
@@ -78,8 +91,10 @@ export function looseFilesWords(files: readonly { pagePath?: string | undefined 
 /**
  * True when a person attaches files beside this format's content on the
  * web ("Attach file", and a drop anywhere on the page): every format with
- * the quiet list but a document, whose files go into its text. An HTML
- * artifact's are plain attachments too; its page files come from agents.
+ * the quiet list but a document, whose files go into its text. On an HTML
+ * artifact ("Add files") a file whose type can be a page file becomes one,
+ * at its path, and any other file a plain attachment
+ * (src/lib/page-files/drop-rules.ts, PageFilesSection).
  */
 export function attachesBeside(kind: string): boolean {
   return filesPanel(kind) === "list" && kind !== "markdown";

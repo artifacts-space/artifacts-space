@@ -7,6 +7,7 @@ import type { FileDto } from "@/lib/files/types";
 
 import { fixtureArtifact } from "./fixture-content";
 import { withContentMedia } from "./fixture-media";
+import { memoryPageFilesApi, type FixturePageStore } from "./fixture-page-files";
 
 /**
  * The /dev/workspace fixture's stand-in for storing new artifacts: kept in
@@ -134,6 +135,20 @@ function attachedIds(): Set<string> {
   return new Set(readStored().flatMap((entry) => entry.files.map((file) => file.id)));
 }
 
+/** A stored new artifact's page files, kept with it in the tab: a publish stores the artifact with its new files. */
+function pageStoreFor(artifactId: string): FixturePageStore | null {
+  const current = () => readStored().find((entry) => entry.id === artifactId);
+  const found = current();
+  if (!found) return null;
+  return {
+    artifact: () => current() ?? found,
+    files: {
+      get: () => current()?.files ?? [],
+      set: (files) => { const now = current(); if (now) save({ ...now, files, updatedAt: new Date().toISOString() }); },
+    },
+  };
+}
+
 /** The fixture's NewArtifactApi. */
 export const fixtureNewArtifactApi: NewArtifactApi = {
   create: async (input, fileIds, requestId) => {
@@ -207,6 +222,7 @@ export const fixtureNewArtifactApi: NewArtifactApi = {
     recordDiscard(fileId);
     return Promise.resolve();
   },
+  page: memoryPageFilesApi(pageStoreFor),
   load: async (publicId) => {
     await gate(holdLoadKey, "fixture:release-load");
     // Set by a test so the check after a lost answer fails too.
