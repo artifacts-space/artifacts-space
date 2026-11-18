@@ -18,7 +18,22 @@ export const passRenewal = {
    * renewed the moment it is used.
    */
   lastShare: 4,
+  /**
+   * A hidden tab keeps renewing for this long after it was hidden, so a page
+   * in a background tab (music, video) keeps loading its files. After that it
+   * rests, and asks again only when the tab is shown. The limit is why an
+   * abandoned tab never asks the server for ever.
+   */
+  hiddenMs: 60 * 60_000,
 } as const;
+
+/** The hidden allowance in words, for the guide and the docs: "one hour". */
+export function hiddenAllowanceWords(): string {
+  const minutes = passRenewal.hiddenMs / 60_000;
+  if (minutes % 60 !== 0) return `${String(minutes)} minutes`;
+  const hours = minutes / 60;
+  return hours === 1 ? "one hour" : `${String(hours)} hours`;
+}
 
 /** The files address a running page holds: when it ends, and when to ask for the next one. Times in milliseconds. */
 export interface HeldPass {
@@ -34,7 +49,7 @@ export function heldPass(endsAt: number, receivedAt: number): HeldPass {
 
 /** What to do about the address in hand right now. */
 export type RenewStep =
-  /** Nothing, and no timer: the tab is hidden, or there is nothing to renew. */
+  /** Nothing, and no timer: nothing to renew, or the tab has been hidden longer than its allowance (passRenewal.hiddenMs). */
   | { do: "rest" }
   /** One timer, set from the known time: ask when it fires. */
   | { do: "wait"; delayMs: number }
@@ -43,13 +58,23 @@ export type RenewStep =
 
 /**
  * The one decision, taken when an address arrives, when the tab is shown or
- * hidden, and when the timer fires. A hidden tab never asks and holds no
- * timer; when it is shown again with an address that ended or is close to
- * its end, it asks at once. A shown tab waits, on a single timer, for the
- * time to renew. Nothing here repeats on an interval.
+ * hidden, and when the timer fires. `hiddenSince` is when the tab was hidden,
+ * or null while it is shown. A shown tab waits, on a single timer, for the
+ * time to renew, and asks at once when the address is close to its end or
+ * has ended. A tab hidden for less than `passRenewal.hiddenMs` does the same.
+ * Past that it rests, with no timer and no request, and asks at once when it
+ * is shown again (a new hour starts the next time it is hidden). The hour is
+ * judged from `now`, so a timer that fires late, as browsers delay the
+ * timers of hidden tabs, never asks after it. A hidden tab whose renewal
+ * time falls after its hour holds no timer. Nothing here repeats on an
+ * interval.
  */
-export function renewStep(pass: HeldPass | null, visible: boolean, now: number): RenewStep {
-  if (!pass || !visible) return { do: "rest" };
+export function renewStep(pass: HeldPass | null, hiddenSince: number | null, now: number): RenewStep {
+  if (!pass) return { do: "rest" };
+  if (hiddenSince !== null) {
+    const hourEnds = hiddenSince + passRenewal.hiddenMs;
+    if (now >= hourEnds || pass.renewAt >= hourEnds) return { do: "rest" };
+  }
   return now >= pass.renewAt ? { do: "ask" } : { do: "wait", delayMs: pass.renewAt - now };
 }
 

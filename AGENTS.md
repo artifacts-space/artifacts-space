@@ -804,13 +804,24 @@ path, as on any website: `<link href="css/site.css">`, a module's
   `history.replaceState`. The frame's `src` never changes: a new `src`
   would load the page again. When to ask is one decision (`renewStep`),
   taken when an address arrives, when the tab is shown or hidden, and when
-  the timer fires: a shown tab holds one timer set from the known end; a
-  hidden tab holds none and never asks; a tab shown again with an address
-  that ended or is close asks at once. A refusal (the reader lost access,
+  the timer fires: a shown tab holds one timer set from the known end. A
+  hidden tab does the same for one hour after it was hidden (the owner's
+  decision, 17 Nov 2026, `passRenewal.hiddenMs`), so music or video in a
+  background tab keeps loading; after that hour it holds no timer and
+  asks nothing, so an abandoned tab never asks the server for ever. A tab
+  shown again with an address that ended or is close asks at once, and
+  hiding it again starts a new hour (`usePassRenewal` records when the tab
+  was hidden, and `renewStep` takes that moment). Browsers slow a hidden
+  tab's timers (often to once a minute), so a timer decides from the clock
+  when it fires, never from the delay it asked for: one that fires after
+  the hour ends does not ask. Each renewal is still a request that checks
+  access again (`pageAddress`, 3,600 an hour per person, about 6 requests
+  for a tab renewing an hour). A refusal (the reader lost access,
   or no address could be made) ends it for that load: the page keeps
   running without its files. Only an address that ends later counts as new
   (`renewalOutcome`), so one address never sets two timers. Never add an
-  interval here, and never renew while hidden.
+  interval here, and never renew in a tab that has been hidden longer than
+  its hour.
 - The frame document takes `renew` only from the window that frames it,
   only from the site's origin, and only for a path that is a frame
   document's own under a files address (`pageFramePathPattern`), and only
@@ -825,9 +836,10 @@ path, as on any website: `<link href="css/site.css">`, a module's
   the address it loaded from for its own later relative `import()` and
   `import.meta.url`, and a stylesheet file for its own `url()`. Those get a
   404 after the first address ended, until the page loads again. A file
-  asked for while the tab was hidden past the end of its address also gets
-  a 404. The life is one constant (`pageTokenLimits`); a longer life is a
-  longer window after access is lost.
+  asked for in a tab that has been hidden for more than its hour, after the
+  end of its address, also gets a 404. The life is one constant
+  (`pageTokenLimits`); a longer life is a longer window after access is
+  lost.
 - Which files a viewer gets follows the version they are served, like
   every attachment: a reader of the approved version gets only files
   attached by that version's time, and the copy of a replaced file that was

@@ -199,25 +199,57 @@ test("should keep an open page loading its files after its first address ended, 
   expect(drawn).toBe(24);
 });
 
-test("should ask for nothing while the tab is hidden, and renew at once when it is shown again with an address that ended", async ({ page, request, baseURL }) => {
+/** Gives the page a tab whose visibility the test sets, and a clock the test can move forward (`setClockSkew`): the hook reads `Date.now()` when a timer fires. */
+async function controlTabAndClock(page: Page) {
   await page.addInitScript(() => {
     let state: DocumentVisibilityState = "visible";
+    let skewMs = 0;
+    const realNow = Date.now.bind(Date);
+    Date.now = () => realNow() + skewMs;
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
-    (window as MarkedWindow).setTabShown = (shown) => {
+    const marked = window as MarkedWindow & { setClockSkew?: (ms: number) => void };
+    marked.setClockSkew = (ms) => { skewMs = ms; };
+    marked.setTabShown = (shown) => {
       state = shown ? "visible" : "hidden";
       document.dispatchEvent(new Event("visibilitychange"));
     };
   });
+}
+
+test("should keep a hidden tab's page loading its files, by renewing its address while the tab stays hidden", async ({ page, request, baseURL }) => {
+  await controlTabAndClock(page);
   const { frame, asks, loaded, first } = await openShortPassPage(page, "short");
   await page.evaluate(() => { (window as MarkedWindow).setTabShown?.(false); });
   await firstAddressEnded(request, baseURL, first);
 
-  // Hidden past the end of its address: nothing was asked, and the page's files are out of reach.
+  // Still hidden, inside its hour: the site asked once, and the page's files load under the new address.
+  await expect.poll(async () => (await pageState(frame)).status).toBe(200);
   const hidden = await pageState(frame);
-  expect(asks.count - loaded, "the site asked for an address while the tab was hidden").toBe(0);
+  expect(hidden.path, "the frame document moved to the next address").not.toBe(first.pathname);
+  expect(hidden.kept).toBe("since the first load");
+  expect(asks.count - loaded).toBe(1);
+});
+
+test("should ask for nothing in a tab hidden past its hour, and renew at once when it is shown again", async ({ page, request, baseURL }) => {
+  await controlTabAndClock(page);
+  const { frame, asks, loaded, first } = await openShortPassPage(page, "short");
+  await page.evaluate(() => {
+    (window as MarkedWindow).setTabShown?.(false);
+    // Over an hour later by the clock, before the timer set for the first address fires.
+    (window as MarkedWindow & { setClockSkew?: (ms: number) => void }).setClockSkew?.(61 * 60_000);
+  });
+  await firstAddressEnded(request, baseURL, first);
+
+  // The timer fired after the hour ended, and decided from the clock: nothing was asked, and the page's files are out of reach.
+  const hidden = await pageState(frame);
+  expect(asks.count - loaded, "the site asked for an address after the tab's hour").toBe(0);
   expect(hidden).toEqual({ status: 404, path: first.pathname, kept: "since the first load" });
 
-  await page.evaluate(() => { (window as MarkedWindow).setTabShown?.(true); });
+  // The moved clock has done its work: put it back as the tab is shown, or every address made on the server's clock would read as already ended.
+  await page.evaluate(() => {
+    (window as MarkedWindow & { setClockSkew?: (ms: number) => void }).setClockSkew?.(0);
+    (window as MarkedWindow).setTabShown?.(true);
+  });
   await expect.poll(async () => (await pageState(frame)).status).toBe(200);
   const shown = await pageState(frame);
   expect(shown.path).not.toBe(first.pathname);

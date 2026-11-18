@@ -6,6 +6,7 @@ import { manyFilesFlow, pageAddressLife, pageFileLimitRows, pageFilesExample, pa
 import { docsHref } from "@/lib/docs/pages";
 import { fileLimits } from "@/lib/files/config";
 import { pageBatchLimits } from "@/lib/page-files/publish-rules";
+import { hiddenAllowanceWords } from "@/lib/page-files/renew-rules";
 
 /*
  * The page files docs: what the files of an HTML artifact are, on the
@@ -26,7 +27,7 @@ export function HtmlPageFilesDocs() {
           <li><strong>A path is matched exactly</strong>, letter case included, so use lowercase. Two files whose paths differ only by case are refused.</li>
           <li><strong>The type comes from the extension.</strong> A second HTML document is refused: one artifact is one page.</li>
           <li><strong>Readers get the files of the version they are shown.</strong> On a link or public artifact, added and replaced files reach readers outside the team when the change is approved. Removed files stop loading for everyone at once.</li>
-          <li><strong>A page left open keeps working.</strong> Its files load under an address that works for {pageAddressLife}; while its tab is visible the page gets the next address before that, without loading again. One limit remains: a module that already loaded keeps its first address for its own later <code>import()</code>, and a stylesheet file for its own <code>url()</code>. Import what a module needs when it starts, or resolve a later import from the document: <code>import(new URL(&quot;js/chart.js&quot;, document.baseURI))</code>.</li>
+          <li><strong>A page left open keeps working.</strong> Its files load under an address that works for {pageAddressLife}; while its tab is visible, and for {hiddenAllowanceWords()} after it was hidden, the page gets the next address before that, without loading again. A tab hidden for longer stops asking, and gets its next address when it is shown again. One limit remains: a module that already loaded keeps its first address for its own later <code>import()</code>, and a stylesheet file for its own <code>url()</code>. Import what a module needs when it starts, or resolve a later import from the document: <code>import(new URL(&quot;js/chart.js&quot;, document.baseURI))</code>.</li>
         </ul>
       </Prose>
       <FactTable head={["Extensions", "Served as", "Name"]} rows={pageFileTypeRows()} mono={[0, 1]} />

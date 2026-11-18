@@ -1,7 +1,7 @@
 import { rateLimits } from "@/lib/abuse/limits";
 import { fileLimits, formatBytes } from "@/lib/files/config";
 import { pageBatchLimits } from "@/lib/page-files/publish-rules";
-import { passRenewal } from "@/lib/page-files/renew-rules";
+import { hiddenAllowanceWords, passRenewal } from "@/lib/page-files/renew-rules";
 import { pageFileExtensions, pageFileLimits } from "@/lib/page-files/rules";
 import { pageTokenLimits } from "@/lib/page-files/token";
 
@@ -42,7 +42,7 @@ export function pageFileLimitRows(): string[][] {
     ["Uploads waiting to finish, per person, when a call asks for a set", String(pageBatchLimits.maxPendingUploads)],
     ["Page file uploads started with page_files_request_uploads", `${n(rateLimits.pageFileUpload.limit)} per hour, per person, counted per file`],
     ["Upload URL lifetime", `${minutes(fileLimits.uploadUrlSeconds)} minutes`],
-    ["A page's files address", `Works for ${pageAddressLife}. Renewed ${minutes(passRenewal.leadMs / 1000)} minutes before it ends while the page's tab is visible, without loading the page again.`],
+    ["A page's files address", `Works for ${pageAddressLife}. Renewed ${minutes(passRenewal.leadMs / 1000)} minutes before it ends while the page's tab is visible, and for ${hiddenAllowanceWords()} after the tab was hidden, without loading the page again.`],
   ];
 }
 
