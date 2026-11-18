@@ -221,10 +221,10 @@ describe.runIf(Boolean(databaseUrl))("page file tools with a database", async ()
     const call = await agentOf(owner);
     const before = (await uploadsOf(owner)).length;
 
-    const refused = await call("page_files_request_uploads", { artifact: page.publicId, files: [{ path: "css/site.css", size: 120 }, { path: "../up.css", size: 10 }, { path: "about.html", size: 10 }, { path: "run.exe", size: 10 }] });
+    const refused = await call("page_files_request_uploads", { artifact: page.publicId, files: [{ path: "css/site.css", size: 120 }, { path: "../up.css", size: 10 }, { path: "about.htm", size: 10 }, { path: "run.exe", size: 10 }] });
     expect(refused.isError).toBe(true);
     expect(refused.text).toContain("No upload was started.");
-    for (const path of ["../up.css", "about.html", "run.exe"]) expect(refused.text).toContain(`- ${path}:`);
+    for (const path of ["../up.css", "about.htm", "run.exe"]) expect(refused.text).toContain(`- ${path}:`);
     expect(refused.text).not.toContain("- css/site.css:");
     expect((await uploadsOf(owner)).length).toBe(before);
     expect(await getDb().select().from(rateLimitBucket).where(like(rateLimitBucket.key, `pageFileUpload:${owner}`))).toEqual([]);
