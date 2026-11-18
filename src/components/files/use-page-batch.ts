@@ -51,6 +51,11 @@ export function newPageRow(file: File, path: string, chosen = false): PageRow {
   return { key: `page-${String(nextKey)}`, file, path, stage: "new", progress: 0, error: null, fileId: null, chosen };
 }
 
+/** True while the row still holds this upload: it was not left out, cancelled, or given another path meanwhile. */
+function holdsUpload(rows: readonly PageRow[], key: string, fileId: string): boolean {
+  return rows.some((row) => row.key === key && row.fileId === fileId);
+}
+
 function uploadState(stage: RowStage): BatchUploadState {
   if (stage === "ready" || stage === "failed") return stage;
   return stage === "new" || stage === "starting" || stage === "queued" ? "waiting" : "uploading";
@@ -99,7 +104,14 @@ export function usePageBatch({ artifactId, held, api, onUpdated }: Options) {
 
   const review = useMemo<BatchReview>(() => reviewBatch(state.rows.map(({ key, path, file }) => ({ key, path, size: file.size })), held), [state.rows, held]);
 
-  /** Sends one queued file, then has the server check it. A file left out or cancelled meanwhile is let go quietly. */
+  /** Takes the server's check of a sent file: ready, or failed with its words. An upload the row no longer holds is let go. */
+  const takeCheck = useCallback((key: string, fileId: string, checked: { success: true; data: FileDto } | { success: false; error: string }) => {
+    if (rowOf(key)?.stage !== "checking" || !holdsUpload(stateRef.current.rows, key, fileId)) { void context.current.api.discard(fileId).catch(() => undefined); return; }
+    // A file that failed its check was removed by the server: Try again starts a new upload.
+    patchRow(key, checked.success ? { stage: "ready" } : { stage: "failed", error: checked.error, fileId: null });
+  }, [patchRow]);
+
+  /** Sends one queued file, then has the server check it. A file left out, cancelled, or given another path meanwhile is let go quietly. */
   const send = useCallback(async (key: string) => {
     const row = rowOf(key);
     const ticket = tickets.current.get(key);
@@ -110,20 +122,16 @@ export function usePageBatch({ artifactId, held, api, onUpdated }: Options) {
     try {
       await context.current.api.put(ticket, row.file, (progress) => { patchRow(key, { progress }); }, stop.signal);
       patchRow(key, { stage: "checking", progress: 100 });
-      const checked: { success: true; data: FileDto } | { success: false; error: string } = await context.current.api.finalize(ticket.fileId);
-      // Left out or cancelled while it was checked: the upload is not needed.
-      if (!rowOf(key)) { void context.current.api.discard(ticket.fileId).catch(() => undefined); return; }
-      // A file that failed its check was removed by the server: Try again starts a new upload.
-      patchRow(key, checked.success ? { stage: "ready" } : { stage: "failed", error: checked.error, fileId: null });
+      takeCheck(key, ticket.fileId, await context.current.api.finalize(ticket.fileId));
     } catch (error) {
-      if (!rowOf(key) || (error instanceof Error && error.message === uploadCancelled)) return;
+      if (!holdsUpload(stateRef.current.rows, key, ticket.fileId) || (error instanceof Error && error.message === uploadCancelled)) return;
       void context.current.api.discard(ticket.fileId).catch(() => undefined);
       patchRow(key, { stage: "failed", error: error instanceof Error ? error.message : "The upload failed. Try again.", fileId: null });
     } finally {
       controllers.current.delete(key);
       tickets.current.delete(key);
     }
-  }, [patchRow]);
+  }, [patchRow, takeCheck]);
 
   // Sends queued files, a few at a time; each one that ends makes room for the next.
   const drainRef = useRef<() => void>(() => undefined);
@@ -169,6 +177,8 @@ export function usePageBatch({ artifactId, held, api, onUpdated }: Options) {
   }, [commit, takeTicket]);
 
   const publish = useCallback(async () => {
+    // One publish at a time: a second call from the same render would send the same uploads again.
+    if (stateRef.current.publishing) return;
     const ready = stateRef.current.rows.filter((row) => row.stage === "ready" && row.fileId !== null);
     const uploadIds = ready.flatMap((row) => row.fileId ?? []);
     if (uploadIds.length === 0) return;

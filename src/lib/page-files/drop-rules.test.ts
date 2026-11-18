@@ -100,11 +100,16 @@ describe("leftOutWords", () => {
 
 describe("replacementPickProblem", () => {
   it("should take a file of the same type for a page file's path", () => {
-    expect(replacementPickProblem("css/site.css", "new-styles.css")).toBeNull();
-    expect(replacementPickProblem("img/photo.jpg", "photo.jpeg")).toBeNull();
+    expect(replacementPickProblem("css/site.css", { name: "new-styles.css", size: 10 })).toBeNull();
+    expect(replacementPickProblem("img/photo.jpg", { name: "photo.jpeg", size: 10 })).toBeNull();
   });
 
   it("should refuse a file of another type, which the path would serve as the wrong type", () => {
-    expect(replacementPickProblem("css/site.css", "logo.png")).toContain("css/site.css");
+    expect(replacementPickProblem("css/site.css", { name: "logo.png", size: 10 })).toContain("css/site.css");
+  });
+
+  it("should refuse an empty file and one over the limit, as a drop does, so no path field is offered for them", () => {
+    expect(replacementPickProblem("css/site.css", { name: "site.css", size: 0 })).toBe(emptyFileProblem);
+    expect(replacementPickProblem("css/site.css", { name: "site.css", size: fileLimits.maxBytes + 1 })).toContain("The limit is");
   });
 });

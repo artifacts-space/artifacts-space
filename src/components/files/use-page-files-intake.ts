@@ -69,7 +69,7 @@ export function usePageFilesIntake(batch: PageBatch, attach: (files: File[]) => 
   }, [add, attach]);
 
   const replaceAt = useCallback((path: string, file: File) => {
-    const problem = replacementPickProblem(path, file.name);
+    const problem = replacementPickProblem(path, file);
     if (problem) { setNotes((current) => ({ ...current, refused: [...current.refused, { key: key("refused"), name: file.name, problem }] })); return; }
     add([newPageRow(file, path, true)]);
   }, [add]);

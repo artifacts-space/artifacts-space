@@ -32,11 +32,13 @@ interface PathFixProps {
   row: PageRow;
   problem: string;
   suggestion: string;
+  /** True while the set is being published: nothing in it changes then. */
+  locked: boolean;
   onSetPath: (path: string) => void;
 }
 
 /** A path that cannot be used yet: the reason, and a field prefilled with a cleaned path the person takes or changes. */
-function PathFix({ row, problem, suggestion, onSetPath }: PathFixProps) {
+function PathFix({ row, problem, suggestion, locked, onSetPath }: PathFixProps) {
   const [typed, setTyped] = useState(suggestion);
   const problemId = useId();
   return (
@@ -50,8 +52,8 @@ function PathFix({ row, problem, suggestion, onSetPath }: PathFixProps) {
     >
       <p id={problemId} role="alert" className="text-xs break-words text-tone-danger">{problem}</p>
       <div className="flex min-w-0 items-center gap-2">
-        <Input value={typed} onChange={(event) => { setTyped(event.target.value); }} aria-label={`Path for ${row.file.name}`} aria-describedby={problemId} autoCapitalize="off" autoCorrect="off" spellCheck={false} className="h-7 flex-1 font-mono text-sm" />
-        <Button type="submit" variant="outline" size="xs">Use path</Button>
+        <Input value={typed} onChange={(event) => { setTyped(event.target.value); }} aria-label={`Path for ${row.file.name}`} aria-describedby={problemId} autoCapitalize="off" autoCorrect="off" spellCheck={false} disabled={locked} className="h-7 flex-1 font-mono text-sm" />
+        <Button type="submit" variant="outline" size="xs" disabled={locked}>Use path</Button>
       </div>
     </form>
   );
@@ -62,13 +64,15 @@ interface BatchRowProps {
   problem: string | undefined;
   replaces: string | undefined;
   suggestion: string;
+  /** True while the set is being published: a file cannot be left out of a publish on its way. */
+  locked: boolean;
   onLeaveOut: () => void;
   onRetry: () => void;
   onSetPath: (path: string) => void;
 }
 
 /** One file on its way to the page: its name, the path it takes (or why that path cannot be used), what it replaces, and its upload. */
-function BatchRow({ row, problem, replaces, suggestion, onLeaveOut, onRetry, onSetPath }: BatchRowProps) {
+function BatchRow({ row, problem, replaces, suggestion, locked, onLeaveOut, onRetry, onSetPath }: BatchRowProps) {
   return (
     <li className="card-nested flex min-w-0 flex-col gap-1.5 bg-card px-3 py-2" data-slot="page-batch-row">
       <div className="flex min-w-0 items-center gap-2">
@@ -80,12 +84,12 @@ function BatchRow({ row, problem, replaces, suggestion, onLeaveOut, onRetry, onS
         {row.stage === "failed" ? (
           <Button type="button" variant="ghost" size="xs" onClick={onRetry}><IconRefresh aria-hidden /> Try again</Button>
         ) : null}
-        <Button type="button" variant="ghost" size="icon-xs" aria-label={`Leave out ${row.path}`} title="Leave this file out" onClick={onLeaveOut}>
+        <Button type="button" variant="ghost" size="icon-xs" aria-label={`Leave out ${row.path}`} title="Leave this file out" disabled={locked} onClick={onLeaveOut}>
           <IconX />
         </Button>
       </div>
       {replaces ? <p className="text-xs font-medium text-tone-warning" data-slot="page-batch-replaces">Replaces {replaces}</p> : null}
-      {problem ? <PathFix key={row.path} row={row} problem={problem} suggestion={suggestion} onSetPath={onSetPath} /> : null}
+      {problem ? <PathFix key={row.path} row={row} problem={problem} suggestion={suggestion} locked={locked} onSetPath={onSetPath} /> : null}
       {row.stage === "sending" ? <Progress value={row.progress} aria-label={`Uploading ${row.path}`} /> : null}
       {problem ? null : <p role={row.stage === "failed" ? "alert" : undefined} className={cn("text-xs break-words", row.stage === "failed" ? "text-tone-danger" : "text-muted-foreground")}>{stageWords(row)}</p>}
     </li>
@@ -99,6 +103,8 @@ function headline(batch: PageBatch): string {
   if (batch.publishing) return `Adding ${files} to the page…`;
   if (batch.step === "fix") return `${files} to add. Fix the paths marked below.`;
   if (batch.step === "confirm") return `${files} ready. Some replace files the page has.`;
+  if (batch.step === "too-many") return `${files} to add. They do not fit the page.`;
+  if (batch.step === "failed") return `${files} to add. Try again or leave out the files marked below.`;
   const ready = batch.rows.filter((row) => row.stage === "ready").length;
   return `Uploading ${files} · ${String(ready)} ready`;
 }
@@ -141,6 +147,7 @@ export function PageBatchList({ batch, held }: { batch: PageBatch; held: readonl
             problem={batch.review.pathProblems.get(row.key)}
             replaces={batch.review.replaces.get(row.key)}
             suggestion={pathSuggestion(row.path, held, takenBesides(batch.rows, row.key))}
+            locked={batch.publishing}
             onLeaveOut={() => { batch.leaveOut(row.key); }}
             onRetry={() => { batch.retry(row.key); }}
             onSetPath={(path) => { batch.setPath(row.key, path); }}

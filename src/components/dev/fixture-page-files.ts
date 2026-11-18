@@ -15,6 +15,10 @@ import { pageFileTypeFor } from "@/lib/page-files/rules";
  * sessionStorage:
  * - `fixture:hold-page-uploads` "1": every upload waits until the test
  *   dispatches `fixture:release-page-uploads` on window, or is aborted.
+ * - `fixture:hold-page-checks` "1": every check of a sent file waits until
+ *   the test dispatches `fixture:release-page-checks`.
+ * - `fixture:hold-page-publish` "1": every publish waits until the test
+ *   dispatches `fixture:release-page-publish`.
  * - `fixture:next-page-publish` "refuse": the next publish is refused.
  * A file whose name starts with `broken` fails the server's check.
  */
@@ -62,6 +66,12 @@ function held(signal: AbortSignal): Promise<void> {
     signal.addEventListener("abort", abort, { once: true });
     window.addEventListener("fixture:release-page-uploads", () => { resolve(); }, { once: true });
   });
+}
+
+/** Resolves at once, or once the test dispatches `release` on window while `key` is set. */
+function gate(key: string, release: string): Promise<void> {
+  if (flag(key) !== "1") return Promise.resolve();
+  return new Promise((resolve) => { window.addEventListener(release, () => { resolve(); }, { once: true }); });
 }
 
 /** A page file of the fixture: a seeded one (`?files=1`) with a fixed id, so the server's page and the browser's agree, or an upload with its own. */
@@ -125,24 +135,28 @@ export function memoryPageFilesApi(storeFor: (artifactId: string) => FixturePage
       await held(signal);
       onProgress(100);
     },
-    finalize: (fileId) => {
+    finalize: async (fileId) => {
+      await gate("fixture:hold-page-checks", "fixture:release-page-checks");
       const upload = uploads.get(fileId);
-      if (!upload) return Promise.resolve({ success: false, error: "File not found." });
+      if (!upload) return { success: false, error: "File not found." };
       if (upload.filename.startsWith("broken")) {
         uploads.delete(fileId);
-        return Promise.resolve({ success: false, error: "The file does not look like the type its path says. Upload the file again." });
+        return { success: false, error: "The file does not look like the type its path says. Upload the file again." };
       }
-      return Promise.resolve({ success: true, data: upload });
+      return { success: true, data: upload };
     },
-    publish: ({ artifactId, uploadIds, remove }) => {
+    publish: async ({ artifactId, uploadIds, remove }) => {
+      await gate("fixture:hold-page-publish", "fixture:release-page-publish");
       const store = storeFor(artifactId);
-      if (!store) return Promise.resolve({ success: false, error: "Artifact not found." });
-      if (takeFlag("fixture:next-page-publish") === "refuse") return Promise.resolve({ success: false, error: "The page's files or these uploads changed while they were being published, so nothing was changed." });
+      if (!store) return { success: false, error: "Artifact not found." };
+      if (takeFlag("fixture:next-page-publish") === "refuse") return { success: false, error: "The page's files or these uploads changed while they were being published, so nothing was changed." };
+      // As the server does: an upload that was deleted, or is in an artifact already, refuses the whole publish.
+      if (uploadIds.some((id) => !uploads.has(id))) return { success: false, error: "These uploads are gone, so nothing was changed." };
       const named = uploadIds.flatMap((id) => uploads.get(id) ?? []);
       const published = applyPublish(store, named, remove);
       for (const id of uploadIds) uploads.delete(id);
       counts().publishes.push(published);
-      return Promise.resolve({ success: true, data: { artifact: { ...store.artifact(), files: store.files.get(), updatedAt: new Date().toISOString() }, status: "applied", ...published } });
+      return { success: true, data: { artifact: { ...store.artifact(), files: store.files.get(), updatedAt: new Date().toISOString() }, status: "applied", ...published } };
     },
     discard: (fileId) => {
       counts().discards += 1;

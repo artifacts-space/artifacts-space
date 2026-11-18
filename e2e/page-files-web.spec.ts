@@ -238,6 +238,41 @@ test("should load the running page again with its new files, and keep saving the
   await expect.poll(async () => pathsShown(pageFiles(page))).toEqual(["site.css"]);
 });
 
+test("should start a file again at its new path when the path is fixed while the old upload is checked, and publish both", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-page-checks", "1"); });
+  await addFromMenu(page, [{ name: "a.css" }]);
+  const rows = batch(page).locator("[data-slot=page-batch-row]");
+  await expect(rows.first()).toContainText("Checking…");
+  // A second file at the same path: both rows say so, and the first takes a new path while its upload is still checked.
+  await addFromMenu(page, [{ name: "a.css", text: "p { margin: 0; }" }]);
+  await expect(rows).toHaveCount(2);
+  await rows.first().getByRole("textbox", { name: "Path for a.css" }).fill("first.css");
+  await rows.first().getByRole("button", { name: "Use path" }).click();
+  await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-page-checks"); window.dispatchEvent(new Event("fixture:release-page-checks")); });
+  await expect(batch(page)).toHaveCount(0);
+  expect((await counts(page)).publishes).toEqual([{ added: ["first.css", "a.css"], replaced: [], removed: [] }]);
+  await expect.poll(async () => pathsShown(pageFiles(page))).toEqual(["a.css", "first.css"]);
+});
+
+test("should keep a set as it is while it is being published, and refuse an empty file picked to replace a page file", async ({ page }) => {
+  await open(page, "&files=1");
+  await page.evaluate(() => { window.sessionStorage.setItem("fixture:hold-page-publish", "1"); });
+  await addFromMenu(page, [{ name: "new.css" }]);
+  await expect(batch(page)).toContainText("Adding 1 file to the page…");
+  await expect(batch(page).getByRole("button", { name: "Leave out new.css" })).toBeDisabled();
+  await expect(batch(page).getByRole("button", { name: "Cancel" })).toBeDisabled();
+  await page.evaluate(() => { window.sessionStorage.removeItem("fixture:hold-page-publish"); window.dispatchEvent(new Event("fixture:release-page-publish")); });
+  await expect(batch(page)).toHaveCount(0);
+  expect((await counts(page)).publishes).toEqual([{ added: ["new.css"], replaced: [], removed: [] }]);
+
+  const chooser = page.waitForEvent("filechooser");
+  await pageFiles(page).getByRole("button", { name: "Replace css/site.css" }).click();
+  await (await chooser).setFiles([payload({ name: "site.css", text: "" })]);
+  await expect(section(page).getByRole("list", { name: "Not added" }).getByRole("alert")).toHaveText("The file is empty. Choose a file with content.");
+  await expect(batch(page)).toHaveCount(0);
+});
+
 test.describe("dropping files on the page", () => {
   test.skip(({ isMobile }) => isMobile, "Files are dragged from a desktop.");
 

@@ -91,8 +91,10 @@ export function looseFilesWords(files: readonly { pagePath?: string | undefined 
 /**
  * True when a person attaches files beside this format's content on the
  * web ("Attach file", and a drop anywhere on the page): every format with
- * the quiet list but a document, whose files go into its text. An HTML
- * artifact's are plain attachments too; its page files come from agents.
+ * the quiet list but a document, whose files go into its text. On an HTML
+ * artifact ("Add files") a file whose type can be a page file becomes one,
+ * at its path, and any other file a plain attachment
+ * (src/lib/page-files/drop-rules.ts, PageFilesSection).
  */
 export function attachesBeside(kind: string): boolean {
   return filesPanel(kind) === "list" && kind !== "markdown";

@@ -106,11 +106,15 @@ function htmlRefusal(path: string): string {
   return pagePathProblem(suggestPagePath(path) || "page.html") ?? "A page file cannot be another HTML document.";
 }
 
+/** Why a file of this size cannot be a page file, in a person's words, or null when it can. */
+function sizeRefusal(size: number): string | null {
+  return size <= 0 ? emptyFileProblem : pageFileSizeProblem(size);
+}
+
 /** Where a page-file type goes once its path is known: refused when its size cannot be a page file. */
 function pageRoute(entry: DroppedEntry, path: string): DropRoute {
-  if (entry.size <= 0) return { kind: "refused", problem: emptyFileProblem };
-  const sizeProblem = pageFileSizeProblem(entry.size);
-  return sizeProblem ? { kind: "refused", problem: sizeProblem } : { kind: "page", path };
+  const problem = sizeRefusal(entry.size);
+  return problem ? { kind: "refused", problem } : { kind: "page", path };
 }
 
 /** Where a file that is no page-file type goes: a plain attachment when the site takes its type, refused otherwise. */
@@ -150,11 +154,14 @@ export function leftOutWords(count: number): string | null {
 /**
  * Why a picked file cannot replace the page file at `path`, or null when it
  * can. The new file is stored at the same path, so it must be of the type
- * that path is served as: its extension must give the same type.
+ * that path is served as: its extension must give the same type. An empty
+ * file, or one over the limit, is refused as in a drop.
  */
-export function replacementPickProblem(path: string, pickedName: string): string | null {
+export function replacementPickProblem(path: string, picked: { name: string; size: number }): string | null {
+  const sizeProblem = sizeRefusal(picked.size);
+  if (sizeProblem) return sizeProblem;
   const wanted = pageFileExtensions.find((entry) => entry.extension === fileExtension(path));
-  const picked = pageFileExtensions.find((entry) => entry.extension === fileExtension(pickedName));
-  if (wanted && picked?.contentType === wanted.contentType) return null;
+  const given = pageFileExtensions.find((entry) => entry.extension === fileExtension(picked.name));
+  if (wanted && given?.contentType === wanted.contentType) return null;
   return `Pick a file of the same type (${wanted?.label ?? "page file"}) to replace ${path}, so the page keeps loading it from the same path.`;
 }
