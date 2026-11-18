@@ -245,12 +245,16 @@ test("should ask for nothing in a tab hidden past its hour, and renew at once wh
   expect(asks.count - loaded, "the site asked for an address after the tab's hour").toBe(0);
   expect(hidden).toEqual({ status: 404, path: first.pathname, kept: "since the first load" });
 
-  await page.evaluate(() => { (window as MarkedWindow).setTabShown?.(true); });
+  // The moved clock has done its work: put it back as the tab is shown, or every address made on the server's clock would read as already ended.
+  await page.evaluate(() => {
+    (window as MarkedWindow & { setClockSkew?: (ms: number) => void }).setClockSkew?.(0);
+    (window as MarkedWindow).setTabShown?.(true);
+  });
   await expect.poll(async () => (await pageState(frame)).status).toBe(200);
   const shown = await pageState(frame);
   expect(shown.path).not.toBe(first.pathname);
   expect(shown.kept).toBe("since the first load");
-  expect(asks.count - loaded).toBeGreaterThanOrEqual(1);
+  expect(asks.count - loaded).toBe(1);
 });
 
 test("should give a reader who lost access no new address, and keep the page running without its files", async ({ page, request, baseURL }) => {

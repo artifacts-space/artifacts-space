@@ -837,8 +837,9 @@ path, as on any website: `<link href="css/site.css">`, a module's
   `import.meta.url`, and a stylesheet file for its own `url()`. Those get a
   404 after the first address ended, until the page loads again. A file
   asked for in a tab that has been hidden for more than its hour, after the
-  end of its address, also gets a 404. The life is one constant (`pageTokenLimits`); a longer life is a
-  longer window after access is lost.
+  end of its address, also gets a 404. The life is one constant
+  (`pageTokenLimits`); a longer life is a longer window after access is
+  lost.
 - Which files a viewer gets follows the version they are served, like
   every attachment: a reader of the approved version gets only files
   attached by that version's time, and the copy of a replaced file that was
