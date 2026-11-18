@@ -2,8 +2,8 @@ import Link from "next/link";
 import { IconArrowRight, IconCheck } from "@tabler/icons-react";
 
 import { Button } from "@/components/ui/button";
-import { formatKinds } from "@/lib/artifact-formats";
 import { formatBytes } from "@/lib/files/config";
+import { formatLine } from "@/lib/landing/format-line";
 import { storageQuota } from "@/lib/quota/rules";
 import { teamLimits } from "@/lib/teams/limits";
 
@@ -24,7 +24,7 @@ const plans: readonly Plan[] = [
     name: "Individuals",
     lead: "Free forever for everyone who signs up now.",
     items: [
-      `Save in all ${String(formatKinds.length)} formats: Markdown, web pages, code, text, JSON, CSV, diagrams, interfaces, canvases, and files.`,
+      formatLine(),
       "Connect any agent: Claude, ChatGPT, Codex, Cursor, Grok Bot, OpenCode, Kimi Code, Devin, fx, or any MCP client.",
       "Comment on every artifact.",
       "Restore any saved version from the history.",

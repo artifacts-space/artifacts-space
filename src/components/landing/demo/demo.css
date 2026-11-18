@@ -237,6 +237,15 @@ div.demo-swap {
   opacity: 0;
   pointer-events: none;
 }
+/* The web page's rollout steps: a line joins each step's mark to the next. */
+.demo-steps > li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 1.25rem;
+  bottom: 0.125rem;
+  left: calc(0.5rem - 1px);
+  border-left: 2px solid var(--border);
+}
 .demo-typing {
   display: inline-flex;
   gap: 3px;
@@ -272,10 +281,10 @@ div.demo-swap {
 }
 /* From Dana's reply in the thread to the newest terminal line. */
 .demo-packet--back {
-  top: 640px;
+  top: 400px;
   left: calc(100cqw - 15rem - 36px);
   --fly-x: calc(-100cqw + 15rem + 72px);
-  --fly-y: -256px;
+  --fly-y: -16px;
 }
 
 /* --- The finished state ------------------------------------------------------------ */
@@ -367,13 +376,6 @@ div.demo-swap {
   }
   .demo-term__input {
     margin-bottom: 12px;
-  }
-  /* A shorter chart and a tighter timeline, so both fit in the phone window. */
-  .demo-piece--chart .h-40 {
-    height: 6.5rem;
-  }
-  .demo-piece--timeline li:not(:last-child) {
-    padding-bottom: 12px;
   }
   /* The comment sheet fades the page out above it, so no line shows cut in half. */
   .demo-sheet {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { docsMcpTools } from "@/lib/docs/mcp-tools";
-import { validateUiSpec } from "@/lib/ui/validate";
+import { htmlProblem } from "@/lib/html/rules";
 
-import { demoArtifactContent, demoPieceContent, demoPieces } from "./demo-artifact";
-import { demoCalls, demoPeople, demoPrompt, HOLD, replayCycleMs, reviewerReply, T, typedAt } from "./demo-story";
+import { holdDays, pageSourceStart, planCopy, planSteps, ramp, rampDays, rampPath } from "./demo-artifact";
+import { demoCalls, demoListRows, demoPeople, demoPrompt, HOLD, replayCycleMs, reviewerReply, T, typedAt } from "./demo-story";
 
 const registered = new Map(docsMcpTools().map((tool) => [tool.name as string, new Set(tool.args.map((arg) => arg.name))]));
 
@@ -34,25 +34,55 @@ describe("landing demo: fidelity to the MCP server", () => {
 });
 
 describe("landing demo: the artifact", () => {
-  it("should render both versions of the page with no issues when validated as a ui artifact", () => {
+  const savesWithContent = demoCalls.filter((call) => call.args.some(([key]) => key === "content"));
+
+  it("should save a web page when the agent calls artifacts_create", () => {
+    const create = demoCalls.find((call) => call.tool === "artifacts_create");
+    expect(create?.args).toContainEqual(["kind", "html"]);
+  });
+
+  it("should send content an HTML artifact accepts when a call carries the page", () => {
+    expect(savesWithContent.length).toBeGreaterThanOrEqual(2);
+    for (const call of savesWithContent) {
+      const content = call.args.find(([key]) => key === "content")?.[1] ?? "";
+      expect(htmlProblem(content), call.tool).toBeNull();
+      expect(content).toBe(pageSourceStart);
+    }
+  });
+
+  it("should never name an earlier format when the demo shows a kind", () => {
+    const kinds = [...demoCalls.flatMap((call) => call.args.filter(([key]) => key === "kind").map(([, value]) => value)), ...demoListRows.map((row) => row.kind)];
+    expect(kinds).not.toContain("ui");
+    expect(kinds).not.toContain("canvas");
+  });
+
+  it("should hold at 5% over the weekend and still reach all traffic when the agent saves version 2", () => {
+    const held = ramp[2].slice(holdDays.first, holdDays.last + 1);
+    expect(held).toEqual([5, 5, 5]);
+    expect(rampDays.slice(holdDays.first, holdDays.last + 1)).toEqual(["Fri", "Sat", "Sun"]);
+    expect(ramp[1].at(-1)).toBe(100);
+    expect(ramp[2].at(-1)).toBe(100);
+    expect(ramp[1]).toHaveLength(rampDays.length);
+    expect(ramp[2]).toHaveLength(rampDays.length);
+  });
+
+  it("should change the headline, the steps, and the chart when the agent saves version 2", () => {
+    expect(planCopy[2].title).not.toBe(planCopy[1].title);
+    expect(planSteps[2]).not.toEqual(planSteps[1]);
+    expect(rampPath(2)).not.toBe(rampPath(1));
+    expect(planSteps[2].some((step) => step.title.includes("Hold"))).toBe(true);
+  });
+
+  it("should list a step for every rise the chart draws when either version is shown", () => {
     for (const version of [1, 2] as const) {
-      const result = validateUiSpec(demoArtifactContent(version));
-      expect(result.renderable).toBe(true);
-      expect(result.issues).toEqual([]);
+      const rises = ramp[version].flatMap((value, day) => (day === 0 || value !== ramp[version][day - 1] ? [`${String(value)}% of traffic ${rampDays[day] ?? ""}`] : []));
+      const steps = planSteps[version].filter((step) => step.title.endsWith("of traffic")).map((step) => `${step.title} ${step.time}`);
+      expect(steps, `version ${String(version)}`).toEqual(rises);
     }
   });
 
-  it("should render every piece on its own with no issues when the demo builds it", () => {
-    for (const piece of demoPieces) {
-      for (const version of [1, 2] as const) {
-        expect(validateUiSpec(demoPieceContent(piece, version)).issues, `${piece} v${String(version)}`).toEqual([]);
-      }
-    }
-  });
-
-  it("should change the plan when the agent saves version 2", () => {
-    expect(demoArtifactContent(2)).not.toBe(demoArtifactContent(1));
-    expect(demoPieceContent("board", 2)).toBe(demoPieceContent("board", 1));
+  it("should close the chart's area along the bottom when the path is filled", () => {
+    expect(rampPath(1, true)).toMatch(/^M0,95L.*L100,100L0,100Z$/);
   });
 });
 

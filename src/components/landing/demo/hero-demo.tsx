@@ -10,9 +10,9 @@ import "./demo-replay.css";
 
 const description =
   "Two windows on a desktop: Claude Code and the artifacts.space app in a browser. You ask Claude Code to save a checkout rollout plan and to ask Dana to check the risks. " +
-  "The agent creates the artifact. It lands in your list and opens as a page with a chart, a timeline, and a board of risks. " +
+  "The agent saves it as a web page. It lands in your list and opens with the live numbers and a chart of traffic on the new checkout. " +
   "The agent shares it with the Acme team and mentions Dana in a comment. Dana replies: hold at 5% over the weekend. " +
-  "The agent reads her reply and saves version 2 of the plan with the hold.";
+  "The agent reads her reply and saves version 2 of the page, with the weekend hold on the chart.";
 
 /** When focus moves between the windows; demo-replay.css reads these. */
 const focusTimes: Record<string, number> = { "--focus-app": T.appFront, "--focus-term": T.termFront, "--focus-app2": T.appFront2 };

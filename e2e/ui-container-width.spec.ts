@@ -117,7 +117,7 @@ test.describe("on a wide window", () => {
  * would take the narrow layout. Each interface on these pages must fill the
  * room its parent gives it.
  */
-const interfacePages = ["/dev/components", "/?home", "/docs/json-render/components/grid", "/preview", "/dev/editor?kind=ui", "/dev/workspace", "/dev/canvas?fixture=site"] as const;
+const interfacePages = ["/dev/components", "/docs/json-render/components/grid", "/preview", "/dev/editor?kind=ui", "/dev/workspace", "/dev/canvas?fixture=site"] as const;
 
 /** Narrower than any place we draw an interface: a phone column is about 330px. */
 const narrowestInterface = 200;
