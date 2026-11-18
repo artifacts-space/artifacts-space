@@ -1283,12 +1283,32 @@ to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
   answered (`uploadedFacts`).
 - **Cancel stops the request** (`putFile`'s `signal`, one `AbortController`
   per upload in `media-uploads.ts`), then discards the pending upload.
-- **Every still image is redrawn in the browser before it uploads**
-  (`documentPrepareProfile`): at most 2400 px on its long side, upright,
-  camera data such as the place it was taken removed. A GIF, an animated
-  WebP, and an animated PNG upload as they are (`isAnimatedImage`): a
-  redraw would keep one frame. Never loosen this to "small pictures upload untouched": that would
-  put a phone photo's location into a shared page.
+- **A small still image uploads as it is; a large one, or one that says
+  where it was taken, is redrawn** (decided by the owner on 17 Nov 2026:
+  "there is no need to redraw small images"; `documentImageToSend` in
+  `src/components/images/document-image.ts`, rules in
+  `src/lib/images/original-rules.ts`). A JPEG, PNG, or WebP keeps its own
+  bytes, type, and quality when all of these hold (`keepsOriginal`): its
+  longest side, as the browser decodes it upright, is at most 2400 px (never
+  a header alone); it fits `documentPrepareProfile.maxBytes`; the size the
+  server will store (`readImageDimensions` on the same bytes) is the size
+  the browser draws, so a JPEG turned by its camera orientation keeps its
+  place the right way round; and its bytes positively say nothing of a
+  place (`findLocation` in `src/lib/images/location-rules.ts`: no Exif GPS
+  pointer, no XMP or text naming GPS or a location, every segment or chunk
+  one it knows, nothing after the picture's end). Anything else is redrawn
+  as before: at most 2400 px, upright, camera data removed. AVIF, HEIC,
+  and any type the check cannot read are always redrawn. A small image
+  sent as it is keeps its other camera data (camera model, time taken,
+  settings, an embedded thumbnail); only the place is guaranteed gone.
+  When the file store refuses an image sent as it is before any byte goes
+  (`UploadRequestRefused`), the redrawn image is sent instead if it is
+  smaller. A GIF, an animated WebP, and an animated PNG upload as they are
+  (`isAnimatedImage`): a redraw would keep one frame. Never send a small
+  image as it is without the location check: that would put a phone
+  photo's location into a shared page. Covers and icons still redraw every
+  image (see Covers), because their redraw keeps them under the server's
+  hard byte caps and, for covers, in the two types link previews draw.
 - The fixture is `/dev/editor?kind=media&doc=gallery` (add `&as=reader` for
   the read view); `e2e/document-images.spec.ts` covers all of the above.
 

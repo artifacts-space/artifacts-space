@@ -1,8 +1,7 @@
-import { prepareImage } from "@/components/images/prepare-image";
+import { documentImageToSend, type DocumentImageChoice } from "@/components/images/document-image";
 import { fileLimits, formatBytes } from "@/lib/files/config";
-import { animationBytes, documentPrepareProfile, isAnimatedImage, uploadsUnprepared } from "@/lib/images/prepare-rules";
 
-import { filenameFromUrl, maxUploadsAtOnce, mediaUploadProblem, uploadMediaKind } from "./media-upload-rules";
+import { filenameFromUrl, maxUploadsAtOnce, mediaUploadProblem, UploadRequestRefused, uploadMediaKind } from "./media-upload-rules";
 
 /**
  * Uploads that media blocks wait for, in this browser. A block stores only
@@ -107,29 +106,37 @@ export function subscribeUpload(uploadId: string, listener: () => void): () => v
   return () => { entry?.listeners.delete(listener); };
 }
 
-/** Whether a picked image moves: a redraw would keep only its first frame. A file that cannot be read counts as a still. */
-async function isAnimated(file: File): Promise<boolean> {
-  if (file.size > documentPrepareProfile.maxBytes) return false;
-  try {
-    return isAnimatedImage(file.type, new Uint8Array(await file.slice(0, animationBytes).arrayBuffer()));
-  } catch {
-    return false;
-  }
+/** What an image uploads as (document-image.ts): small stills with their own bytes when they say nothing of a place, the rest redrawn. Every other file uploads as it is. */
+async function prepared(file: File): Promise<DocumentImageChoice> {
+  if (uploadMediaKind(file) !== "image") return { file, redraw: null };
+  return documentImageToSend(file);
 }
 
-/** Still images are redrawn first (upright, at most 2400 px, camera data dropped); a GIF, an animated image, and every other file upload as they are. */
-async function prepared(file: File): Promise<File> {
-  if (uploadMediaKind(file) !== "image" || uploadsUnprepared(file, documentPrepareProfile)) return file;
-  if (await isAnimated(file)) return file;
-  return prepareImage(file, documentPrepareProfile);
+/**
+ * Sends the chosen file. When an image sent with its own bytes is refused
+ * before any byte goes (its size against the account's room, say), the
+ * redrawn image is sent instead if it is smaller, so the person is not
+ * refused for a file the redraw would have fitted.
+ */
+async function send(uploadId: string, entry: Entry, uploader: MediaUploader, choice: DocumentImageChoice): Promise<UploadedMedia> {
+  const onProgress = (progress: number) => { setState(uploadId, { status: "uploading", progress }); };
+  setState(uploadId, { status: "uploading", progress: 0 });
+  try {
+    return await uploader(choice.file, onProgress, entry.stop.signal);
+  } catch (error) {
+    if (!(error instanceof UploadRequestRefused) || !choice.redraw || entry.stop.signal.aborted) throw error;
+    setState(uploadId, { status: "preparing" });
+    const smaller = await choice.redraw();
+    if (smaller.size >= choice.file.size) throw error;
+    setState(uploadId, { status: "uploading", progress: 0 });
+    return uploader(smaller, onProgress, entry.stop.signal);
+  }
 }
 
 async function run(uploadId: string, entry: Entry, uploader: MediaUploader) {
   try {
     setState(uploadId, { status: "preparing" });
-    const ready = await prepared(entry.file);
-    setState(uploadId, { status: "uploading", progress: 0 });
-    const file = await uploader(ready, (progress) => { setState(uploadId, { status: "uploading", progress }); }, entry.stop.signal);
+    const file = await send(uploadId, entry, uploader, await prepared(entry.file));
     finished.set(file.id.toLowerCase(), file);
     setState(uploadId, { status: "done", file });
   } catch (error) {

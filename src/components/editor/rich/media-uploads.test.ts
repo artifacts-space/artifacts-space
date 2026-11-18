@@ -2,8 +2,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fileLimits } from "@/lib/files/config";
 
-import { maxUploadsAtOnce } from "./media-upload-rules";
+import type { DocumentImageChoice } from "@/components/images/document-image";
+
+import { maxUploadsAtOnce, UploadRequestRefused } from "./media-upload-rules";
 import { canRetryUpload, fetchFromLink, forgetUpload, queueUpload, retryUpload, startUpload, subscribeUpload, uploadedFacts, uploadState, type MediaUploader, type UploadedMedia } from "./media-uploads";
+
+/** What a picked image uploads as: the real choice, unless a test sets its answer once. */
+const imageChoice = vi.hoisted(() => vi.fn<(file: File) => Promise<DocumentImageChoice>>());
+vi.mock("@/components/images/document-image", async (importOriginal) => {
+  const real = await importOriginal<{ documentImageToSend: (file: File) => Promise<DocumentImageChoice> }>();
+  imageChoice.mockImplementation((file) => real.documentImageToSend(file));
+  return { documentImageToSend: imageChoice };
+});
 
 const pdf = () => new File([new Uint8Array([37, 80, 68, 70])], "q3.pdf", { type: "application/pdf" });
 const ready = { id: "0f8fad5b-d9cb-469f-a165-70867728950e", filename: "q3.pdf", contentType: "application/pdf" };
@@ -145,6 +155,54 @@ describe("media uploads", () => {
 
   it("should read as failed when a block names an upload this tab never started", () => {
     expect(uploadState("upload-from-another-tab")).toMatchObject({ status: "failed" });
+  });
+});
+
+describe("media uploads of an image sent as it is", () => {
+  const picked = () => new File([new Uint8Array(5000)], "Screenshot.png", { type: "image/png" });
+  const redrawnOf = (size: number) => new File([new Uint8Array(size)], "Screenshot.png", { type: "image/png" });
+  const image = { id: "4b0c4e46-3c43-4d4f-9b55-6d2ab7a1c0de", filename: "Screenshot.png", contentType: "image/png" };
+
+  it("should send the redrawn image when the store refuses the original before any byte goes, and the redraw is smaller", async () => {
+    const original = picked();
+    const redrawn = redrawnOf(3000);
+    imageChoice.mockResolvedValueOnce({ file: original, redraw: () => Promise.resolve(redrawn) });
+    const uploader = vi.fn<MediaUploader>().mockRejectedValueOnce(new UploadRequestRefused("The file is too large for the room left.")).mockResolvedValueOnce(image);
+    const uploadId = queueUpload(original);
+    startUpload(uploadId, uploader);
+    await expect(settled(uploadId)).resolves.toEqual({ status: "done", file: image });
+    expect(uploader.mock.calls.map(([file]) => file)).toEqual([original, redrawn]);
+    forgetUpload(uploadId);
+  });
+
+  it("should keep the refusal when the redraw is no smaller than the original", async () => {
+    const original = picked();
+    imageChoice.mockResolvedValueOnce({ file: original, redraw: () => Promise.resolve(redrawnOf(9000)) });
+    const uploader = vi.fn<MediaUploader>().mockRejectedValueOnce(new UploadRequestRefused("The file is too large for the room left."));
+    const uploadId = queueUpload(original);
+    startUpload(uploadId, uploader);
+    await expect(settled(uploadId)).resolves.toEqual({ status: "failed", message: "The file is too large for the room left." });
+    expect(uploader).toHaveBeenCalledOnce();
+    forgetUpload(uploadId);
+  });
+
+  it("should not redraw when the upload failed on its way, or when the image was redrawn already", async () => {
+    const original = picked();
+    const redraw = vi.fn(() => Promise.resolve(redrawnOf(10)));
+    imageChoice.mockResolvedValueOnce({ file: original, redraw });
+    const uploader = vi.fn<MediaUploader>().mockRejectedValue(new Error("The upload stopped."));
+    const first = queueUpload(original);
+    startUpload(first, uploader);
+    await expect(settled(first)).resolves.toEqual({ status: "failed", message: "The upload stopped." });
+    expect(redraw).not.toHaveBeenCalled();
+    imageChoice.mockResolvedValueOnce({ file: redrawnOf(10), redraw: null });
+    uploader.mockRejectedValueOnce(new UploadRequestRefused("No room."));
+    const second = queueUpload(original);
+    startUpload(second, uploader);
+    await expect(settled(second)).resolves.toEqual({ status: "failed", message: "No room." });
+    expect(uploader).toHaveBeenCalledTimes(2);
+    forgetUpload(first);
+    forgetUpload(second);
   });
 });
 

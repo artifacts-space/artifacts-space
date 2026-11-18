@@ -49,8 +49,8 @@ export async function writeDocument(page: Page, title: string, paragraphs: reado
   await expect.poll(async () => (await storedNew(page))[0]?.content ?? "", { timeout: 15_000 }).toContain(paragraphs.at(-1) ?? "");
 }
 
-/** A file to carry in a drag or a paste: a small PDF by default, or `size` bytes of zeros. */
-export interface CarriedFile { name: string; type: string; size?: number }
+/** A file to carry in a drag or a paste: a small PDF by default, `size` bytes of zeros, or the `bytes` given. */
+export interface CarriedFile { name: string; type: string; size?: number; bytes?: number[] }
 
 /** What the page did with a drag event. */
 export interface DragOutcome { prevented: boolean }
@@ -64,7 +64,8 @@ export interface DragOutcome { prevented: boolean }
 export async function dragFilesAt(page: Page, type: "dragover" | "drop" | "dragleave", files: readonly CarriedFile[], point: { x: number; y: number }): Promise<DragOutcome> {
   return page.evaluate(({ type, files, point }) => {
     const data = new DataTransfer();
-    for (const file of files) data.items.add(new File([file.size === undefined ? "%PDF-1.4" : new Uint8Array(file.size)], file.name, { type: file.type }));
+    const contents = (file: CarriedFile) => (file.bytes ? new Uint8Array(file.bytes) : file.size === undefined ? "%PDF-1.4" : new Uint8Array(file.size));
+    for (const file of files) data.items.add(new File([contents(file)], file.name, { type: file.type }));
     const target = document.elementFromPoint(point.x, point.y) ?? document.body;
     const event = new DragEvent(type, { dataTransfer: data, clientX: point.x, clientY: point.y, bubbles: true, cancelable: true });
     target.dispatchEvent(event);

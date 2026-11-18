@@ -6,6 +6,7 @@ import { discardUploadAction, finalizeUploadAction, requestUploadAction } from "
 import { putFile } from "@/components/files/put-file";
 import { fileUrl } from "@/lib/files/types";
 
+import { UploadRequestRefused } from "./media-upload-rules";
 import type { MediaUploader } from "./media-uploads";
 
 /**
@@ -32,7 +33,7 @@ function discardCancelled(fileId: string, signal: AbortSignal | undefined) {
  */
 export const uploadThroughFileStore: MediaUploader = async (file, onProgress, signal) => {
   const ticket = await requestUploadAction({ filename: file.name, contentType: file.type, size: file.size });
-  if (!ticket.success) throw new Error(ticket.error);
+  if (!ticket.success) throw new UploadRequestRefused(ticket.error);
   try {
     await putFile(ticket.data.url, ticket.data.headers, file, onProgress, signal);
   } catch (error) {

@@ -6,7 +6,9 @@ import { ICON_MAX_BYTES } from "@/lib/files/icon-rules";
  * How the browser prepares a picked image before it uploads as a cover, an
  * icon, or an image in a document: scaled down to a sensible size and re-encoded, so a phone photo fits
  * the cap, carries no camera metadata (no GPS in a public page), and is a
- * JPEG or PNG that link previews can draw. Pure, so it is tested without a
+ * JPEG or PNG that link previews can draw. A document sends a small still
+ * image that says nothing of a place with its own bytes instead
+ * (original-rules.ts, src/components/images/document-image.ts). Pure, so it is tested without a
  * browser; src/components/images/prepare-image.ts does the drawing. The
  * server still checks every upload: this only helps honest uploads succeed.
  */
@@ -106,9 +108,11 @@ export function imageOutputType(source: { size: number; type?: string }, hasAlph
 }
 
 /**
- * True when a picked image uploads as it is, without preparing: a GIF that
- * fits the cap keeps its animation, and GIFs carry no camera data. Every
- * other image is redrawn, which drops camera data and caps its size.
+ * True when a picked GIF uploads as it is, without preparing: a GIF that
+ * fits the cap keeps its animation, and GIFs carry no camera data. Covers
+ * and icons redraw every other image, which drops camera data and caps its
+ * size; a document also keeps a small still image's own bytes when it says
+ * nothing of a place (original-rules.ts).
  */
 export function uploadsUnprepared(file: { type: string; size: number }, profile: ImagePrepareProfile): boolean {
   return file.type === "image/gif" && file.size > 0 && file.size <= profile.maxBytes;
