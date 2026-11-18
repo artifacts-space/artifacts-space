@@ -25,7 +25,7 @@ import { beat } from "./beat";
  */
 function Versions({ render }: { render: (version: PlanVersion) => ReactNode }) {
   return (
-    <div className="demo-swap">
+    <div className="demo-swap relative isolate">
       <div style={beat(0, T.v2)}>{render(1)}</div>
       <div style={beat(T.v2)}>{render(2)}</div>
       <span className="demo-glow" style={beat(T.v2)} />
@@ -86,8 +86,14 @@ function Stat({ stat }: { stat: PlanStat }) {
   return (
     <div className="card-nested grid min-w-0 gap-1 bg-card p-2 sm:p-2.5">
       <span className="truncate text-xs text-muted-foreground">{stat.label}</span>
-      <span className={cn("text-lg leading-6 font-semibold tracking-[-0.02em] tabular-nums", stat.good === true && "text-tone-success")}>{stat.value}</span>
-      <span className="truncate text-xs text-muted-foreground max-xl:hidden">{stat.detail}</span>
+      <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+        <span className={cn("text-lg leading-6 font-semibold tracking-[-0.02em] tabular-nums", stat.good === true && "text-tone-success")}>{stat.value}</span>
+        {/*
+         * On a wide page the detail follows the value on its line. On a narrower one it needs a line of its own,
+         * which only the desktop window has room for; the stacked windows below 1280px have a fixed height.
+         */}
+        <span className="min-w-0 basis-full truncate text-xs text-muted-foreground @min-[36rem]/page:basis-auto max-xl:@max-[36rem]/page:hidden">{stat.detail}</span>
+      </span>
       <span className="max-sm:hidden"><Sparkline trend={stat.trend} /></span>
     </div>
   );

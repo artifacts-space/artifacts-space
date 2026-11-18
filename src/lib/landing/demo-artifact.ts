@@ -16,7 +16,7 @@ export const rampDays = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"] as con
 /** Percent of checkout traffic on v2, per day, in each version of the plan. */
 export const ramp = {
   1: [5, 25, 25, 50, 50, 100, 100],
-  2: [5, 5, 5, 5, 25, 50, 100],
+  2: [5, 5, 5, 5, 25, 25, 100],
 } as const satisfies Record<number, readonly number[]>;
 
 export type PlanVersion = keyof typeof ramp;

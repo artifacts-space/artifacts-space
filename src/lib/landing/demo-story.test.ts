@@ -73,6 +73,14 @@ describe("landing demo: the artifact", () => {
     expect(planSteps[2].some((step) => step.title.includes("Hold"))).toBe(true);
   });
 
+  it("should list a step for every rise the chart draws when either version is shown", () => {
+    for (const version of [1, 2] as const) {
+      const rises = ramp[version].flatMap((value, day) => (day === 0 || value !== ramp[version][day - 1] ? [`${String(value)}% of traffic ${rampDays[day] ?? ""}`] : []));
+      const steps = planSteps[version].filter((step) => step.title.endsWith("of traffic")).map((step) => `${step.title} ${step.time}`);
+      expect(steps, `version ${String(version)}`).toEqual(rises);
+    }
+  });
+
   it("should close the chart's area along the bottom when the path is filled", () => {
     expect(rampPath(1, true)).toMatch(/^M0,95L.*L100,100L0,100Z$/);
   });
