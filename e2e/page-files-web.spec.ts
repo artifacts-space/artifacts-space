@@ -1,4 +1,5 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import type { Locator, Page } from "@playwright/test";
@@ -42,8 +43,17 @@ async function addFromMenu(page: Page, files: readonly Picked[]) {
   await (await chooser).setFiles(files.map(payload));
 }
 
-/** Writes a folder of files under the test's output folder and returns its path. */
-function folderOf(root: string, files: Record<string, string>): string {
+/** Folders written for a test, removed after it. Outside the repository, so no tool reads their scripts as source. */
+const written: string[] = [];
+test.afterEach(() => {
+  for (const folder of written.splice(0)) rmSync(folder, { recursive: true, force: true });
+});
+
+/** Writes a folder named `name` of files in a new temporary folder and returns its path. */
+function folderOf(name: string, files: Record<string, string>): string {
+  const parent = mkdtempSync(join(tmpdir(), "page-files-web-"));
+  written.push(parent);
+  const root = join(parent, name);
   for (const [path, text] of Object.entries(files)) {
     const full = join(root, path);
     mkdirSync(dirname(full), { recursive: true });
@@ -82,9 +92,9 @@ test("should add picked files where their types belong, as one publish: page fil
   await expect(pageFiles(page).getByRole("button", { name: "Open app.js" })).toHaveAttribute("href", /^\/api\/files\//);
 });
 
-test("should keep a picked folder's shape, leave out hidden files with one quiet line, and offer its index.html as the page", async ({ page }, testInfo) => {
+test("should keep a picked folder's shape, leave out hidden files with one quiet line, and offer its index.html as the page", async ({ page }) => {
   await open(page);
-  const folder = folderOf(testInfo.outputPath("site"), {
+  const folder = folderOf("site", {
     "css/site.css": "body { color: green; }",
     "img/logo.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>",
     ".DS_Store": "x",
@@ -129,10 +139,10 @@ test("should show a path a person can fix, with a cleaned suggestion, and add th
   expect((await counts(page)).publishes).toEqual([{ added: ["hero-image.css", "ok.css"], replaced: [], removed: [] }]);
 });
 
-test("should say which files a set replaces before it publishes, let one be left out, and replace on the person's word", async ({ page }, testInfo) => {
+test("should say which files a set replaces before it publishes, let one be left out, and replace on the person's word", async ({ page }) => {
   await open(page, "&files=1");
   await expect.poll(async () => pathsShown(pageFiles(page))).toEqual(["css/site.css", "img/logo.png"]);
-  await addFolder(page, folderOf(testInfo.outputPath("update"), { "css/site.css": "body { color: red; }", "img/logo.png": "png", "js/new.js": "1;" }));
+  await addFolder(page, folderOf("update", { "css/site.css": "body { color: red; }", "img/logo.png": "png", "js/new.js": "1;" }));
   await expect(batch(page).locator("[data-slot=page-batch-replaces]")).toHaveCount(2);
   expect((await batch(page).locator("[data-slot=page-batch-replaces]").allTextContents()).sort()).toEqual(["Replaces css/site.css", "Replaces img/logo.png"]);
   const go = batch(page).getByRole("button", { name: "Add and replace 3 files" });
