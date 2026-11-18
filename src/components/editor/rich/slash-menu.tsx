@@ -175,8 +175,9 @@ const menuMiddleware = [
   }),
 ];
 
+/** The slash menu inserts blocks, which a code block or a table cell cannot hold (table-shape.ts). */
 function allowSlash({ editor }: { editor: Editor; range: Range }) {
-  return !editor.isActive("codeBlock");
+  return !editor.isActive("codeBlock") && !editor.isActive("table");
 }
 
 /**
