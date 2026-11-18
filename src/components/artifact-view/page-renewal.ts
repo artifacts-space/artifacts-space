@@ -32,12 +32,17 @@ interface Renewal {
  *
  * When it asks is one decision (renewStep), taken when an address arrives,
  * when the tab is shown or hidden, and when its timer fires: a shown tab
- * holds one timer, set from the address's known end; a hidden tab holds
- * none and never asks; a tab shown again with an address that ended or is
- * close to its end asks at once. A refusal ends it for this load: the
- * page keeps running without its files. A request that failed twice, or an
- * answer that is no later address, waits for the tab to be shown again or
- * the browser to come back online. Nothing repeats on an interval.
+ * holds one timer, set from the address's known end. A hidden tab does the
+ * same for one hour after it was hidden (passRenewal.hiddenMs), so a page
+ * in a background tab keeps loading its files; after that hour it holds no
+ * timer and asks nothing. A tab shown again with an address that ended or
+ * is close to its end asks at once, and hiding it again starts a new hour.
+ * Browsers slow the timers of hidden tabs, so every timer decides from the
+ * clock when it fires, never from the delay it was set for. A refusal ends
+ * it for this load: the page keeps running without its files. A request
+ * that failed twice, or an answer that is no later address, waits for the
+ * tab to be shown again or the browser to come back online. Nothing repeats
+ * on an interval.
  *
  * Returns `resend`: posts the newest address again. The frame calls it when
  * the frame document loads again (a page that reloads itself starts at the
@@ -58,6 +63,8 @@ export function usePassRenewal({ frameRef, origin, pass }: Renewal): () => void 
     // Set after an answer that brought nothing new: the next ask waits for the tab to be shown again, or the browser to come back online.
     let resting = false;
     let ended = false;
+    // When the tab was hidden, or null while it is shown: the start of its hour of renewing in the background.
+    let hiddenSince: number | null = document.visibilityState === "visible" ? null : Date.now();
 
     const clearTimer = () => {
       if (timer !== null) window.clearTimeout(timer);
@@ -76,7 +83,7 @@ export function usePassRenewal({ frameRef, origin, pass }: Renewal): () => void 
     const settle = () => {
       clearTimer();
       if (ended || asking || resting) return;
-      const step = renewStep(held, document.visibilityState === "visible", Date.now());
+      const step = renewStep(held, hiddenSince, Date.now());
       if (step.do === "wait") timer = window.setTimeout(settle, step.delayMs);
       if (step.do !== "ask") return;
       asking = true;
@@ -93,8 +100,14 @@ export function usePassRenewal({ frameRef, origin, pass }: Renewal): () => void 
       settle();
     };
     const onVisibility = () => {
-      if (document.visibilityState === "visible") wake();
-      else clearTimer();
+      if (document.visibilityState === "visible") {
+        hiddenSince = null;
+        wake();
+        return;
+      }
+      // A second "hidden" signal keeps the first moment: the hour starts once.
+      hiddenSince ??= Date.now();
+      settle();
     };
 
     document.addEventListener("visibilitychange", onVisibility);

@@ -1,6 +1,7 @@
 import { artifactSizeLimits } from "@/lib/artifact-limits";
 import { fileLimits, formatBytes } from "@/lib/files/config";
 import { pageBatchLimits } from "@/lib/page-files/publish-rules";
+import { hiddenAllowanceWords } from "@/lib/page-files/renew-rules";
 import { pageFileLimits, pageFileTypesHint } from "@/lib/page-files/rules";
 import { pageTokenLimits } from "@/lib/page-files/token";
 import { pageScriptHosts } from "@/lib/page-host/rules";
@@ -49,11 +50,11 @@ export function buildHtmlGuide(): string {
     "- A good split for a site: index markup in the document, css/site.css, js/app.js as a module that imports its parts, img/ for pictures, data/ for JSON the page fetches.",
     "",
     "A page that stays open",
-    `- A page's files load under an address that ends after ${addressLife}. While the page's tab is visible it gets the next address before that, without loading again, so a page left open keeps working.`,
+    `- A page's files load under an address that ends after ${addressLife}. While the page's tab is visible, and for ${hiddenAllowanceWords()} after it was hidden, it gets the next address before that, without loading again, so a page left open keeps working, music and video in a background tab included.`,
     '- What follows the new address: fetch("data.json"), elements the page adds later (an <img>, a <script>, a <link>), and anything resolved against the document, such as new URL("js/chart.js", document.baseURI).',
     "- What does not: a module that already loaded keeps the address it loaded from for its own later relative import() and for import.meta.url, and a stylesheet file keeps it for its own url(...). After the first address ended, those are refused until the reader loads the page again.",
     '- So import what a module needs when it starts. For a part you load later, resolve it from the document: import(new URL("js/chart.js", document.baseURI)).',
-    "- A tab that was hidden gets its next address when it is shown again. A file asked for while it was hidden past the end of its address is refused; ask again once the tab is visible.",
+    `- A tab that stayed hidden for more than ${hiddenAllowanceWords()} stops asking, and gets its next address when it is shown again. A file asked for after that, before the tab is shown, is refused; ask again once the tab is visible.`,
     "- Files a publish removed stop loading for every reader at once.",
     "- Readers of a shared page see the files that were approved with it, like the page itself.",
     "",
