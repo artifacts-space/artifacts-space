@@ -75,6 +75,7 @@ test("should serve the same frame document as the page's name under a files addr
   expect(named.status()).toBe(200);
   expect(await named.text()).toBe(await root.text());
   expect(named.headers()["content-security-policy"]).toBe(root.headers()["content-security-policy"]);
+  expect(named.headers()["cache-control"]).toBe("private, max-age=3600");
   expect(named.headers()["set-cookie"]).toBeUndefined();
 });
 
@@ -87,9 +88,11 @@ test("should answer a browser that goes to another page of a site with the same 
     expect(response.status(), page).toBe(200);
     const headers = response.headers();
     expect(await response.text(), page).toBe(await root.text());
-    for (const name of ["content-type", "content-security-policy", "x-content-type-options", "referrer-policy", "permissions-policy", "x-robots-tag", "cache-control"]) {
+    for (const name of ["content-type", "content-security-policy", "x-content-type-options", "referrer-policy", "permissions-policy", "x-robots-tag"]) {
       expect(headers[name], `${page} ${name}`).toBe(root.headers()[name]);
     }
+    // The address holds a reader's short-lived token: only that reader's browser may keep the answer, never a shared cache.
+    expect(headers["cache-control"], page).toBe("private, max-age=3600");
     expect(headers.vary ?? "", page).toMatch(/(^|, )X-Page-Source(,|$)/);
     expect(headers["x-frame-options"]).toBeUndefined();
     expect(headers["set-cookie"]).toBeUndefined();

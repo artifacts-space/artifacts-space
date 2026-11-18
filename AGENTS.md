@@ -1009,7 +1009,11 @@ path, as on any website: `<link href="css/site.css">`, a module's
   - A browser that goes to `/f/<token>/<page>.html` (a link, `location.href`,
     Back or Forward in the frame) gets the frame document, with exactly its
     headers, plus `Vary: X-Page-Source` (`pageHostHeaders` with `page`). The
-    token is not read: the frame document cannot know.
+    token is not read: the frame document cannot know. Under a files
+    address (`index.html` too) the frame document is `private, max-age=3600`,
+    never `public`: the address holds one reader's short-lived token, and a
+    shared cache that ignored `Vary` could serve it for the page's source.
+    Only `/` stays `public, max-age=3600` (`frameCacheControl`).
   - The frame document there says "opened" (`pageMessages.opened`, never
     "ready", so the site sends it no HTML), waits for the site's `renew`
     with the newest address (`onOpened` in `PageWindow`: the newest renewal,

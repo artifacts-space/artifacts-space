@@ -185,6 +185,8 @@ describe("pageFileResponse for another page of the site", () => {
     expect(response.headers.get("content-type")).toBe("text/plain; charset=utf-8");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(response.headers.get("vary")).toBe("X-Page-Source");
+    // Only the reader's browser may keep it, no longer than its address works: never a shared cache.
+    expect(response.headers.get("cache-control")).toMatch(/^private, max-age=\d+$/);
     expect(response.headers.get("content-security-policy")).toMatch(/; sandbox$/);
     expect(await response.text()).toBe(html);
     expect(mocks.findPageFile).toHaveBeenCalledWith("artifact-1", "docs/guide.html", null);

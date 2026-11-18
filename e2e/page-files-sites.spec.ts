@@ -157,6 +157,7 @@ test("should give a browser that goes to a page's address the frame document, an
   expect(source.headers()["x-content-type-options"]).toBe("nosniff");
   expect(source.headers().vary).toMatch(/(^|, )X-Page-Source(,|$)/);
   expect(source.headers()["content-security-policy"]).toMatch(/; sandbox$/);
+  expect(source.headers()["cache-control"]).toMatch(/^private, max-age=\d+$/);
   expect(await source.text()).toContain('<h1 id="page">About</h1>');
 
   // The header on anything that is not a same-origin fetch does not get the source; nor does a page that is not there.

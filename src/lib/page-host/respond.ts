@@ -1,7 +1,7 @@
 import { siteOrigin } from "@/lib/site-origin";
 
 import { frameDocument } from "./frame-document";
-import { hostPort, isPageSourceRequest, pageHostBase, pageHostHeaders, pageHostPath, pageHostRefusalHeaders, pageLabelOf } from "./rules";
+import { hostPort, isPageSourceRequest, pageHostBase, pageHostHeaders, pageHostPath, pageHostRefusalHeaders, pageLabelOf, type FramePlace } from "./rules";
 
 /** What the proxy needs of a request to answer for a page host. */
 export interface PageHostRequest {
@@ -21,6 +21,12 @@ export function framingSite(host: string | null, env: NodeJS.ProcessEnv = proces
   if (env.NODE_ENV !== "development") return siteOrigin(env);
   const port = hostPort(host);
   return `http://localhost${port ? `:${port}` : ""}`;
+}
+
+/** Where the frame document answers: `/`, or under a files address, as the first page or another. */
+function framePlace(pathname: string, path: "frame" | "page"): FramePlace {
+  if (path === "page") return "page";
+  return pathname === "/" ? "root" : "index";
 }
 
 /** The answer where nothing is served: on a page host's other paths, and on every other host under the page domain. */
@@ -47,6 +53,6 @@ export function pageHostResponse(request: PageHostRequest, env: NodeJS.ProcessEn
   if (request.method !== "GET" && request.method !== "HEAD") return pageHostRefusal(405);
   if (path === "file" || (path === "page" && isPageSourceRequest(request.headers))) return null;
   const site = framingSite(request.host, env);
-  const headers = pageHostHeaders(site, env.NODE_ENV !== "development", path === "page");
+  const headers = pageHostHeaders(site, env.NODE_ENV !== "development", framePlace(request.pathname, path));
   return new Response(request.method === "HEAD" ? null : frameDocument(site), { status: 200, headers });
 }

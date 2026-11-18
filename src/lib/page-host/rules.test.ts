@@ -230,7 +230,8 @@ describe("pageHostResponse", () => {
         expect(response.status, page).toBe(200);
         expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8");
         expect(response.headers.get("content-security-policy")).toBe(root.headers.get("content-security-policy"));
-        expect(response.headers.get("cache-control")).toBe(root.headers.get("cache-control"));
+        // Only the reader's own browser may keep it: a shared cache never stores an answer under a files address.
+        expect(response.headers.get("cache-control")).toBe("private, max-age=3600");
         expect(response.headers.get("vary")).toBe("X-Page-Source");
         expect(await response.text()).toBe(await ask("/").text());
       }
@@ -238,6 +239,18 @@ describe("pageHostResponse", () => {
     // Only the frame document's own address keeps the answer it always had.
     expect(root.headers.get("vary")).toBeNull();
     expect(ask(`/f/${token}/index.html`).headers.get("vary")).toBeNull();
+  });
+
+  it("should let any cache keep the frame document at the root, and only the reader's browser keep it under a files address", () => {
+    expect(ask("/").headers.get("cache-control")).toBe("public, max-age=3600");
+    for (const page of ["index.html", "about.html", "docs/guide.html"]) {
+      const cacheControl = ask(`/f/${token}/${page}`).headers.get("cache-control") ?? "";
+      expect(cacheControl, page).toBe("private, max-age=3600");
+      expect(cacheControl, page).not.toMatch(/public|s-maxage/);
+    }
+    // Under next dev nothing is kept, as before.
+    const dev = pageHostResponse({ method: "GET", pathname: `/f/${token}/about.html`, host: `${label}.localhost:3000`, headers: new Headers() }, { NODE_ENV: "development" });
+    expect(dev?.headers.get("cache-control")).toBe("no-store");
   });
 
   it("should let only the frame document's fetch of a page's source through to the route", () => {

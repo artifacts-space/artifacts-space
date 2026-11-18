@@ -262,23 +262,41 @@ export function pageContentPolicy(siteOrigin: string): string {
  */
 export const pageSandbox = "allow-scripts allow-same-origin allow-forms allow-modals allow-popups";
 
+/** Where on a page host the frame document answers: `/`, `index.html` under a files address, or another page's address there. */
+export type FramePlace = "root" | "index" | "page";
+
+/**
+ * How long, and by whom, the frame document may be kept. At `/` any cache
+ * may keep it for an hour: it is the same for everyone. Under a files
+ * address the address holds a short-lived token made for one reader, so
+ * only the reader's own browser may keep it (`private`), and a shared cache
+ * never stores it: at another page's address the same address answers the
+ * frame document's fetch with the page's source, and a shared cache that
+ * ignored `Vary` could give one answer for the other. `no-store` under
+ * `next dev`.
+ */
+function frameCacheControl(cache: boolean, place: FramePlace): string {
+  if (!cache) return "no-store";
+  return place === "root" ? "public, max-age=3600" : "private, max-age=3600";
+}
+
 /**
  * Headers of the frame document. No session exists on the page host, so the
  * response is the same for everyone. At another page's address (`page`) the
  * same address answers the frame document's fetch with the page's source,
- * so the answer names the header that tells the two apart (`Vary`), and no
- * cache gives one for the other.
+ * so the answer names the header that tells the two apart (`Vary`) for the
+ * browser's own cache, and no shared cache keeps it (frameCacheControl).
  */
-export function pageHostHeaders(siteOrigin: string, cache: boolean, page = false): Record<string, string> {
+export function pageHostHeaders(siteOrigin: string, cache: boolean, place: FramePlace = "root"): Record<string, string> {
   return {
-    ...(page ? { Vary: pageSourceHeader } : {}),
+    ...(place === "page" ? { Vary: pageSourceHeader } : {}),
     "Content-Type": "text/html; charset=utf-8",
     "Content-Security-Policy": pageContentPolicy(siteOrigin),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
     "Permissions-Policy": permissionsPolicy,
     "X-Robots-Tag": "noindex, nofollow",
-    "Cache-Control": cache ? "public, max-age=3600" : "no-store",
+    "Cache-Control": frameCacheControl(cache, place),
   };
 }
 
