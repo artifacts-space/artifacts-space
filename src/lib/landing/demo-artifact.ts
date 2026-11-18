@@ -56,7 +56,7 @@ export const planSteps: Record<PlanVersion, readonly PlanStep[]> = {
   ],
   2: [
     { title: "5% of traffic", time: "Thu", status: "done" },
-    { title: "Hold at 5%", time: "Fri to Sun", status: "current", note: "Payments on-call is thin until Monday." },
+    { title: "Hold at 5%", time: "Fri to Sun", status: "current", note: "On-call is thin until Monday." },
     { title: "25% of traffic", time: "Mon", status: "upcoming" },
     { title: "100% of traffic", time: "Wed", status: "upcoming" },
   ],

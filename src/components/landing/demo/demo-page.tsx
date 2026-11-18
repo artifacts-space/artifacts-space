@@ -215,7 +215,7 @@ export function DemoPage() {
         <SiteBar />
         <PageHeader />
         <Stats />
-        <div className="grid gap-3 @min-[34rem]/page:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <div className="grid gap-3 @min-[34rem]/page:grid-cols-2">
           <RampChart />
           <Steps />
         </div>
