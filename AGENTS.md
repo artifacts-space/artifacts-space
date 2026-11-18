@@ -1308,8 +1308,9 @@ to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
     cropped since: an Exif thumbnail (a second image directory, or
     JPEGInterchangeFormat), a JFIF thumbnail or JFXX extension, or XMP
     `xmp:Thumbnails` or `xapGImg`.
-  A segment or chunk the check does not know, compressed text, a file cut
-  short, or bytes after the picture's end also mean a redraw: the check says
+  A segment or chunk the check does not know, compressed text, text in
+  UTF-16 or UTF-32 (a byte-order mark, or a NUL byte in the text), a file
+  cut short, or bytes after the picture's end also mean a redraw: the check says
   "none" only for what it read. A small image sent as it is keeps its camera
   make and model, the time it was taken, exposure settings, the editing
   software, its orientation, a user comment, and its color profile, so a
@@ -1318,9 +1319,15 @@ to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
   HEIC, and any type the check cannot read are always redrawn. When the
   file store refuses an image sent as it is before any byte goes
   (`UploadRequestRefused`), the redrawn image is sent instead if it is
-  smaller. A GIF, an animated WebP, and an animated PNG upload as they are
-  (`isAnimatedImage`), and are not checked for private data, as before this
-  change: a redraw would keep one frame. Never send a small still image as
+  smaller. A GIF of at most `documentPrepareProfile.maxBytes` (8 MB)
+  uploads as it is (`uploadsUnprepared`; a larger one is redrawn), and so
+  does a WebP or PNG with more than one frame (`isAnimatedImage`: a WebP
+  with the animation flag, an `ANIM` chunk, and two or more `ANMF` frames;
+  a PNG whose `acTL` states more than one frame and that holds two or more
+  `fcTL` frame headers). Neither is checked for private data, as before
+  this change: a redraw would keep one frame. A file that declares
+  animation but holds one frame is a still, checked like any other: a
+  redraw keeps that frame and loses nothing. Never send a small still image as
   it is without the check: that would put a phone photo's location, its
   owner, or its uncropped preview into a shared page. Covers and icons still
   redraw every image (see Covers), because their redraw keeps them under the

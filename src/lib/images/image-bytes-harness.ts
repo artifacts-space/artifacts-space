@@ -136,10 +136,20 @@ export const pngText = (keyword: string, text: string, compressed = false) => pn
 /** One WebP chunk, padded to an even length. */
 export const webpChunk = (type: string, data: number[]) => [...ascii(type), ...le32(data.length), ...data, ...(data.length % 2 === 1 ? [0] : [])];
 
-/** A small extended WebP: VP8X with its canvas size, the chunks given, and a VP8L picture. `riffExtra` changes the size the RIFF header states. */
-export function webpBytes({ width = 320, height = 200, chunks = [], riffExtra = 0 }: { width?: number; height?: number; chunks?: number[][]; riffExtra?: number } = {}): Uint8Array {
+/** A small extended WebP: VP8X with its flags and canvas size, the chunks given, and a VP8L picture. `riffExtra` changes the size the RIFF header states. */
+export function webpBytes({ width = 320, height = 200, chunks = [], riffExtra = 0, flags = 0x08 }: { width?: number; height?: number; chunks?: number[][]; riffExtra?: number; flags?: number } = {}): Uint8Array {
   const side = (value: number) => le32(value - 1).slice(0, 3);
-  const extended = webpChunk("VP8X", [0x08, 0, 0, 0, ...side(width), ...side(height)]);
+  const extended = webpChunk("VP8X", [flags, 0, 0, 0, ...side(width), ...side(height)]);
   const body = [...ascii("WEBP"), ...extended, ...chunks.flat(), ...webpChunk("VP8L", [0x2f, 0, 0, 0, 0])];
   return new Uint8Array([...ascii("RIFF"), ...le32(body.length + riffExtra), ...body]);
 }
+
+/** An APNG's animation control chunk, stating `frames` frames. */
+export const pngAcTL = (frames: number) => pngChunk("acTL", [...be32(frames), 0, 0, 0, 0]);
+
+/** An APNG frame header. */
+export const pngFcTL = () => pngChunk("fcTL", new Array<number>(26).fill(0));
+
+/** A WebP's animation chunk and one animation frame. */
+export const webpAnim = () => webpChunk("ANIM", [0, 0, 0, 0, 0, 0]);
+export const webpFrame = () => webpChunk("ANMF", new Array<number>(16).fill(0));

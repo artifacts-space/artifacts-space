@@ -146,32 +146,54 @@ describe("documentPrepareProfile", () => {
 describe("isAnimatedImage", () => {
   const ascii = (word: string) => Array.from(new TextEncoder().encode(word));
   const be32 = (value: number) => [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255];
+  const le32 = (value: number) => be32(value).reverse();
   const chunk = (type: string, data: number[]) => [...be32(data.length), ...ascii(type), ...data, 0, 0, 0, 0];
-  const png = (...chunks: number[][]) => new Uint8Array([0x89, ...ascii("PNG"), 0x0d, 0x0a, 0x1a, 0x0a, ...chunk("IHDR", new Array<number>(13).fill(0)), ...chunks.flat()]);
-  const webp = (flags: number) => new Uint8Array([...ascii("RIFF"), 0, 0, 0, 0, ...ascii("WEBPVP8X"), 10, 0, 0, 0, flags, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  const png = (...chunks: number[][]) => new Uint8Array([0x89, ...ascii("PNG"), 0x0d, 0x0a, 0x1a, 0x0a, ...chunk("IHDR", new Array<number>(13).fill(0)), ...chunks.flat(), ...chunk("IEND", [])]);
+  const acTL = (frames: number) => chunk("acTL", [...be32(frames), 0, 0, 0, 0]);
+  const fcTL = () => chunk("fcTL", new Array<number>(26).fill(0));
+  /** An APNG with `frames` frames: the default image is the first, and each next one is an fcTL and fdAT. */
+  const apng = (frames: number, declared = frames) => png(acTL(declared), fcTL(), chunk("IDAT", [1, 2, 3]), ...Array.from({ length: frames - 1 }, () => [...fcTL(), ...chunk("fdAT", [0, 0, 0, 1, 4, 5])]));
+  const riffChunk = (type: string, data: number[]) => [...ascii(type), ...le32(data.length), ...data, ...(data.length % 2 === 1 ? [0] : [])];
+  const webp = (flags: number, ...chunks: number[][]) => {
+    const body = [...ascii("WEBP"), ...riffChunk("VP8X", [flags, 0, 0, 0, 0, 0, 0, 0, 0, 0]), ...chunks.flat()];
+    return new Uint8Array([...ascii("RIFF"), ...le32(body.length), ...body]);
+  };
+  const anim = riffChunk("ANIM", [0, 0, 0, 0, 0, 0]);
+  const anmf = riffChunk("ANMF", new Array<number>(16).fill(0));
 
-  it("should know an animated WebP by the animation flag of its extended header", () => {
-    expect(isAnimatedImage("image/webp", webp(0x02))).toBe(true);
-    expect(isAnimatedImage("image/webp", webp(0x12))).toBe(true);
+  it("should know an animated WebP by its animation flag, an ANIM chunk, and more than one frame", () => {
+    expect(isAnimatedImage("image/webp", webp(0x02, anim, anmf, anmf))).toBe(true);
+    expect(isAnimatedImage("image/webp", webp(0x12, anim, anmf, anmf, anmf))).toBe(true);
   });
 
-  it("should read a WebP with transparency, or a plain one, as a still", () => {
-    expect(isAnimatedImage("image/webp", webp(0x10))).toBe(false);
+  it("should read a WebP that declares animation but has one frame, no ANIM chunk, or no flag as a still", () => {
+    expect(isAnimatedImage("image/webp", webp(0x02, anim, anmf))).toBe(false);
+    expect(isAnimatedImage("image/webp", webp(0x02, anmf, anmf))).toBe(false);
+    expect(isAnimatedImage("image/webp", webp(0x02))).toBe(false);
+    expect(isAnimatedImage("image/webp", webp(0x10, anim, anmf, anmf))).toBe(false);
     expect(isAnimatedImage("image/webp", new Uint8Array([...ascii("RIFF"), 0, 0, 0, 0, ...ascii("WEBPVP8 "), 0, 0, 0, 0, 0x02]))).toBe(false);
   });
 
-  it("should know an animated PNG by an animation chunk before its picture data, after other chunks", () => {
-    expect(isAnimatedImage("image/png", png(chunk("gAMA", [0, 0, 0, 1]), chunk("acTL", new Array<number>(8).fill(0)), chunk("IDAT", [1, 2, 3])))).toBe(true);
+  it("should know an animated PNG by an acTL chunk that states more than one frame, and two frame headers", () => {
+    expect(isAnimatedImage("image/png", apng(2))).toBe(true);
+    expect(isAnimatedImage("image/png", png(chunk("gAMA", [0, 0, 0, 1]), acTL(3), fcTL(), chunk("IDAT", [1]), fcTL(), chunk("fdAT", [0]), fcTL(), chunk("fdAT", [0])))).toBe(true);
+  });
+
+  it("should read a one-frame APNG, or one whose acTL claims more frames than it holds, as a still", () => {
+    expect(isAnimatedImage("image/png", apng(1))).toBe(false);
+    expect(isAnimatedImage("image/png", apng(1, 4))).toBe(false);
+    expect(isAnimatedImage("image/png", png(acTL(0), fcTL(), chunk("IDAT", [1]), fcTL()))).toBe(false);
   });
 
   it("should read a PNG as a still when no animation chunk comes before its picture data", () => {
     expect(isAnimatedImage("image/png", png(chunk("IDAT", [...ascii("acTL"), 1, 2, 3])))).toBe(false);
+    expect(isAnimatedImage("image/png", png(fcTL(), chunk("IDAT", [1]), acTL(2), fcTL()))).toBe(false);
     expect(isAnimatedImage("image/png", png())).toBe(false);
   });
 
   it("should not read another type, or bytes that are not the type stated, as animated", () => {
-    expect(isAnimatedImage("image/jpeg", webp(0x02))).toBe(false);
-    expect(isAnimatedImage("image/png", webp(0x02))).toBe(false);
+    expect(isAnimatedImage("image/jpeg", webp(0x02, anim, anmf, anmf))).toBe(false);
+    expect(isAnimatedImage("image/png", webp(0x02, anim, anmf, anmf))).toBe(false);
     expect(isAnimatedImage("image/webp", new Uint8Array())).toBe(false);
   });
 });

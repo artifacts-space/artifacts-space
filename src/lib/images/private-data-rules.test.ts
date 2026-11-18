@@ -101,6 +101,38 @@ describe("findPrivateData for a JPEG's preview, people, and devices", () => {
   });
 });
 
+describe("findPrivateData for text it cannot read as plain text", () => {
+  const xmpName = "http://ns.adobe.com/xap/1.0/\0";
+  const utf16 = (text: string, little: boolean) => Array.from(text).flatMap((letter) => (little ? [letter.charCodeAt(0), 0] : [0, letter.charCodeAt(0)]));
+  const packet = '<x:xmpmeta><exif:GPSLatitude>51,30N</exif:GPSLatitude></x:xmpmeta>';
+  const jpegWithXmp = (payload: number[]) => jpegBytes({ segments: [jpegSegment(0xe1, [...ascii(xmpName), ...payload])] });
+
+  it("should not tell for an XMP packet in UTF-16 with a byte-order mark, in either byte order", () => {
+    expect(findPrivateData("image/jpeg", jpegWithXmp([0xfe, 0xff, ...utf16(packet, false)]))).toBe("unknown");
+    expect(findPrivateData("image/jpeg", jpegWithXmp([0xff, 0xfe, ...utf16(packet, true)]))).toBe("unknown");
+    expect(findPrivateData("image/jpeg", jpegWithXmp([0xfe, 0xff, ...utf16("<x:xmpmeta/>", false)]))).toBe("unknown");
+  });
+
+  it("should not tell for an XMP packet in UTF-32 with a byte-order mark, or in UTF-16 without one", () => {
+    const utf32be = Array.from("<x:xmpmeta/>").flatMap((letter) => [0, 0, 0, letter.charCodeAt(0)]);
+    expect(findPrivateData("image/jpeg", jpegWithXmp([0, 0, 0xfe, 0xff, ...utf32be]))).toBe("unknown");
+    expect(findPrivateData("image/jpeg", jpegWithXmp([0xff, 0xfe, 0, 0, ...utf32be.reverse()]))).toBe("unknown");
+    expect(findPrivateData("image/jpeg", jpegWithXmp(utf16("<x:xmpmeta/>", true)))).toBe("unknown");
+  });
+
+  it("should not tell for UTF-16 XMP in a WebP or a PNG, or a PNG text value that holds a NUL", () => {
+    expect(findPrivateData("image/webp", webpBytes({ chunks: [webpChunk("XMP ", [0xff, 0xfe, ...utf16("<x:xmpmeta/>", true)])] }))).toBe("unknown");
+    expect(findPrivateData("image/png", pngBytes({ chunks: [pngChunk("iTXt", [...ascii("XML:com.adobe.xmp\0"), 0, 0, 0, 0, 0xfe, 0xff, ...utf16("<x/>", false)])] }))).toBe("unknown");
+    expect(findPrivateData("image/png", pngBytes({ chunks: [pngChunk("tEXt", [...ascii("Comment\0"), ...ascii("a"), 0, ...ascii("b")])] }))).toBe("unknown");
+  });
+
+  it("should read a UTF-8 XMP packet with its byte-order mark in the xpacket header as plain text", () => {
+    const header = [...ascii('<?xpacket begin="'), 0xef, 0xbb, 0xbf, ...ascii('" id="W5M0MpCehiHzreSzNTczkc9d"?>')];
+    expect(findPrivateData("image/jpeg", jpegWithXmp([...header, ...ascii("<x:xmpmeta/>")]))).toBe("none");
+    expect(findPrivateData("image/jpeg", jpegWithXmp([...header, ...ascii(packet)]))).toBe("private");
+  });
+});
+
 describe("findPrivateData for a PNG", () => {
   it("should find nothing private in a plain screenshot, macOS's iDOT chunk included", () => {
     expect(findPrivateData("image/png", pngBytes())).toBe("none");

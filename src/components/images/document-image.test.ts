@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { exifTag, jpegBytes, pngBytes, pngChunk, webpBytes } from "@/lib/images/image-bytes-harness";
+import { exifTag, jpegBytes, pngAcTL, pngBytes, pngChunk, pngFcTL, webpAnim, webpBytes, webpFrame } from "@/lib/images/image-bytes-harness";
 import { documentPrepareProfile } from "@/lib/images/prepare-rules";
 
 import { documentImageToSend } from "./document-image";
@@ -92,12 +92,38 @@ describe("documentImageToSend", () => {
   });
 
   it("should send an animated image as it is, as before", async () => {
-    const animated = fileOf(pngBytes({ chunks: [pngChunk("acTL", [0, 0, 0, 2, 0, 0, 0, 0])] }), "Loop.png", "image/png");
+    const animated = fileOf(pngBytes({ chunks: [pngAcTL(2), pngFcTL(), pngFcTL()] }), "Loop.png", "image/png");
     const { env, decode } = fakeEnv({ width: 320, height: 200 });
     await expect(documentImageToSend(animated, env)).resolves.toEqual({ file: animated, redraw: null });
     const gif = fileOf(new Uint8Array([71, 73, 70, 56, 57, 97, 1, 0, 1, 0]), "Wave.gif", "image/gif");
     await expect(documentImageToSend(gif, env)).resolves.toEqual({ file: gif, redraw: null });
     expect(decode).not.toHaveBeenCalled();
+  });
+
+  it("should send a two-frame animated WebP as it is, as before", async () => {
+    const animated = fileOf(webpBytes({ flags: 0x02, chunks: [webpAnim(), webpFrame(), webpFrame()] }), "Loop.webp", "image/webp");
+    const { env, decode } = fakeEnv({ width: 320, height: 200 });
+    await expect(documentImageToSend(animated, env)).resolves.toEqual({ file: animated, redraw: null });
+    expect(decode).not.toHaveBeenCalled();
+  });
+
+  it("should treat a one-frame APNG or animated WebP as a still: checked, measured, and kept when small and plain", async () => {
+    const stills = [
+      fileOf(pngBytes({ chunks: [pngAcTL(1), pngFcTL()] }), "One.png", "image/png"),
+      fileOf(webpBytes({ flags: 0x02, chunks: [webpAnim(), webpFrame()] }), "One.webp", "image/webp"),
+    ];
+    for (const still of stills) {
+      const { env, decode } = fakeEnv({ width: 320, height: 200 });
+      const choice = await documentImageToSend(still, env);
+      expect(choice.file, still.name).toBe(still);
+      expect(choice.redraw, still.name).not.toBeNull();
+      expect(decode, still.name).toHaveBeenCalledOnce();
+    }
+  });
+
+  it("should redraw a one-frame APNG that carries private data, which a redraw keeps all of the picture of", async () => {
+    const still = fileOf(pngBytes({ chunks: [pngAcTL(1), pngFcTL(), pngChunk("tEXt", [...Array.from("Author\0", (letter) => letter.charCodeAt(0)), 74])] }), "One.png", "image/png");
+    expect((await documentImageToSend(still, fakeEnv({ width: 320, height: 200 }).env)).file).not.toBe(still);
   });
 
   it("should redraw an image whose private data cannot be told: a type the check cannot read, or bytes it cannot parse", async () => {

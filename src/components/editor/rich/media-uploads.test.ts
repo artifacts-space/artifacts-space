@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fileLimits } from "@/lib/files/config";
+import { webpAnim, webpBytes, webpFrame } from "@/lib/images/image-bytes-harness";
 
 import type { DocumentImageChoice } from "@/components/images/document-image";
 
@@ -143,8 +144,8 @@ describe("media uploads", () => {
   });
 
   it("should upload an animated WebP as it is, never a redraw that keeps one frame", async () => {
-    const bytes = new Uint8Array([...new TextEncoder().encode("RIFF"), 0, 0, 0, 0, ...new TextEncoder().encode("WEBPVP8X"), 10, 0, 0, 0, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    const picked = new File([bytes], "loop.webp", { type: "image/webp" });
+    const bytes = webpBytes({ flags: 0x02, chunks: [webpAnim(), webpFrame(), webpFrame()] });
+    const picked = new File([new Uint8Array(bytes)], "loop.webp", { type: "image/webp" });
     const uploader = vi.fn<MediaUploader>().mockResolvedValue({ id: "3f2504e0-4f89-41d3-9a0c-0305e82c3301", filename: "loop.webp", contentType: "image/webp" });
     const uploadId = queueUpload(picked);
     startUpload(uploadId, uploader);

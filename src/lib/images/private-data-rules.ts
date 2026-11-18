@@ -57,8 +57,22 @@ function uint(bytes: Uint8Array, at: number, count: number, little: boolean): nu
 }
 
 /** Whether the text in `bytes` from `start` to `end` names a place, a person, a serial, or a preview. */
-function textFinding(bytes: Uint8Array, start: number, end: number): PrivateDataFinding {
+function wordsFinding(bytes: Uint8Array, start: number, end: number): PrivateDataFinding {
   return privateWords.test(new TextDecoder().decode(bytes.subarray(start, end))) ? "private" : "none";
+}
+
+/** True when text starts with a UTF-16 or UTF-32 byte-order mark (UTF-32 little-endian starts like UTF-16 little-endian). */
+const wideByteOrderMark = (bytes: Uint8Array, at: number) => ascii(bytes, at, "\xfe\xff") || ascii(bytes, at, "\xff\xfe") || ascii(bytes, at, "\0\0\xfe\xff");
+
+/**
+ * A block of text (an XMP packet, a comment, a PNG text value) from `start`
+ * to `end`. Text in UTF-16 or UTF-32 (a byte-order mark, or a NUL byte,
+ * which UTF-8 and Latin-1 text never holds) is not read: "unknown". Any
+ * other text is read for the private words.
+ */
+function textFinding(bytes: Uint8Array, start: number, end: number): PrivateDataFinding {
+  if (wideByteOrderMark(bytes, start) || bytes.subarray(start, end).includes(0)) return "unknown";
+  return wordsFinding(bytes, start, end);
 }
 
 /** A TIFF block as Exif holds it: where it starts, where it must end, and its byte order. */
@@ -130,7 +144,8 @@ const xmpNames = ["http://ns.adobe.com/xap/1.0/\0", "http://ns.adobe.com/xmp/ext
 /** An APP1 segment: Exif or XMP; any other kind is not read. */
 function app1Finding(bytes: Uint8Array, start: number, end: number): PrivateDataFinding {
   if (ascii(bytes, start, "Exif\0\0")) return exifFinding(bytes, start, end);
-  return xmpNames.some((name) => ascii(bytes, start, name)) ? textFinding(bytes, start, end) : "unknown";
+  const name = xmpNames.find((prefix) => ascii(bytes, start, prefix));
+  return name === undefined ? "unknown" : textFinding(bytes, start + name.length, end);
 }
 
 /** One JPEG segment before the first scan, by its marker. Only segments known to hold nothing private, or read here, can be "none". */
@@ -194,13 +209,32 @@ const plainPngChunks: ReadonlySet<string> = new Set([
   "cICP", "mDCV", "mDCv", "cLLI", "cLLi", "acTL", "fcTL", "fdAT", "iDOT",
 ]);
 
-/** A PNG text block (`tEXt`, or `iTXt` with `international`): its words, unless it is compressed or holds a raw profile (camera tags written out as hex). */
+/**
+ * A PNG text block: `tEXt` (keyword, NUL, text) or, with `international`,
+ * `iTXt` (keyword, NUL, compression flag and method, language, NUL,
+ * translated keyword, NUL, text). Its keyword and words are read, unless it
+ * is compressed, holds a raw profile (camera tags written out as hex), or
+ * its text is not plain (textFinding).
+ */
 function pngTextFinding(bytes: Uint8Array, start: number, end: number, international: boolean): PrivateDataFinding {
   if (ascii(bytes, start, "Raw profile type")) return "unknown";
   const keywordEnd = bytes.subarray(start, end).indexOf(0);
   if (keywordEnd < 0) return "unknown";
-  if (international && bytes[start + keywordEnd + 1] !== 0) return "unknown";
-  return textFinding(bytes, start, end);
+  const keyword = wordsFinding(bytes, start, start + keywordEnd);
+  if (keyword !== "none") return keyword;
+  return international ? internationalText(bytes, start + keywordEnd + 1, end) : textFinding(bytes, start + keywordEnd + 1, end);
+}
+
+/** The rest of an `iTXt` chunk after its keyword: uncompressed, then a language and a translated keyword, each ended by NUL, then the text. */
+function internationalText(bytes: Uint8Array, start: number, end: number): PrivateDataFinding {
+  if (start + 2 > end || bytes[start] !== 0) return "unknown";
+  const languageEnd = bytes.subarray(start + 2, end).indexOf(0);
+  if (languageEnd < 0) return "unknown";
+  const translatedStart = start + 2 + languageEnd + 1;
+  const translatedEnd = bytes.subarray(translatedStart, end).indexOf(0);
+  if (translatedEnd < 0) return "unknown";
+  const label = wordsFinding(bytes, start + 2, translatedStart + translatedEnd);
+  return label === "none" ? textFinding(bytes, translatedStart + translatedEnd + 1, end) : label;
 }
 
 function pngChunkFinding(type: string, bytes: Uint8Array, start: number, end: number): PrivateDataFinding {
