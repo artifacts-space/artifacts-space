@@ -1298,9 +1298,13 @@ to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
   pointer, no XMP or text naming GPS or a location, every segment or chunk
   one it knows, nothing after the picture's end). Anything else is redrawn
   as before: at most 2400 px, upright, camera data removed. AVIF, HEIC,
-  and any type the check cannot read are always redrawn. A small image
-  sent as it is keeps its other camera data (camera model, time taken,
-  settings, an embedded thumbnail); only the place is guaranteed gone.
+  and any type the check cannot read are always redrawn. The promise is
+  narrower than before, on purpose: only the place is guaranteed gone. A
+  small image sent as it is keeps every other tag it carries, on shared and
+  public pages too: camera make, model, and serial number, the time it was
+  taken, exposure settings, the software that edited it, the artist, owner,
+  and comment fields, and an embedded thumbnail, which can still show the
+  whole frame of a picture cropped after the thumbnail was written.
   When the file store refuses an image sent as it is before any byte goes
   (`UploadRequestRefused`), the redrawn image is sent instead if it is
   smaller. A GIF, an animated WebP, and an animated PNG upload as they are

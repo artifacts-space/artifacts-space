@@ -1,6 +1,6 @@
 import type { ImageDimensions } from "@/lib/files/image-dimensions";
 
-import type { LocationFinding } from "./location-rules";
+import { locationCheckedTypes, type LocationFinding } from "./location-rules";
 import type { ImagePrepareProfile } from "./prepare-rules";
 
 /**
@@ -10,12 +10,14 @@ import type { ImagePrepareProfile } from "./prepare-rules";
  * it, fits the profile's `maxSide`. A small image that says where it was
  * taken, or that the check cannot read for certain, is still redrawn: the
  * redraw is what drops the place a photo was taken, and these images land
- * on shared and public pages. Pure; src/components/images/document-image.ts
- * gathers the facts.
+ * on shared and public pages. Only the place is checked: an image sent as
+ * it is keeps every other tag it carries (camera, serial number, time
+ * taken, software, artist and comment fields, an embedded thumbnail). Pure;
+ * src/components/images/document-image.ts gathers the facts.
  */
 
 /** Types a still image may keep its bytes in: the ones the location check reads (location-rules.ts). AVIF, HEIC, and the rest are always redrawn. */
-export const originalStillTypes: ReadonlySet<string> = new Set(["image/jpeg", "image/png", "image/webp"]);
+export const originalStillTypes: ReadonlySet<string> = locationCheckedTypes;
 
 /** What the browser knows about a picked still image before it chooses. */
 export interface StillImageFacts {
