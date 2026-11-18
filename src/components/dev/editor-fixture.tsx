@@ -95,7 +95,7 @@ function useMemoryAttach(artifact: ArtifactDto, attached: FixtureFiles): AttachF
     replace: () => Promise.resolve({ success: false, error: "The fixture does not replace files." }),
     discard: (fileId) => Promise.resolve(uploaded.current.delete(fileId)),
     // A web page's page files, in the same list (fixture-page-files.ts).
-    page: memoryPageFilesApi({ artifact, files: attached }),
+    page: memoryPageFilesApi(() => ({ artifact: () => artifact, files: attached })),
   }), [artifact, attached]);
 }
 

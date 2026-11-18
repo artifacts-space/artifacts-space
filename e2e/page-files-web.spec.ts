@@ -5,7 +5,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { expectNoAxeViolations } from "./support/a11y";
 import { expect, test } from "./support/test";
-import { dragFilesAt, pointIn } from "./support/workspace-files";
+import { dragFilesAt, openNewArtifact, pointIn, storedNew } from "./support/workspace-files";
 
 /*
  * A web page's files from the web app, on the artifact page fixture
@@ -251,5 +251,30 @@ test.describe("dropping files on the page", () => {
     expect((await dragFilesAt(page, "drop", files, onTitle)).prevented).toBe(true);
     await expect.poll(async () => pathsShown(pageFiles(page))).toEqual(["drop.css"]);
     await expect(section(page).getByRole("list", { name: "Attachments" })).toContainText("notes.pdf");
+  });
+});
+
+test.describe("in the workspace pane", () => {
+  test("should add a web page's files from Add files in its More menu, as one publish, and list them by path", async ({ page }) => {
+    await openNewArtifact(page);
+    const blank = page.getByRole("region", { name: "New artifact" });
+    await blank.getByRole("button", { name: "Format" }).click();
+    const dialog = page.getByRole("dialog", { name: "Format and language" });
+    await dialog.getByRole("combobox", { name: "Format" }).click();
+    await page.getByRole("option", { name: "HTML", exact: true }).click();
+    await dialog.getByRole("button", { name: "Apply" }).click();
+    await expect.poll(async () => (await storedNew(page))[0]?.kind, { timeout: 15_000 }).toBe("html");
+
+    const editor = page.getByRole("region", { name: /^Edit / });
+    const chooser = page.waitForEvent("filechooser");
+    await editor.getByRole("button", { name: "More actions" }).click();
+    await expect(page.getByRole("menuitem", { name: "Attach file" })).toHaveCount(0);
+    await page.getByRole("menuitem", { name: "Add files" }).click();
+    await (await chooser).setFiles([payload({ name: "site.css" }), payload({ name: "logo.svg", text: "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>" }), payload({ name: "brief.pdf", text: "%PDF-1.4", mimeType: "application/pdf" })]);
+    await expect.poll(async () => pathsShown(pageFiles(page))).toEqual(["logo.svg", "site.css"]);
+    await expect(section(page).getByRole("list", { name: "Attachments" })).toContainText("brief.pdf");
+    expect((await counts(page)).publishes).toEqual([{ added: ["site.css", "logo.svg"], replaced: [], removed: [] }]);
+    await expect.poll(async () => (await storedNew(page))[0]?.files.length, { timeout: 15_000 }).toBe(3);
+    await expectNoAxeViolations(section(page));
   });
 });

@@ -82,13 +82,14 @@ export function fixtureFiles(initial: readonly FileDto[]): FixtureFiles {
   return { get: () => files, set: (next) => { files = next; } };
 }
 
-interface Store {
-  artifact: ArtifactDto;
+/** One artifact's page files in the tab: the artifact as it is now, and its files. */
+export interface FixturePageStore {
+  artifact: () => ArtifactDto;
   files: FixtureFiles;
 }
 
 /** Applies one publish to the files in the tab: adds, replaces at a held path, and removes. */
-function applyPublish(store: Store, uploads: readonly FileDto[], remove: readonly string[]) {
+function applyPublish(store: FixturePageStore, uploads: readonly FileDto[], remove: readonly string[]) {
   const now = new Date().toISOString();
   const published = { added: [] as string[], replaced: [] as string[], removed: [...remove] };
   let files = store.files.get().filter((file) => file.pagePath === undefined || !remove.includes(file.pagePath));
@@ -106,8 +107,8 @@ function applyPublish(store: Store, uploads: readonly FileDto[], remove: readonl
   return published;
 }
 
-/** The fixture's page files, over the same files the fixture's attachments live in. */
-export function memoryPageFilesApi(store: Store): PageFilesApi {
+/** The fixture's page files, over the same files the fixture's attachments live in, for the artifact a call names. */
+export function memoryPageFilesApi(storeFor: (artifactId: string) => FixturePageStore | null): PageFilesApi {
   const uploads = new Map<string, FileDto>();
   return {
     request: ({ files }) => {
@@ -133,13 +134,15 @@ export function memoryPageFilesApi(store: Store): PageFilesApi {
       }
       return Promise.resolve({ success: true, data: upload });
     },
-    publish: ({ uploadIds, remove }) => {
+    publish: ({ artifactId, uploadIds, remove }) => {
+      const store = storeFor(artifactId);
+      if (!store) return Promise.resolve({ success: false, error: "Artifact not found." });
       if (takeFlag("fixture:next-page-publish") === "refuse") return Promise.resolve({ success: false, error: "The page's files or these uploads changed while they were being published, so nothing was changed." });
       const named = uploadIds.flatMap((id) => uploads.get(id) ?? []);
       const published = applyPublish(store, named, remove);
       for (const id of uploadIds) uploads.delete(id);
       counts().publishes.push(published);
-      return Promise.resolve({ success: true, data: { artifact: { ...store.artifact, files: store.files.get(), updatedAt: new Date().toISOString() }, status: "applied", ...published } });
+      return Promise.resolve({ success: true, data: { artifact: { ...store.artifact(), files: store.files.get(), updatedAt: new Date().toISOString() }, status: "applied", ...published } });
     },
     discard: (fileId) => {
       counts().discards += 1;
