@@ -252,8 +252,15 @@ async function selectorsFor(scope: Locator): Promise<ScanSelector[]> {
 /** How many times a scan of a part is taken before it gives up on a page that keeps moving its elements. */
 const scopeTries = 3;
 
-/** axe's words when a selector it was given matches nothing. */
+/**
+ * axe's words when a selector it was given matches nothing. If axe ever
+ * words it differently, such a scan fails with axe's own error instead of
+ * being taken again: loud, never a wrong pass.
+ */
 const scopeMatchedNothing = "No elements found for include";
+
+/** The annotation a test gets when a scan of a part had to be taken again, so a page that moves under its scans can be found. */
+export const retakenNote = "axe-scan-retaken";
 
 /**
  * One scan of what `target` matches, or null when the page moved those
@@ -263,8 +270,12 @@ const scopeMatchedNothing = "No elements found for include";
  * leaves a selector matching nothing, or matching another element. Both are
  * caught: axe says when a selector matches nothing, and the elements are
  * named again after the scan and must have the names they had before it.
+ * A scan that did not count leaves no note of what it could not judge: its
+ * notes may name the wrong elements.
  */
 async function scanInPlace(page: Page, target: Locator, skip: SkippedRules, only: readonly string[] | undefined): Promise<AxeRuleResult[] | null> {
+  const { annotations } = test.info();
+  const notesBefore = annotations.length;
   const selectors = await selectorsFor(target);
   if (selectors.length === 0) throw new Error(`Cannot scan ${target.toString()}: it matches no element.`);
   let found: AxeRuleResult[];
@@ -275,14 +286,18 @@ async function scanInPlace(page: Page, target: Locator, skip: SkippedRules, only
     throw error;
   }
   const after = await selectorsFor(target);
-  return JSON.stringify(after) === JSON.stringify(selectors) ? found : null;
+  if (JSON.stringify(after) === JSON.stringify(selectors)) return found;
+  annotations.length = notesBefore;
+  return null;
 }
 
 async function analyze(page: Page, target: Locator | null, skip: SkippedRules, only: readonly string[] | undefined): Promise<AxeRuleResult[]> {
   if (!target) return runRules(page, null, skip, only);
   for (let attempt = 1; attempt <= scopeTries; attempt += 1) {
     const found = await scanInPlace(page, target, skip, only);
-    if (found) return found;
+    if (found === null) continue;
+    if (attempt > 1) test.info().annotations.push({ type: retakenNote, description: `${target.toString()} at ${page.url()}: scan ${String(attempt)} counted, the page moved its elements during the ones before` });
+    return found;
   }
   throw new Error(`Cannot scan ${target.toString()}: the page moved its elements during each of ${String(scopeTries)} scans.`);
 }
