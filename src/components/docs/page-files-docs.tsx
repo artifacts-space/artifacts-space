@@ -20,7 +20,7 @@ export function HtmlPageFilesDocs() {
     <>
       <DocsH page="formats" id="page-files" />
       <Prose>
-        <p>An HTML artifact can be a whole small site, not one long document. Its page loads its own stylesheets, scripts, images, fonts, and data by relative path, as on any web host, so the document stays short and each file changes by itself. Agents put the files in with two calls, however many there are.</p>
+        <p>An HTML artifact can be a whole small site, not one long document. Its page loads its own stylesheets, scripts, images, fonts, and data by relative path, as on any web host, so the document stays short and each file changes by itself. Agents put the files in with two calls, however many there are. People drop them on the page, or a whole folder, in the web app.</p>
         <ul>
           <li><strong>Paths</strong> are relative to the page, which is <code>index.html</code>: <code>css/site.css</code>, <code>js/app.js</code>, <code>img/logo.png</code>. Folders and a file name of letters, digits, dots, dashes, and underscores, joined by <code>/</code>. No leading slash and no <code>..</code>.</li>
           <li><strong>A path is matched exactly</strong>, letter case included, so use lowercase. Two files whose paths differ only by case are refused.</li>
@@ -33,8 +33,19 @@ export function HtmlPageFilesDocs() {
       <FactTable head={["Limit", "Value"]} rows={pageFileLimitRows()} mono={[]} />
       <CodeSnippet title="Example: the document" language="html" code={pageFilesExample.document} className="mt-4" />
       <CodeSnippet title="Example: its page files" language="text" code={pageFilesExample.files.map((file) => `${file.path}\n  ${file.content}`).join("\n")} className="mt-4" />
+      <DocsH page="formats" id="page-files-web" />
+      <Prose>
+        <p>Anyone who may edit an HTML artifact adds files from its page, in the workspace or on the artifact&apos;s own page: drop files or a folder anywhere on the page, or use <strong>Add files</strong> in the More menu or <strong>Add folder</strong> beside the list.</p>
+        <ul>
+          <li><strong>Each file goes where its type belongs.</strong> A type in the table above becomes a page file. Any other file the site takes, such as a PDF, is attached beside the page as before.</li>
+          <li><strong>A folder keeps its shape.</strong> Dropping <code>site/</code> that holds <code>css/site.css</code> and <code>img/logo.png</code> adds those two paths. Hidden and system files, such as <code>.DS_Store</code>, are left out.</li>
+          <li><strong>A path that cannot be used says why.</strong> A name with a space or capital letters gets a cleaned path to take or change, and nothing is added under a name you did not see.</li>
+          <li><strong>One drop is one change.</strong> Up to {pageBatchLimits.maxFilesPerPublish} files land together as one version in History, or not at all. A file at a path the page has replaces it, and the row says so before it happens.</li>
+          <li><strong>The page itself.</strong> An <code>index.html</code> at the top of a dropped folder can become the page&apos;s HTML, after you confirm. The HTML it had stays in History.</li>
+        </ul>
+      </Prose>
       <Note>
-        How an agent uploads them is on the <Link href={docsHref("mcp", "uploads")} className="underline underline-offset-2">MCP reference</Link>. Adding page files in the web app is not built yet.
+        How an agent uploads them is on the <Link href={docsHref("mcp", "uploads")} className="underline underline-offset-2">MCP reference</Link>.
       </Note>
     </>
   );

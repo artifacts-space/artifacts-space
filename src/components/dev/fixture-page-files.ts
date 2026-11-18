@@ -64,10 +64,10 @@ function held(signal: AbortSignal): Promise<void> {
   });
 }
 
-/** A seeded page file, for the fixture's starting state with `?files=1`. */
-export function fixturePageFile(pagePath: string, size: number): FileDto {
+/** A page file of the fixture: a seeded one (`?files=1`) with a fixed id, so the server's page and the browser's agree, or an upload with its own. */
+export function fixturePageFile(pagePath: string, size: number, id: string): FileDto {
   const contentType = pageFileTypeFor(pagePath)?.contentType ?? "application/octet-stream";
-  return { id: crypto.randomUUID(), filename: pagePath.slice(pagePath.lastIndexOf("/") + 1), contentType, size, createdAt: "2026-11-17T00:00:00.000Z", replacedAt: null, pagePath };
+  return { id, filename: pagePath.slice(pagePath.lastIndexOf("/") + 1), contentType, size, createdAt: "2026-11-17T00:00:00.000Z", replacedAt: null, pagePath };
 }
 
 /** The fixture artifact's files, held in the tab: its attachments and its page files. */
@@ -114,7 +114,7 @@ export function memoryPageFilesApi(store: Store): PageFilesApi {
       counts().requests.push(files.length);
       const tickets = files.map((file) => {
         const fileId = crypto.randomUUID();
-        uploads.set(fileId, { ...fixturePageFile(file.path, file.size), id: fileId, createdAt: new Date().toISOString() });
+        uploads.set(fileId, { ...fixturePageFile(file.path, file.size, fileId), createdAt: new Date().toISOString() });
         return { path: file.path, fileId, url: `https://store.invalid/${fileId}`, headers: {} };
       });
       return Promise.resolve({ success: true, data: tickets });

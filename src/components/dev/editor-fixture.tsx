@@ -113,7 +113,7 @@ const keepSignalInTab = () => Promise.resolve(null);
  */
 export function EditorFixture({ kind, failingSaves = false, agentSaves = false, catchUp = null, pageFiles = false }: { kind: EditorFixtureKind; failingSaves?: boolean; agentSaves?: boolean; catchUp?: FixtureCatchUp; pageFiles?: boolean }) {
   // `pageFiles`: a web page that starts with two page files, for the tests that replace and remove one.
-  const [seeded] = useState(() => (pageFiles ? [fixturePageFile("css/site.css", 120), fixturePageFile("img/logo.png", 2048)] : []));
+  const [seeded] = useState(() => (pageFiles ? [fixturePageFile("css/site.css", 120, "00000000-0000-4000-8000-0000000000c1"), fixturePageFile("img/logo.png", 2048, "00000000-0000-4000-8000-0000000000c2")] : []));
   const artifact = useMemo(() => ({ ...fixtureArtifact({ id: `fixture-${kind}`, kind: samples[kind].kind, title: `Long ${kind} fixture`, content: samples[kind].content() }), files: seeded }), [kind, seeded]);
   const [files] = useState(() => fixtureFiles(seeded));
   const save = useMemorySave(artifact, agentSaves, files);
