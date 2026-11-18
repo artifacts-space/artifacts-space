@@ -3,14 +3,15 @@ import { servedVersionTime } from "@/lib/files/download";
 import { pageLabelFor } from "@/lib/page-host/rules";
 import { getVersionOf } from "@/lib/versions/history";
 
-import { mintPageToken } from "./token";
+import { answerFor, mintPageToken, type PageTokenAnswer } from "./token";
 
-/** Where a page loads its files from: the token for its frame's address, and when it ends. */
-export interface PageAddress {
-  token: string;
-  /** ISO time. The frame asks for a new address before it loads the page again after this. */
-  expiresAt: string;
-}
+/**
+ * Where a page loads its files from: the token for its frame's address, and
+ * how long it works. The browser times its renewal from `lifeMs`, counted
+ * from when the answer reaches it, and never compares `expiresAt` with its
+ * own clock (see PageTokenAnswer).
+ */
+export type PageAddress = PageTokenAnswer;
 
 /** Which page: the artifact's public id, and optionally one version of it in History. */
 export interface PageAddressRequest {
@@ -54,6 +55,5 @@ export async function pageAddressFor(request: PageAddressRequest, viewerId: stri
   const time = await filesTime(access, request.versionId);
   if (!time) return null;
   const label = await pageLabelFor(request.pageKey);
-  const { token, expiresAt } = mintPageToken({ artifactId: access.record.id, label, asOf: time.asOf, stamp: time.stamp.getTime() }, now);
-  return { token, expiresAt: expiresAt.toISOString() };
+  return answerFor(mintPageToken({ artifactId: access.record.id, label, asOf: time.asOf, stamp: time.stamp.getTime() }, now), now);
 }
