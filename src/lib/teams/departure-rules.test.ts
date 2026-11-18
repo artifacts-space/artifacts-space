@@ -5,6 +5,7 @@ import {
   leaveConfirmKind,
   leaveSummary,
   movableIds,
+  moveAllLabel,
   movedMessage,
   moveProblems,
   removalConfirmKind,
@@ -115,6 +116,13 @@ describe("movableIds", () => {
   });
 });
 
+describe("moveAllLabel", () => {
+  it("should say all only when every artifact is listed", () => {
+    expect(moveAllLabel(previewOf(7))).toBe("Move all to Personal");
+    expect(moveAllLabel(previewOf(130, 100))).toBe("Move the newest 100 to Personal");
+  });
+});
+
 describe("movedMessage and moveProblems", () => {
   it("should name a single moved artifact and count several", () => {
     expect(movedMessage({ moved: [item(1)], waiting: [], refused: [] })).toBe("Moved “Plan 1” to Personal.");
@@ -123,13 +131,19 @@ describe("movedMessage and moveProblems", () => {
   });
 
   it("should say that a waiting move has not happened and where the artifact goes on leaving", () => {
-    expect(moveProblems({ moved: [], waiting: [item(1)], refused: [] })).toEqual([
+    expect(moveProblems({ moved: [], waiting: [item(1)], refused: [] }).map((note) => note.text)).toEqual([
       "“Plan 1” waits for an owner's or admin's approval, so it is still in this team. If you leave now, it goes to the new owner.",
     ]);
   });
 
   it("should name each refused artifact with its reason", () => {
-    expect(moveProblems({ moved: [], waiting: [], refused: [{ artifact: item(2), reason: "Artifact not found." }] })).toEqual(["“Plan 2” did not move: Artifact not found."]);
+    expect(moveProblems({ moved: [], waiting: [], refused: [{ artifact: item(2), reason: "Artifact not found." }] })).toEqual([{ key: "a-2", text: "“Plan 2” did not move: Artifact not found." }]);
+  });
+
+  it("should keep two refusals with the same words apart, by artifact", () => {
+    const twin = { ...item(3), title: "Plan 2" };
+    const notes = moveProblems({ moved: [], waiting: [], refused: [{ artifact: item(2), reason: "Artifact not found." }, { artifact: twin, reason: "Artifact not found." }] });
+    expect(new Set(notes.map((note) => note.key)).size).toBe(2);
   });
 
   it("should have nothing to say when everything moved", () => {

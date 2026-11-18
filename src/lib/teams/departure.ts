@@ -71,6 +71,7 @@ async function moveOne(userId: string, item: DepartingArtifact, outcome: MoveOut
   try {
     const result = await requestArtifactSharing({ requesterId: userId, artifactId: item.id, visibility: "private", actor: "person" });
     if (result.status === "applied" && result.artifact.visibility === "private") outcome.moved.push(item);
+    // Defensive: today the private path always applies for the author. If it ever waits, the dialog must not call it moved.
     else outcome.waiting.push(item);
   } catch (error) {
     outcome.refused.push({ artifact: item, reason: refusalReason(error) });

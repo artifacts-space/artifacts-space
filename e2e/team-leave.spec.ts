@@ -82,6 +82,15 @@ test("should name a refused move with its reason", async ({ page }) => {
   await expect(artifactList(page).getByText("Launch plan")).toBeVisible();
 });
 
+test("should say how many a move takes when more are in the team than are listed", async ({ page }) => {
+  await openLeave(page, "&leaving=130");
+  const dialog = leaveDialog(page);
+  await dialog.getByRole("button", { name: "Move the newest 100 to Personal" }).click();
+  await expect(page.getByText("Moved 100 artifacts to Personal.")).toBeVisible();
+  await expect(dialog.getByText(/^30 of your artifacts live in this team\./)).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Move all to Personal" })).toBeVisible();
+});
+
 test("should keep the plain confirm when none of the person's artifacts live in the team", async ({ page }) => {
   await openLeave(page, "&leaving=0");
   const dialog = leaveDialog(page);

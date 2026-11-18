@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { ActionResult } from "@/lib/artifact-types";
-import { leaveSummary, movedMessage, moveProblems, shownArtifacts, type LeavePreview, type MoveResult } from "@/lib/teams/departure-rules";
+import { leaveSummary, moveAllLabel, movedMessage, moveProblems, shownArtifacts, type LeavePreview, type MoveNote, type MoveResult } from "@/lib/teams/departure-rules";
 
 const offline = "Something went wrong. Check your connection and try again.";
 
@@ -49,7 +49,7 @@ function ArtifactChecklist({ preview, selected, onToggle, disabled }: { preview:
 /** Moves the chosen artifacts (or all listed) to Personal, and keeps what did not move on screen. */
 function useMoves(move: (ids: string[]) => Promise<ActionResult<MoveResult>>, onPreview: (preview: LeavePreview) => void) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const [notes, setNotes] = useState<string[]>([]);
+  const [notes, setNotes] = useState<MoveNote[]>([]);
   const [moving, setMoving] = useState(false);
 
   function toggle(id: string, on: boolean) {
@@ -68,7 +68,7 @@ function useMoves(move: (ids: string[]) => Promise<ActionResult<MoveResult>>, on
     try {
       const result = await move(ids);
       if (!result.success) {
-        setNotes([result.error]);
+        setNotes([{ key: "error", text: result.error }]);
         return;
       }
       onPreview(result.data.preview);
@@ -77,7 +77,7 @@ function useMoves(move: (ids: string[]) => Promise<ActionResult<MoveResult>>, on
       if (moved) toast.success(moved);
       setNotes(moveProblems(result.data.outcome));
     } catch {
-      setNotes([offline]);
+      setNotes([{ key: "error", text: offline }]);
     } finally {
       setMoving(false);
     }
@@ -126,14 +126,14 @@ export function LeaveChoiceDialog({ open, teamName, preview, onPreview, move, on
                 {moves.moving ? <IconLoader2 className="animate-spin" /> : null} Move selected to Personal
               </Button>
               <Button variant="outline" size="sm" disabled={busy} onClick={() => void moves.run(preview.artifacts.map((item) => item.id))}>
-                Move all to Personal
+                {moveAllLabel(preview)}
               </Button>
             </div>
           </div>
         ) : null}
         {moves.notes.length > 0 ? (
           <ul className="space-y-1 text-md leading-6 text-tone-warning" data-leave-notes="">
-            {moves.notes.map((note) => <li key={note}>{note}</li>)}
+            {moves.notes.map((note) => <li key={note.key}>{note.text}</li>)}
           </ul>
         ) : null}
         <p className="text-sm leading-5 text-muted-foreground">Agents you added go to the team&apos;s owner, and their tokens stop working at once. Your private artifacts stay yours.</p>

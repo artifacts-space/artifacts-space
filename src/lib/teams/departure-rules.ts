@@ -144,17 +144,33 @@ export function movedMessage(outcome: MoveOutcome): string | null {
   return count === 1 && only ? `Moved “${only.title}” to Personal.` : `Moved ${String(count)} artifacts to Personal.`;
 }
 
+/** A line the dialog keeps on screen about a move that did not happen, keyed by what it is about. */
+export interface MoveNote {
+  key: string;
+  text: string;
+}
+
 /**
  * What did not move, in plain words, for the dialog to keep on screen. A
  * waiting move is not a move: the artifact stays with the team until an
- * owner or admin approves it, and leaving before then hands it over.
+ * owner or admin approves it, and leaving before then hands it over. Each
+ * refusal is keyed by its artifact, since titles and reasons repeat.
  */
-export function moveProblems(outcome: MoveOutcome): string[] {
-  const notes: string[] = [];
-  if (outcome.waiting.length > 0) {
+export function moveProblems(outcome: MoveOutcome): MoveNote[] {
+  const notes: MoveNote[] = [];
+  const waiting = outcome.waiting.length;
+  if (waiting > 0) {
     const names = outcome.waiting.map((item) => `“${item.title}”`).join(", ");
-    notes.push(`${names} ${outcome.waiting.length === 1 ? "waits" : "wait"} for an owner's or admin's approval, so ${outcome.waiting.length === 1 ? "it is" : "they are"} still in this team. If you leave now, ${outcome.waiting.length === 1 ? "it goes" : "they go"} to the new owner.`);
+    const text = waiting === 1
+      ? `${names} waits for an owner's or admin's approval, so it is still in this team. If you leave now, it goes to the new owner.`
+      : `${names} wait for an owner's or admin's approval, so they are still in this team. If you leave now, they go to the new owner.`;
+    notes.push({ key: "waiting", text });
   }
-  for (const { artifact, reason } of outcome.refused) notes.push(`“${artifact.title}” did not move: ${reason}`);
+  for (const { artifact, reason } of outcome.refused) notes.push({ key: artifact.id, text: `“${artifact.title}” did not move: ${reason}` });
   return notes;
+}
+
+/** The button that moves every listed artifact: "all" only when every one is listed. */
+export function moveAllLabel(preview: LeavePreview): string {
+  return preview.total > preview.artifacts.length ? `Move the newest ${String(preview.artifacts.length)} to Personal` : "Move all to Personal";
 }

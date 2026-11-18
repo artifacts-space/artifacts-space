@@ -7,7 +7,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * the artifacts the hand-over will move and names the person who will get
  * them, "Move to Personal first" moves only the leaver's own artifacts in
  * that team (into their Personal list, out of the team's), and after the
- * leave the rest belong to the person the preview named. Runs only when
+ * leave the rest belong to the person the preview named. The tests are one
+ * story and run in order: each later one reads the state the earlier ones
+ * left (team-b moved, then the leave). Runs only when
  * TEST_DATABASE_URL names a throwaway local database with the migrations
  * applied; never point it at a shared one.
  */
