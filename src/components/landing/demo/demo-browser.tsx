@@ -2,27 +2,19 @@ import Image from "next/image";
 import { IconLock, IconShare3, IconUsers } from "@tabler/icons-react";
 import type { CSSProperties, ReactNode } from "react";
 
-import { UiView } from "@/components/artifact-view/ui-view";
 import { PixelAvatar } from "@/components/pixel-avatar";
 import { kindColors, kindIcons } from "@/lib/artifact-kinds";
-import { demoPieceContent, type DemoPiece } from "@/lib/landing/demo-artifact";
 import { demoListRows, demoPeople, demoTitle, shortId, T } from "@/lib/landing/demo-story";
 import { cn } from "@/lib/utils";
 
 import { beat } from "./beat";
+import { DemoPage } from "./demo-page";
 import { DemoCommentSheet, DemoComments, DemoShareDialog } from "./demo-review";
+import { Swap } from "./swap";
 
-const UiIcon = kindIcons.ui;
-
-/** Two states of one spot: the first leaves as the second lands. */
-function Swap({ at, before, after, className }: { at: number; before: ReactNode; after: ReactNode; className?: string }) {
-  return (
-    <span className={cn("demo-swap", className)}>
-      <span style={beat(0, at)}>{before}</span>
-      <span style={beat(at)}>{after}</span>
-    </span>
-  );
-}
+/** The format the agent saves: a web page. */
+const savedKind = "html";
+const SavedIcon = kindIcons[savedKind];
 
 /** Browser chrome: traffic lights and the address, which follows the page that is open. */
 function BrowserBar() {
@@ -91,7 +83,7 @@ function ListScene() {
       <h3 className="px-3 text-lg font-medium tracking-[-0.01em]">Artifacts</h3>
       <p className="px-3 text-sm text-muted-foreground">Newest first</p>
       <ul className="mt-3 grid gap-0.5">
-        <ListRow title={demoTitle} kind="ui" meta={`${demoPeople.project} · now`} visibility="Private" style={beat(T.listRow)} fresh />
+        <ListRow title={demoTitle} kind={savedKind} meta={`${demoPeople.project} · now`} visibility="Private" style={beat(T.listRow)} fresh />
         {demoListRows.map((row) => <ListRow key={row.title} {...row} />)}
       </ul>
     </div>
@@ -102,27 +94,10 @@ function Chip({ children }: { children: ReactNode }) {
   return <span className="inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium whitespace-nowrap">{children}</span>;
 }
 
-/** One piece of the page, drawn by the app's own renderer, in both versions when it changes. */
-function Piece({ piece, at, changes = false, className }: { piece: DemoPiece; at: number; changes?: boolean; className?: string }) {
-  return (
-    <div className={cn("demo-piece relative isolate min-w-0", className)} style={beat(at)}>
-      {changes ? (
-        <div className="demo-swap">
-          <div style={beat(0, T.v2)}><UiView content={demoPieceContent(piece, 1)} /></div>
-          <div style={beat(T.v2)}><UiView content={demoPieceContent(piece, 2)} /></div>
-          <span className="demo-glow" style={beat(T.v2)} />
-        </div>
-      ) : (
-        <UiView content={demoPieceContent(piece, 1)} />
-      )}
-    </div>
-  );
-}
-
-/** The artifact page: title, share state, version, the pieces as they build in, and the thread. */
+/** The artifact page: title, share state, version, the web page as it builds in, and the thread beside it on wide screens. */
 function ArtifactScene() {
   return (
-    <div className="demo-scene @container flex flex-col gap-4 p-4 sm:gap-5 sm:p-5" style={beat(T.open)}>
+    <div className="demo-scene flex flex-col gap-4 p-4 sm:gap-5 sm:p-5" style={beat(T.open)}>
       <div className="flex flex-col gap-2.5">
         <div className="flex items-start justify-between gap-3">
           <h3 className="min-w-0 text-xl font-medium tracking-[-0.02em]">{demoTitle}</h3>
@@ -131,7 +106,7 @@ function ArtifactScene() {
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Chip><UiIcon aria-hidden className={cn("size-3.5", kindColors.ui)} /> ui</Chip>
+          <Chip><SavedIcon aria-hidden className={cn("size-3.5", kindColors[savedKind])} /> {savedKind}</Chip>
           <Swap
             at={T.shared}
             before={<Chip><IconLock aria-hidden className="size-3.5" /> Private</Chip>}
@@ -143,12 +118,8 @@ function ArtifactScene() {
           </span>
         </div>
       </div>
-      <div className="grid gap-5 @min-[560px]:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-        <Piece piece="chart" at={T.chart} changes className="demo-piece--chart" />
-        <Piece piece="timeline" at={T.timeline} changes className="demo-piece--timeline" />
-      </div>
-      <div className="grid items-start gap-5 @min-[640px]:grid-cols-[minmax(0,1fr)_14rem]">
-        <Piece piece="board" at={T.board} className="max-sm:hidden" />
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_14rem]">
+        <DemoPage />
         <DemoComments className="max-xl:hidden" />
       </div>
     </div>

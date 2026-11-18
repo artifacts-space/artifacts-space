@@ -10,6 +10,8 @@
  * Claude Code shows compact arguments, and so does the demo.
  */
 
+import { pageSourceStart } from "./demo-artifact";
+
 /** When each beat lands, in seconds after the replay starts. */
 export const T = {
   type: 0.3,
@@ -22,9 +24,10 @@ export const T = {
   appFront: 3.9,
   listRow: 4.3,
   open: 4.9,
-  chart: 5.2,
-  timeline: 5.6,
-  board: 6.0,
+  /** The web page builds in: its live numbers, the traffic chart, then the steps. */
+  stats: 5.2,
+  chart: 5.6,
+  steps: 6.0,
   share: 6.7,
   sharePick: 7.2,
   shared: 7.8,
@@ -80,12 +83,11 @@ export interface DemoCall {
   resultAt: number;
 }
 
-const pageContent = "{ Chart, Timeline, Board }";
 
 export const demoCalls: readonly DemoCall[] = [
   {
     tool: "artifacts_create",
-    args: [["title", demoTitle], ["kind", "ui"], ["project", demoPeople.project], ["content", pageContent]],
+    args: [["title", demoTitle], ["kind", "html"], ["project", demoPeople.project], ["content", pageSourceStart]],
     result: "Saved. Only you can see it.",
     at: T.create,
     resultAt: T.created,
@@ -113,7 +115,7 @@ export const demoCalls: readonly DemoCall[] = [
   },
   {
     tool: "artifacts_update",
-    args: [["id", shortId], ["content", pageContent]],
+    args: [["id", shortId], ["content", pageSourceStart]],
     result: "Saved version 2.",
     at: T.update,
     resultAt: T.updated,
@@ -124,7 +126,7 @@ export const demoCalls: readonly DemoCall[] = [
 export const demoListRows = [
   { title: "Payments on-call runbook", kind: "markdown", meta: "payments · 2 h ago", visibility: "Team" },
   { title: "Tax rounding notes", kind: "code", meta: "checkout · Yesterday", visibility: "Team" },
-  { title: "Q3 conversion review", kind: "ui", meta: "growth · Mon", visibility: "Link" },
+  { title: "Q3 conversion review", kind: "html", meta: "growth · Mon", visibility: "Link" },
   { title: "Retry queue design", kind: "mermaid", meta: "payments · Oct 28", visibility: "Team" },
   { title: "Refund API types", kind: "code", meta: "billing · Oct 24", visibility: "Private" },
 ] as const;

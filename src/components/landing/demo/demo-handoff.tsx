@@ -5,7 +5,9 @@ import { cn } from "@/lib/utils";
 
 import { beat } from "./beat";
 
-const UiIcon = kindIcons.ui;
+/** The format the agent saves: a web page. */
+const savedKind = "html";
+const SavedIcon = kindIcons[savedKind];
 
 /**
  * What travels between the two windows. The artifact card flies from the
@@ -18,10 +20,10 @@ export function DemoHandoff() {
   return (
     <>
       <div className="demo-packet demo-packet--out theme-invert" style={beat(T.handoff)}>
-        <UiIcon aria-hidden className={cn("size-4 shrink-0", kindColors.ui)} />
+        <SavedIcon aria-hidden className={cn("size-4 shrink-0", kindColors[savedKind])} />
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium">{demoTitle}</span>
-          <span className="block truncate text-xs text-muted-foreground">ui · {demoPeople.project}</span>
+          <span className="block truncate text-xs text-muted-foreground">{savedKind} · {demoPeople.project}</span>
         </span>
       </div>
       <div className="demo-packet demo-packet--back theme-invert" style={beat(T.handback)}>
