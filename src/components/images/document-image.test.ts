@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { jpegBytes, pngBytes, pngChunk, webpBytes } from "@/lib/images/image-bytes-harness";
+import { exifTag, jpegBytes, pngBytes, pngChunk, webpBytes } from "@/lib/images/image-bytes-harness";
 import { documentPrepareProfile } from "@/lib/images/prepare-rules";
 
 import { documentImageToSend } from "./document-image";
@@ -61,6 +61,20 @@ describe("documentImageToSend", () => {
     expect(decode).toHaveBeenCalledOnce();
   });
 
+  it("should redraw a small photo with an embedded thumbnail, a serial number, or an artist", async () => {
+    for (const exif of [{ thumbnail: true }, { exif: [exifTag.bodySerial] }, { first: [exifTag.artist] }]) {
+      const picked = fileOf(jpegBytes({ width: 640, height: 480, exif }), "IMG_2044.jpg", "image/jpeg");
+      const choice = await documentImageToSend(picked, fakeEnv({ width: 640, height: 480 }).env);
+      expect(choice.file, JSON.stringify(exif)).not.toBe(picked);
+    }
+  });
+
+  it("should send a small photo that keeps only its make, model, time, settings, and software with its own bytes", async () => {
+    const exif = { first: [exifTag.make, exifTag.software, exifTag.dateTime], exif: [exifTag.exposureTime, exifTag.userComment] };
+    const picked = fileOf(jpegBytes({ width: 640, height: 480, exif }), "IMG_2045.jpg", "image/jpeg");
+    expect((await documentImageToSend(picked, fakeEnv({ width: 640, height: 480 }).env)).file).toBe(picked);
+  });
+
   it("should redraw a large still image, decoding it once", async () => {
     const picked = fileOf(jpegBytes({ width: 4032, height: 3024 }), "IMG_2043.jpg", "image/jpeg");
     const { env, decode, close } = fakeEnv({ width: 4032, height: 3024 });
@@ -86,7 +100,7 @@ describe("documentImageToSend", () => {
     expect(decode).not.toHaveBeenCalled();
   });
 
-  it("should redraw an image whose location cannot be told: a type the check cannot read, or bytes it cannot parse", async () => {
+  it("should redraw an image whose private data cannot be told: a type the check cannot read, or bytes it cannot parse", async () => {
     const avif = fileOf(new Uint8Array([0, 0, 0, 0x14, 102, 116, 121, 112, 97, 118, 105, 102]), "Photo.avif", "image/avif");
     const avifChoice = await documentImageToSend(avif, fakeEnv({ width: 320, height: 200 }).env);
     expect(avifChoice.file).not.toBe(avif);

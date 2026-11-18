@@ -7,18 +7,18 @@ import { keepsOriginal, mayKeepOriginal, type StillImageFacts } from "./original
 import { documentPrepareProfile } from "./prepare-rules";
 
 const profile = documentPrepareProfile;
-const small: StillImageFacts = { type: "image/png", size: 40_000, location: "none", drawn: { width: 1280, height: 800 }, stated: { width: 1280, height: 800 } };
+const small: StillImageFacts = { type: "image/png", size: 40_000, privateData: "none", drawn: { width: 1280, height: 800 }, stated: { width: 1280, height: 800 } };
 const facts = (change: Partial<StillImageFacts>): StillImageFacts => ({ ...small, ...change });
 
 describe("keepsOriginal", () => {
-  it("should keep a small image's own bytes when it positively has no location", () => {
+  it("should keep a small image's own bytes when it positively has no private data", () => {
     expect(keepsOriginal(small, profile)).toBe(true);
     expect(keepsOriginal(facts({ drawn: { width: 2400, height: 2400 }, stated: { width: 2400, height: 2400 } }), profile)).toBe(true);
   });
 
-  it("should redraw a small image that has a location, or whose location cannot be told", () => {
-    expect(keepsOriginal(facts({ location: "location" }), profile)).toBe(false);
-    expect(keepsOriginal(facts({ location: "unknown" }), profile)).toBe(false);
+  it("should redraw a small image that has private data (a place, a person, a device serial, a preview), or when that cannot be told", () => {
+    expect(keepsOriginal(facts({ privateData: "private" }), profile)).toBe(false);
+    expect(keepsOriginal(facts({ privateData: "unknown" }), profile)).toBe(false);
   });
 
   it("should redraw an image whose longest side, as the browser draws it, is over 2400 px", () => {
@@ -51,7 +51,7 @@ describe("keepsOriginal", () => {
     expect(keepsOriginal(facts({ size: 0 }), profile)).toBe(false);
   });
 
-  it("should redraw every type the location check cannot read", () => {
+  it("should redraw every type the private data check cannot read", () => {
     for (const type of ["image/avif", "image/heic", "image/gif", "image/bmp", ""]) expect(keepsOriginal(facts({ type }), profile), type).toBe(false);
   });
 });

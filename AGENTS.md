@@ -1283,9 +1283,9 @@ to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
   answered (`uploadedFacts`).
 - **Cancel stops the request** (`putFile`'s `signal`, one `AbortController`
   per upload in `media-uploads.ts`), then discards the pending upload.
-- **A small still image uploads as it is; a large one, or one that says
-  where it was taken, is redrawn** (decided by the owner on 17 Nov 2026:
-  "there is no need to redraw small images"; `documentImageToSend` in
+- **A small still image uploads as it is; a large one, or one that carries
+  private data, is redrawn** (decided by the owner on 17 Nov 2026: "there
+  is no need to redraw small images"; `documentImageToSend` in
   `src/components/images/document-image.ts`, rules in
   `src/lib/images/original-rules.ts`). A JPEG, PNG, or WebP keeps its own
   bytes, type, and quality when all of these hold (`keepsOriginal`): its
@@ -1293,26 +1293,39 @@ to `src/components/editor/rich/block-corpus.ts` so the round trip is tested.
   a header alone); it fits `documentPrepareProfile.maxBytes`; the size the
   server will store (`readImageDimensions` on the same bytes) is the size
   the browser draws, so a JPEG turned by its camera orientation keeps its
-  place the right way round; and its bytes positively say nothing of a
-  place (`findLocation` in `src/lib/images/location-rules.ts`: no Exif GPS
-  pointer, no XMP or text naming GPS or a location, every segment or chunk
-  one it knows, nothing after the picture's end). Anything else is redrawn
-  as before: at most 2400 px, upright, camera data removed. AVIF, HEIC,
-  and any type the check cannot read are always redrawn. The promise is
-  narrower than before, on purpose: only the place is guaranteed gone. A
-  small image sent as it is keeps every other tag it carries, on shared and
-  public pages too: camera make, model, and serial number, the time it was
-  taken, exposure settings, the software that edited it, the artist, owner,
-  and comment fields, and an embedded thumbnail, which can still show the
-  whole frame of a picture cropped after the thumbnail was written.
-  When the file store refuses an image sent as it is before any byte goes
+  place the right way round; and its bytes positively hold no private data
+  (`findPrivateData` in `src/lib/images/private-data-rules.ts`). Private
+  data, any one of which means a redraw:
+  - where it was taken: the Exif GPS block, or XMP or text naming GPS, a
+    location, a city, a state, or a country;
+  - who took it, or with which one device: the Exif Artist, Copyright,
+    CameraOwnerName, BodySerialNumber, LensSerialNumber, ImageUniqueID, and
+    MakerNote tags and the author and comment tags 0x9C9B to 0x9C9F; XMP or
+    text naming a creator (not `CreatorTool`), an author, rights, a
+    copyright, an owner, or a serial; a PNG text chunk named Author or
+    Copyright;
+  - an embedded preview, which can show the whole frame of a picture
+    cropped since: an Exif thumbnail (a second image directory, or
+    JPEGInterchangeFormat), a JFIF thumbnail or JFXX extension, or XMP
+    `xmp:Thumbnails` or `xapGImg`.
+  A segment or chunk the check does not know, compressed text, a file cut
+  short, or bytes after the picture's end also mean a redraw: the check says
+  "none" only for what it read. A small image sent as it is keeps its camera
+  make and model, the time it was taken, exposure settings, the editing
+  software, its orientation, a user comment, and its color profile, so a
+  screenshot from a computer or a phone keeps its bytes. Anything else is
+  redrawn as before: at most 2400 px, upright, camera data removed. AVIF,
+  HEIC, and any type the check cannot read are always redrawn. When the
+  file store refuses an image sent as it is before any byte goes
   (`UploadRequestRefused`), the redrawn image is sent instead if it is
   smaller. A GIF, an animated WebP, and an animated PNG upload as they are
-  (`isAnimatedImage`): a redraw would keep one frame. Never send a small
-  image as it is without the location check: that would put a phone
-  photo's location into a shared page. Covers and icons still redraw every
-  image (see Covers), because their redraw keeps them under the server's
-  hard byte caps and, for covers, in the two types link previews draw.
+  (`isAnimatedImage`), and are not checked for private data, as before this
+  change: a redraw would keep one frame. Never send a small still image as
+  it is without the check: that would put a phone photo's location, its
+  owner, or its uncropped preview into a shared page. Covers and icons still
+  redraw every image (see Covers), because their redraw keeps them under the
+  server's hard byte caps and, for covers, in the two types link previews
+  draw.
 - The fixture is `/dev/editor?kind=media&doc=gallery` (add `&as=reader` for
   the read view); `e2e/document-images.spec.ts` covers all of the above.
 

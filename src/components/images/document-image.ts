@@ -1,6 +1,6 @@
 import { imageDimensionBytes, readImageDimensions } from "@/lib/files/image-dimensions";
-import { findLocation } from "@/lib/images/location-rules";
 import { keepsOriginal, mayKeepOriginal } from "@/lib/images/original-rules";
+import { findPrivateData } from "@/lib/images/private-data-rules";
 import { animationBytes, documentPrepareProfile, isAnimatedImage, uploadsUnprepared } from "@/lib/images/prepare-rules";
 
 import { browserImageEnv, prepareImage, type DecodedImage, type ImageEnv } from "./prepare-image";
@@ -9,8 +9,9 @@ import { browserImageEnv, prepareImage, type DecodedImage, type ImageEnv } from 
  * What an image put into a document uploads as. A GIF and an animated WebP
  * or PNG go as they are (a redraw would keep one frame). A still image whose
  * longest side, decoded by the browser, is at most 2400 px goes with its own
- * bytes, unchanged, when its bytes positively say nothing of where it was
- * taken (location-rules.ts, original-rules.ts). Every other still image is
+ * bytes, unchanged, when its bytes positively hold no private data: no
+ * place, no person, no device serial, no embedded preview
+ * (private-data-rules.ts, original-rules.ts). Every other still image is
  * redrawn as before (prepare-image.ts): upright, at most 2400 px, camera
  * data dropped.
  */
@@ -46,15 +47,15 @@ function redrawn(file: File, env: ImageEnv, decoded: DecodedImage | null = null)
   return prepareImage(file, profile, decoded ? { ...env, decode: () => Promise.resolve(decoded) } : env);
 }
 
-/** A still image that may keep its bytes: checked for a location, decoded, and compared. */
+/** A still image that may keep its bytes: checked for private data, decoded, and compared. */
 async function checkedStill(file: File, env: ImageEnv): Promise<DocumentImageChoice> {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const location = findLocation(file.type, bytes);
-  if (location !== "none") return { file: await redrawn(file, env), redraw: null };
+  const privateData = findPrivateData(file.type, bytes);
+  if (privateData !== "none") return { file: await redrawn(file, env), redraw: null };
   const decoded = await decodedOrNull(file, env);
   const drawn = decoded ? { width: decoded.width, height: decoded.height } : null;
   const stated = readImageDimensions(file.type, bytes.subarray(0, imageDimensionBytes));
-  if (!keepsOriginal({ type: file.type, size: file.size, location, drawn, stated }, profile)) return { file: await redrawn(file, env, decoded), redraw: null };
+  if (!keepsOriginal({ type: file.type, size: file.size, privateData, drawn, stated }, profile)) return { file: await redrawn(file, env, decoded), redraw: null };
   decoded?.close();
   return { file, redraw: () => redrawn(file, env) };
 }

@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { readImageDimensions } from "../src/lib/files/image-dimensions";
-import { findLocation } from "../src/lib/images/location-rules";
+import { findPrivateData } from "../src/lib/images/private-data-rules";
 import { expect, test } from "./support/test";
 import { documentOf, dragFilesAt, media, pointIn, writeDocument } from "./support/workspace-files";
 
@@ -69,7 +69,7 @@ test.describe("a small image dropped on a document", () => {
   test("should store a small screenshot with the bytes, size, and type it had", async ({ page }) => {
     await writeDocument(page, "Screenshot", ["Words."]);
     const png = await drawnImage(page, "image/png");
-    expect(findLocation("image/png", new Uint8Array(png)), "the browser's own PNG holds no place").toBe("none");
+    expect(findPrivateData("image/png", new Uint8Array(png)), "the browser's own PNG holds nothing private").toBe("none");
     const sent = await dropImage(page, "Screenshot.png", "image/png", png);
     expect(sent).toMatchObject({ filename: "Screenshot.png", contentType: "image/png", size: png.length });
     expect(bytesOf(sent)).toEqual(png);
@@ -79,19 +79,19 @@ test.describe("a small image dropped on a document", () => {
     await writeDocument(page, "Photo", ["Words."]);
     const drawn = await drawnImage(page, "image/jpeg");
     const photo = [...drawn.slice(0, 2), ...exifSegment("gps"), ...drawn.slice(2)];
-    expect(findLocation("image/jpeg", new Uint8Array(photo)), "the dropped photo has its location").toBe("location");
+    expect(findPrivateData("image/jpeg", new Uint8Array(photo)), "the dropped photo has its location").toBe("private");
     const sent = await dropImage(page, "IMG_4410.jpg", "image/jpeg", photo);
     expect(sent.contentType).toBe("image/jpeg");
     expect(sent.size).not.toBe(photo.length);
     expect(bytesOf(sent)).not.toEqual(photo);
-    expect(findLocation("image/jpeg", new Uint8Array(bytesOf(sent))), "the stored photo has no location").not.toBe("location");
+    expect(findPrivateData("image/jpeg", new Uint8Array(bytesOf(sent))), "the stored photo has no location").not.toBe("private");
   });
 
   test("should store a small photo turned by its camera, with no location, as it was, drawn upright", async ({ page }) => {
     await writeDocument(page, "Turned", ["Words."]);
     const drawn = await drawnImage(page, "image/jpeg");
     const photo = [...drawn.slice(0, 2), ...exifSegment("turned"), ...drawn.slice(2)];
-    expect(findLocation("image/jpeg", new Uint8Array(photo))).toBe("none");
+    expect(findPrivateData("image/jpeg", new Uint8Array(photo))).toBe("none");
     const sent = await dropImage(page, "IMG_4411.jpg", "image/jpeg", photo);
     expect(bytesOf(sent)).toEqual(photo);
     // The browser draws it on its side, as the camera said: 400 wide, 640 tall, the size the server stores for it.
