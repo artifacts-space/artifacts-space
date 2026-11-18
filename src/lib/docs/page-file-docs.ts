@@ -2,7 +2,7 @@ import { rateLimits } from "@/lib/abuse/limits";
 import { fileLimits, formatBytes } from "@/lib/files/config";
 import { pageBatchLimits } from "@/lib/page-files/publish-rules";
 import { hiddenAllowanceWords, passRenewal } from "@/lib/page-files/renew-rules";
-import { pageFileExtensions, pageFileLimits } from "@/lib/page-files/rules";
+import { pageFileExtensions, pageFileLimits, pageHtmlType } from "@/lib/page-files/rules";
 import { pageTokenLimits } from "@/lib/page-files/token";
 
 /**
@@ -18,6 +18,9 @@ const minutes = (seconds: number) => String(seconds / 60);
 /** "10 to 15 minutes": how long one files address works. */
 export const pageAddressLife = `${minutes(pageTokenLimits.lifeSeconds - pageTokenLimits.stepSeconds)} to ${minutes(pageTokenLimits.lifeSeconds)} minutes`;
 
+/** How another page of the site is served: never as HTML, only as text the frame document writes in. */
+export const pageHtmlServedAs = "text/plain, written into the frame";
+
 /** The types a page file may be: its extensions, the type it is served as, and its name. One row per served type and name. */
 export function pageFileTypeRows(): string[][] {
   const rows = new Map<string, { extensions: string[]; contentType: string; label: string }>();
@@ -27,7 +30,7 @@ export function pageFileTypeRows(): string[][] {
     row.extensions.push(`.${extension}`);
     rows.set(key, row);
   }
-  return [...rows.values()].map((row) => [row.extensions.join(" "), row.contentType, row.label]);
+  return [...rows.values()].map((row) => [row.extensions.join(" "), row.contentType === pageHtmlType ? pageHtmlServedAs : row.contentType, row.label]);
 }
 
 /** Every page file limit, for the Limits page and the Formats page. */

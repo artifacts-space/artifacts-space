@@ -22,7 +22,7 @@ export function buildHtmlGuide(): string {
     "HTML (html): a full web page that runs in a sandbox. Use it for anything visual or interactive: mockups of websites and apps, prototypes, dashboards, reports, explainers, small tools.",
     "",
     "The document",
-    "- One HTML document. It must start with <!doctype html>.",
+    "- One HTML document: the artifact's content, which is the page, or the first page of a site (index.html). It must start with <!doctype html>.",
     "- For a small page, put the CSS in <style> and the JavaScript in <script>, inside the document: one call saves it all.",
     `- The document is at most ${artifactSizeLimits.maxContentBytes.toLocaleString("en-US")} bytes. Put anything heavy (images, data, libraries you bundled, large scripts and styles) in page files.`,
     '- Add <meta name="viewport" content="width=device-width, initial-scale=1">, a <title>, and lang on <html>.',

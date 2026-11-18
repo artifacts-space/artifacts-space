@@ -92,17 +92,22 @@ test("should add picked files where their types belong, as one publish: page fil
   await expect(pageFiles(page).getByRole("button", { name: "Open app.js" })).toHaveAttribute("href", /^\/api\/files\//);
 });
 
-test("should keep a picked folder's shape, leave out hidden files with one quiet line, and offer its index.html as the page", async ({ page }) => {
+test("should keep a picked folder's shape, leave out hidden files with one quiet line, add its other pages as page files, and offer its index.html as the page", async ({ page }) => {
   await open(page);
   const folder = folderOf("site", {
     "css/site.css": "body { color: green; }",
     "img/logo.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>",
     ".DS_Store": "x",
     ".git/config.json": "{}",
+    "about.html": "<!doctype html><html lang=\"en\"><head><title>About</title></head><body><p>About</p></body></html>",
+    "docs/guide.html": "<!doctype html><html lang=\"en\"><head><title>Guide</title></head><body><p>Guide</p></body></html>",
     "index.html": "<!doctype html><html lang=\"en\"><head><title>From the folder</title></head><body><p id=\"from-folder\">From the folder</p></body></html>",
   });
   await addFolder(page, folder);
-  await expect.poll(async () => pathsShown(pageFiles(page))).toEqual(["css/site.css", "img/logo.svg"]);
+  await expect.poll(async () => pathsShown(pageFiles(page))).toEqual(["about.html", "css/site.css", "docs/guide.html", "img/logo.svg"]);
+  // Another page is a row like any page file; Open goes through the file route, which only ever downloads it.
+  await expect(pageFiles(page).locator("[data-slot=page-file-row]").filter({ hasText: "docs/guide.html" })).toContainText("HTML page");
+  await expect(pageFiles(page).getByRole("button", { name: "Open about.html" })).toHaveAttribute("href", /^\/api\/files\//);
   await expect(section(page).locator("[data-slot=page-files-left-out]")).toHaveText("Left out 2 hidden or system files.");
   const pageRow = section(page).locator("[data-slot=page-html-row]");
   await expect(pageRow).toContainText("This is the page itself");
@@ -195,11 +200,11 @@ test("should stop every upload with Cancel, publish nothing, and ask before the 
 
 test("should say why a file is refused in its own row, offer Try again for a failed upload, and Try again for a refused publish", async ({ page }) => {
   await open(page);
-  await addFromMenu(page, [{ name: "setup.exe" }, { name: "about.html", text: "<!doctype html>" }, { name: "broken.css" }, { name: "fine.css" }]);
+  await addFromMenu(page, [{ name: "setup.exe" }, { name: "empty.css", text: "" }, { name: "broken.css" }, { name: "fine.css" }]);
   const notAdded = section(page).getByRole("list", { name: "Not added" });
   await expect(notAdded.getByRole("alert")).toHaveCount(2);
   await expect(notAdded).toContainText("This file type is not supported.");
-  await expect(notAdded).toContainText("A page file cannot be another HTML document");
+  await expect(notAdded).toContainText("The file is empty.");
   const broken = batch(page).locator("[data-slot=page-batch-row]").filter({ hasText: "broken.css" });
   await expect(broken.getByRole("alert")).toHaveText("The file does not look like the type its path says. Upload the file again.");
   await expect(broken.getByRole("button", { name: "Try again" })).toBeVisible();

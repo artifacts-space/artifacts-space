@@ -610,15 +610,21 @@ on a second domain (`src/lib/page-host/rules.ts`).
   turned back into it. One host per artifact keeps each page's browser
   storage apart.
 - A page host serves two things: the frame document (`frame-document.ts`),
-  at `/` and, for a page with files of its own, at
-  `/f/<token>/index.html`; and that page's files, at `/f/<token>/<path>`
-  (see Page files). The proxy answers every request whose Host looks like a
-  page host before any app code (`pageHostResponse`, and the matcher's last
-  entry): the frame document, a 404, or a 405. The one request it lets
-  through is a GET or HEAD of `/f/<token>/<path>` on a page host of this
-  deployment, which one route handler answers
-  (`src/app/f/[token]/[...path]/route.ts`); that route checks the Host
-  again and answers 404 on every other host. No app page, API, or sign-in
+  at `/`, for a page with files of its own at `/f/<token>/index.html`, and
+  at the address of every other page of its site (`/f/<token>/about.html`,
+  `pageAddressPattern`); and that page's files, at `/f/<token>/<path>`
+  (see Page files). The rule, in one line: a page host never serves a
+  document its author wrote. The only document it serves is the frame
+  document, and every page, the first and any other, reaches the frame
+  because the frame document's script writes it in. The proxy answers
+  every request whose Host looks like a page host before any app code
+  (`pageHostResponse`, and the matcher's last entry): the frame document, a
+  404, or a 405. It lets two kinds of request through, both GET or HEAD on
+  a page host of this deployment, to one route handler
+  (`src/app/f/[token]/[...path]/route.ts`): a page file
+  (`/f/<token>/<path>`), and the frame document's own fetch of another
+  page's source (`isPageSourceRequest`, see Page files). That route checks
+  the Host again and answers 404 on every other host. No app page, API, or sign-in
   exists there, so no session can, and a page has nothing of ours to call
   but its own files. `pageHostPattern` (in `security-header-rules.ts`) is
   the one literal the matcher and the header rules share; a test keeps the
@@ -634,7 +640,8 @@ on a second domain (`src/lib/page-host/rules.ts`).
 - The frame document takes the page from the window that frames it, and only
   when that window is the site (`framingSite`: `siteOrigin()` in production,
   never the request). Its `frame-ancestors` names the site alone, so the
-  address shows nothing in a tab of its own.
+  address shows nothing in a tab of its own; at another page's address it
+  also fetches nothing there (`window.parent === window`).
 - What a page may do is the frame document's Content-Security-Policy
   (`pageContentPolicy`): inline scripts run; other requests go only to the
   page's own host (`'self'`: scripts, styles, fonts, images, media, fetch,
@@ -703,8 +710,10 @@ on a second domain (`src/lib/page-host/rules.ts`).
   bar, so the bar's button is always there.
 - `PAGE_HOST` unset (and not `next dev`): no page runs, and `PageFrame`
   draws nothing (`usePagesCanRun`). Tests: `rules.test.ts`,
-  `proxy.test.ts`, `e2e/page-frame.spec.ts` on `/dev/page-frame`, and
-  `e2e/security-headers.prod.spec.ts` for the production build.
+  `frame-document.test.ts`, `frame-document-pages.test.ts`,
+  `proxy.test.ts`, `e2e/page-frame.spec.ts` on `/dev/page-frame`,
+  `e2e/page-files-sites.spec.ts`, and `e2e/security-headers.prod.spec.ts`
+  for the production build.
 
 ### Page files
 
@@ -721,11 +730,14 @@ path, as on any website: `<link href="css/site.css">`, a module's
   path rules are pure (`rules.ts`): relative, `/` between parts, each part
   of letters, digits, dots, dashes, and underscores, no empty part, no `.`
   or `..`, no leading dot, at most 200 characters and 8 parts. The page
-  itself is `index.html`; an `.html` or `.htm` page file is refused, because
-  one artifact is one page.
+  itself is `index.html`, the artifact's content, so no page file takes
+  that name at the top (in any letter case). Any other `.html` path is
+  another page of the site (see Sites of several pages below); its name
+  ends in `.html` in lowercase (`pageNamePattern`), and `.htm` is refused,
+  so every stored page has an address the page host reads as a page's.
 - The type comes from the path's extension alone (`typesByExtension`); a
-  declared type is not read. Stylesheets, scripts, SVG, fonts, and
-  WebAssembly are types only a page file may be. They exist only as page
+  declared type is not read. HTML pages, stylesheets, scripts, SVG, fonts,
+  and WebAssembly are types only a page file may be. They exist only as page
   files of an `html` artifact: an upload requested with a page path can
   only ever be attached as one (`canUseFileInArtifact`, and `page_path is
   null` in every plain attach statement: `attachFileRows`, the save's
@@ -734,8 +746,9 @@ path, as on any website: `<link href="css/site.css">`, a module's
   checked on finalize (`matchesPageFileSignature`). They are never served
   inline from this site: on `/api/files/<id>` and on a signed storage URL
   they download as an attachment (`isInlineType`;
-  `src/lib/files/page-file-inline.test.ts` fails if a script, a stylesheet,
-  or an SVG ever becomes inline there). Never add a page-only type to
+  `src/lib/files/page-file-inline.test.ts` fails if an HTML page, a
+  script, a stylesheet, or an SVG ever becomes inline there), so Open on a
+  page file's row downloads it. Never add a page-only type to
   `allowedFileTypes`.
 - Limits are one constant (`pageFileLimits`): 100 page files and 16 MiB in
   all per artifact. The 20-file limit is for plain attachments only
@@ -800,8 +813,9 @@ path, as on any website: `<link href="css/site.css">`, a module's
   (`usePassRenewal` in `page-renewal.ts`, rules in `renew-rules.ts`). The
   site asks for the next address close to the end of the one in hand (two
   minutes before, `passRenewal`) and posts its frame path to the frame
-  document (`pageMessages.renew`), which moves its own address there with
-  `history.replaceState`. The frame's `src` never changes: a new `src`
+  document (`pageMessages.renew`), which takes only the token from it and
+  moves its own address to the same page, query, and hash under that token
+  with `history.replaceState`, on whichever page of the site it is. The frame's `src` never changes: a new `src`
   would load the page again. When to ask is one decision (`renewStep`),
   taken when an address arrives, when the tab is shown or hidden, and when
   the timer fires: a shown tab holds one timer set from the known end. A
@@ -823,9 +837,9 @@ path, as on any website: `<link href="css/site.css">`, a module's
   interval here, and never renew in a tab that has been hidden longer than
   its hour.
 - The frame document takes `renew` only from the window that frames it,
-  only from the site's origin, and only for a path that is a frame
-  document's own under a files address (`pageFramePathPattern`), and only
-  when it is at such a path already. `frame-document.test.ts` runs the
+  only from the site's origin, and only when both the message's path and
+  its own are a page's under a files address (`pageAddressPattern`:
+  `index.html` or another `.html` page). `frame-document.test.ts` runs the
   script in a VM and fails if the page itself, another window, or another
   origin can move it. The page shares the window and could move its own
   address anyway; that gives it nothing, because a files address serves
@@ -956,7 +970,9 @@ path, as on any website: `<link href="css/site.css">`, a module's
     offers "Use as this page's HTML", which puts the file's text into the
     editor's draft (the normal save path: a version, approval on a shared
     artifact) after the `usePageHtml` confirm. Any other HTML file is
-    refused with the path rule's reason.
+    another page of the site: a page file at its path, in a row like any
+    other ("HTML page"); an `.htm` one waits in its row with a path that
+    ends in `.html` to take (`suggestPagePath`).
   - After a publish the editor takes the artifact the action returns
     (`onUpdated`), so autosave rebases on the files-only version and the
     frame loads again with the new files (`usePageFilesKey`).
@@ -966,6 +982,60 @@ path, as on any website: `<link href="css/site.css">`, a module's
     `e2e/page-files-web.spec.ts` on `/dev/editor?kind=html` (`&files=1`
     starts with two page files), whose stand-in keeps page files in the
     tab (`src/components/dev/fixture-page-files.ts`).
+- Sites of several pages (owner's decision, 18 Nov 2026). `index.html` is
+  the artifact's content, the first page; `about.html` or
+  `docs/guide.html` is a page file, linked with an ordinary relative link,
+  and it opens in the same frame. It counts toward the same limits as any
+  page file. How each address is answered:
+  - A browser that goes to `/f/<token>/<page>.html` (a link, `location.href`,
+    Back or Forward in the frame) gets the frame document, with exactly its
+    headers, plus `Vary: X-Page-Source` (`pageHostHeaders` with `page`). The
+    token is not read: the frame document cannot know.
+  - The frame document there says "opened" (`pageMessages.opened`, never
+    "ready", so the site sends it no HTML), waits for the site's `renew`
+    with the newest address (`onOpened` in `PageWindow`: the newest renewal,
+    else the address the load started on; `usePassRenewal`'s `resend`
+    returns whether it had one), moves to it, and fetches its own path
+    with `X-Page-Source: 1`, `redirect: "error"`. It writes the answer with
+    the same `document.open()` / `write()` / `close()` steps, its ping and
+    renew listeners added after `open()` and before the page's scripts, and
+    says "shown". A 404 or a failed fetch gets a line built from elements
+    and text: "This page has no file at <path>." and a link to the first
+    page by relative path. At `/` and `index.html` it says "ready" and
+    waits for the HTML, as before, so the site answers every "ready" with
+    the HTML (a return to the first page is a new load).
+  - That fetch is told from a navigation by the header
+    (`isPageSourceRequest`): `X-Page-Source: 1`, and `Sec-Fetch-Dest` and
+    `Sec-Fetch-Site`, when sent, must be `empty` and `same-origin`. Those
+    two can only refuse: older browsers send neither. A navigation cannot
+    carry the header, and another origin cannot send it without a
+    preflight, which a page host refuses (405). The proxy lets it through,
+    and the route answers with the page as `text/plain; charset=utf-8`
+    (`servedContentType`: no page file is ever served as `text/html`),
+    `nosniff`, the sandboxed file policy, and `Vary: X-Page-Source`. The
+    token is checked as for any page file. An `.html` path asked for
+    without the header gets the route's 404 before the token is read
+    (`mayAsk`), should the proxy ever let one through.
+  - A query or a hash is the page's own: the proxy and the route read the
+    path alone, and the frame document keeps both across renewals.
+  - Forms stay refused (`form-action 'none'`), and a link to another site
+    or to a folder still leaves the frame, which the site closes
+    (`usePageHandshake`). A folder's address (`docs/`) is no page: Next
+    sends it to `docs` without the slash, which is a page file path with no
+    type, a 404 the frame may not show; the site closes the frame after
+    `PAGE_ANSWER_MS` with "Show the page again".
+  - Known limits: no link from this site to a page inside the frame, no
+    list of pages beside the frame, no search or link preview over pages
+    other than the first, no folder index, no `.htm`, and no zip. The frame
+    document does not scroll to a `#fragment` itself after writing a page.
+  - Tests: `frame-document-pages.test.ts` (the script in a VM: nothing
+    fetched or shown in a tab of its own, only the site's renew moves it,
+    the missing line is text), `serve.test.ts` (the source as text only,
+    every header case, token rules), `rules.test.ts` and `proxy.test.ts`
+    (the answer by request kind, every host), and
+    `e2e/page-files-sites.spec.ts` on `/dev/page-frame?page=files`, whose
+    fixture has `about.html` and `docs/guide.html` with its own stylesheet
+    and script (`fixture-source.ts`).
 - Tests without a database: under `next dev` only, a token for the stand-in
   artifact id `fixture:page-files` is answered from files held in memory
   (`fixture-source.ts`), so `e2e/page-files.spec.ts` on

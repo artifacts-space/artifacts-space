@@ -5,13 +5,19 @@ import { validateArtifactContent } from "@/lib/artifact-content";
 import { faultsMessage, pageBatchLimits, planPagePublish } from "@/lib/page-files/publish-rules";
 import { pageFileExtensions, pageFileLimits, pageFileTypeFor, pagePathProblem } from "@/lib/page-files/rules";
 
-import { manyFilesFlow, pageAddressLife, pageFileLimitRows, pageFilesExample, pageFileTypeRows, refusedSetExample } from "./page-file-docs";
+import { manyFilesFlow, pageAddressLife, pageFileLimitRows, pageFilesExample, pageFileTypeRows, pageHtmlServedAs, refusedSetExample } from "./page-file-docs";
 
 describe("page file docs", () => {
   it("should list every extension a page file may have, once", () => {
     const listed = pageFileTypeRows().flatMap((row) => (row[0] ?? "").split(" "));
     expect(listed.sort()).toEqual(pageFileExtensions.map(({ extension }) => `.${extension}`).sort());
     expect(new Set(listed).size).toBe(listed.length);
+  });
+
+  it("should never say a page file is served as HTML: another page of the site is text the frame writes in", () => {
+    const html = pageFileTypeRows().find((row) => row[0] === ".html");
+    expect(html).toEqual([".html", pageHtmlServedAs, "HTML page"]);
+    for (const row of pageFileTypeRows()) expect(row[1], row[0]).not.toMatch(/^text\/html/);
   });
 
   it("should state each limit from its constant", () => {

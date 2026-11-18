@@ -10,8 +10,35 @@ import { pageFileTypeFor } from "./rules";
  * and the bytes are stood in for.
  */
 
-/** The fixture page's files, by path. The stylesheet names a picture one folder up, and the module imports its sibling. */
+/** A page of the fixture's site: a whole document, as an author uploads one. */
+function sitePage(title: string, head: string, body: string): string {
+  return `<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8"><title>${title}</title>${head}</head>\n<body>\n${body}\n</body>\n</html>\n`;
+}
+
+/**
+ * The fixture page's files, by path. The stylesheet names a picture one
+ * folder up, and the module imports its sibling. The other pages of its
+ * site link back and to each other by relative path; the one in a folder
+ * loads its own stylesheet and script from that folder.
+ */
 export const fixturePageFiles: Readonly<Record<string, string>> = {
+  "about.html": sitePage("About", `<link rel="stylesheet" href="css/site.css">`, [
+    `<h1 id="page">About</h1>`,
+    `<p id="styled">Styled by the site's stylesheet</p>`,
+    `<p><a id="to-index" href="index.html">First page</a> <a id="to-guide" href="docs/guide.html">Guide</a></p>`,
+    `<form id="form" action="docs/intro.html" method="get"><button id="submit" type="submit">Send</button></form>`,
+  ].join("\n")),
+  "docs/guide.html": sitePage("Guide", `<link rel="stylesheet" href="guide.css">`, [
+    `<h1 id="page">Guide</h1>`,
+    `<p id="guide-styled">Styled by the guide's own stylesheet</p>`,
+    `<p id="guide-script">Script did not run</p>`,
+    `<p id="where"></p>`,
+    `<p><a id="to-index" href="../index.html">First page</a> <a id="to-intro" href="intro.html">Intro</a></p>`,
+    `<script src="guide.js"></script>`,
+  ].join("\n")),
+  "docs/intro.html": sitePage("Intro", "", `<h1 id="page">Intro</h1>\n<p><a id="to-guide" href="guide.html">Guide</a></p>`),
+  "docs/guide.css": `#guide-styled { color: rgb(0, 0, 255); }\n`,
+  "docs/guide.js": `document.getElementById("guide-script").textContent = "Guide script ran";\ndocument.getElementById("where").textContent = location.search + location.hash;\n`,
   "css/site.css": `#styled { color: rgb(0, 128, 0); }\n#pictured { width: 24px; height: 24px; background-image: url(../img/dot.svg); }\n`,
   "js/app.js": `import { message } from "./message.js";\ndocument.getElementById("module").textContent = message;\nfetch("data.json").then((response) => response.json()).then((data) => { document.getElementById("data").textContent = "answer " + data.answer; });\n`,
   "js/message.js": `export const message = "Module imported its sibling";\n`,

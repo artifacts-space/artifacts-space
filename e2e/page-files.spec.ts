@@ -110,9 +110,9 @@ test("should refuse a page file on every host but its own page host, and for eve
     expect(response.status(), host).toBe(404);
     expect(await response.text(), host).not.toContain("42");
   }
-  // On its own host: a changed token, a file it does not have, a path that leaves the folder, a second document, and a write.
+  // On its own host: a changed token, a file it does not have, a path that leaves the folder, an .htm page, and a write.
   const changed = file.replace(/\/f\/(.)/, (_whole, first: string) => `/f/${first === "A" ? "B" : "A"}`);
-  for (const path of [changed, `${base}missing.json`, `${base}../data.json`, `${base}about.html`, `/f/${"A".repeat(120)}/data.json`]) {
+  for (const path of [changed, `${base}missing.json`, `${base}../data.json`, `${base}about.htm`, `/f/${"A".repeat(120)}/data.json`]) {
     expect((await askHost(request, baseURL, address.host, path)).status(), path).toBe(404);
   }
   expect((await askHost(request, baseURL, address.host, file, "POST")).status()).toBe(405);
