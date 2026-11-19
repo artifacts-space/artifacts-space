@@ -1428,10 +1428,12 @@ dark surface is 30% opaque, and that or a blur makes the names unreadable
 over a high-contrast image. A removed cover is gone at once; the page around
 it was laid out by the server for a cover (no space above the heading, the
 icon pulled up across the cover's edge), so `RemovedCoverSpace` holds the
-difference until the server's page arrives, and nothing moves when it does.
-If the heading's spacing or the icon's pull-up changes in the artifact page,
-change those heights with it (`e2e/artifact-cover.spec.ts` compares the two
-positions).
+difference until the server's page arrives: the title and everything under
+it stay where they are when it does (with an icon, the icon alone settles a
+few pixels, since its box over a cover is not its row without one). If the
+heading's spacing or the icon's box changes in the artifact page, change
+those heights with it (`e2e/artifact-cover.spec.ts` compares the positions,
+with and without an icon).
 
 ### Media in documents
 

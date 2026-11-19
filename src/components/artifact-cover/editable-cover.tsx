@@ -37,13 +37,16 @@ interface EditableCoverProps {
  * server's page arrives: the page around it was laid out for a cover (no
  * space above the heading, the icon pulled up across the cover's edge), and
  * without this the icon would sit under the header until then. Each height
- * makes up the difference from the page without a cover, so nothing moves
- * when that page takes over: with an icon, the heading's usual space plus
- * what the icon is pulled up by; without one, what the heading's space is
- * short by under a cover.
+ * puts the title, and so everything under it, exactly where the page
+ * without a cover has it, so the page does not move when that page takes
+ * over. Without an icon that is what the heading's space is short by under
+ * a cover. With one it is the heading's usual space plus what the icon's
+ * box is pulled up by, less what that box is taller than the icon's row in
+ * the page without a cover (4 px on phones, 8 px from sm: the icon is
+ * centred in it); the icon itself then settles 2 px (4 px from sm) lower.
  */
 function RemovedCoverSpace({ hasIcon }: { hasIcon: boolean }) {
-  return <div data-cover-removed aria-hidden className={hasIcon ? "h-20 sm:h-26" : "h-4 sm:h-6"} />;
+  return <div data-cover-removed aria-hidden className={hasIcon ? "h-19 sm:h-24" : "h-4 sm:h-6"} />;
 }
 
 /** Moves focus to the reposition slider when it appears, so the arrow keys work at once. A stable function, so React calls it once per mount. */
