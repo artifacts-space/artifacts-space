@@ -643,6 +643,20 @@ catch this, so test the generated SQL with `.toSQL()`, as
     Firewall for the sign-in link path. It needs no deploy, and a request it
     matched (`bypassed`) is let through whatever else the verdict says
     (`refusesSignInLink`). Removing the check altogether is a revert.
+  - The auth client looks `fetch` up when a request is sent
+    (`fetchWhenSent` in `src/lib/auth/client.ts`). Better Auth otherwise
+    keeps the `fetch` from when its module loads, before the bot check
+    replaces it, and the form's request then carries no proof: #252 shipped
+    that way on 2026-11-19, production refused every emailed sign-in link,
+    and it was rolled back within minutes. `src/lib/auth/client.test.ts`
+    and `e2e/sign-in-bot-refusal.spec.ts` hold this. Anything else that
+    sends the sign-in link request must go through `window.fetch` as it is
+    at that moment.
+  - An automated browser (Playwright, headless Chrome) is refused even with
+    the proof: that is the check working, so only a person's browser can
+    show that people pass. What automation can show: the form's request
+    carries an `x-is-human` header and the challenge script
+    (`/149e9513-…/c.js`) loaded.
   - Nothing here proves that a real browser passes: BotID runs only on a
     Vercel deployment, and previews are behind Vercel sign-in. After any
     change to the browser side, ask for a link on a preview from a real
