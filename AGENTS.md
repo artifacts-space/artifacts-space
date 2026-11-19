@@ -79,8 +79,11 @@ check counts as passing.
 In CI a failed browser test runs once more (`retries` in
 `playwright.config.ts`); locally it does not. A test that passes on its retry
 is listed as flaky at the end of the shard's log, and the trace of that
-second attempt is in the shard's `e2e-results-shard-N` artifact: treat it as a bug to fix,
-in the test or in the app, never as noise. A flaky test that this hides for
+second attempt is in the shard's `e2e-results-shard-N-attempt-M` artifact: treat it as a bug to fix,
+in the test or in the app, never as noise. To chase one locally, ask for the
+retry and repeat the test until it misses:
+`pnpm test:e2e e2e/canvas.spec.ts --retries=1 --repeat-each=5` (the trace is
+written to `test-results/` on a retry; `pnpm exec playwright show-trace <zip>` opens it). A flaky test that this hides for
 long enough will fail twice in a row one day. Do not raise the retry count.
 The shards run inside Playwright's Docker image, pinned by digest, which
 already holds Chromium and its system libraries, so CI never installs
