@@ -207,11 +207,44 @@ describe("proxy", () => {
     expect(response.headers.get("x-robots-tag")).toBeNull();
   });
 
-  it("should send noindex, nofollow on the 404 when the viewer cannot read the artifact", async () => {
+  it("should send a signed-out visitor to sign-in, and back to the artifact afterwards, when they cannot read it", async () => {
     mocks.checkArtifactPage.mockResolvedValue(page(false, true));
-    const response = await proxy(request("/artifact/abc"));
+    const response = await proxy(request("/artifact/abc?comments=1"));
+    expect(response.status).toBe(307);
+    expect(location(response)).toBe(`${origin}/sign-in?next=${encodeURIComponent("/artifact/abc?comments=1")}`);
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    // No cookie is signed out: nothing is looked up to decide it.
+    expect(mocks.getSession).not.toHaveBeenCalled();
+  });
+
+  it("should treat a stale session cookie as signed out when the artifact cannot be read", async () => {
+    mocks.checkArtifactPage.mockResolvedValue(page(false));
+    mocks.getSession.mockResolvedValue(null);
+    const response = await proxy(request("/artifact/abc", { cookie: sessionCookie }));
+    expect(response.status).toBe(307);
+    expect(location(response)).toBe(`${origin}/sign-in?next=${encodeURIComponent("/artifact/abc")}`);
+  });
+
+  it("should send noindex, nofollow on the 404 when a signed-in viewer cannot read the artifact, with one session lookup", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "user-1" } });
+    // As the real check does for a private artifact: it asks who the viewer is before it answers.
+    mocks.checkArtifactPage.mockImplementation(async (_publicId: string, viewer: () => Promise<string | null>) => {
+      await viewer();
+      return page(false, true);
+    });
+    const response = await proxy(request("/artifact/abc", { cookie: sessionCookie }));
     expect(response.status).toBe(404);
     expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    expect(mocks.getSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("should keep the Markdown version's own answer when an agent asks for an artifact it cannot read", async () => {
+    mocks.checkArtifactPage.mockResolvedValue(page(false));
+    const response = await proxy(request("/artifact/abc.md"));
+    expect(location(response)).toBeNull();
+    expect(response.headers.get("x-middleware-rewrite")).toContain("/abc");
+    expect(mocks.checkArtifactPage).not.toHaveBeenCalled();
   });
 
   it("should stay noindex when the page check fails", async () => {
