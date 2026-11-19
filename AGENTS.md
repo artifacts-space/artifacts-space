@@ -630,8 +630,11 @@ catch this, so test the generated SQL with `.toSQL()`, as
     `instrumentation-client.ts`, which runs on every page, and do not use the
     `BotIdClient` component: its inline script does not run after a client
     navigation to the sign-in page, and every such person would be refused.
-    The auth client resolves `fetch` at call time, which is what lets the
-    check add its headers; a `customFetchImpl` on the client would bypass it.
+    The check adds its headers in the `window.fetch` it installs then, so
+    the auth client must look `fetch` up when a request is sent:
+    `customFetchImpl: fetchWhenSent` in `src/lib/auth/client.ts` does that
+    (next bullet). What bypasses the check is any reference to `fetch` taken
+    when a module loads, Better Auth's own default included.
   - It fails open: off Vercel (`botCheckRuns`: development, tests,
     self-hosting), on an error, or with no verdict in `botCheckTimeoutMs`,
     the link is sent. The refusal (403 `BOT_SUSPECTED`) is the same for
@@ -654,9 +657,11 @@ catch this, so test the generated SQL with `.toSQL()`, as
     at that moment.
   - An automated browser (Playwright, headless Chrome) is refused even with
     the proof: that is the check working, so only a person's browser can
-    show that people pass. What automation can show: the form's request
-    carries an `x-is-human` header and the challenge script
-    (`/149e9513-…/c.js`) loaded.
+    show that people pass. No test in this repository runs the real check.
+    What a script can still show by hand on a deployment, in the network
+    log: the form's request carries an `x-is-human` header, and the
+    challenge script (`/149e9513-…/c.js`) was requested just before it.
+    Neither was there in #252.
   - Nothing here proves that a real browser passes: BotID runs only on a
     Vercel deployment, and previews are behind Vercel sign-in. After any
     change to the browser side, ask for a link on a preview from a real
