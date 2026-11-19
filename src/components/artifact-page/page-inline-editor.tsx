@@ -31,7 +31,7 @@ const placeholderDraft: ArtifactDraft = { title: "", icon: null, summary: "", co
  * heading and body, so they keep their place in the tree when editing
  * unlocks, and a menu or picker opened before then stays open.
  */
-export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: ArtifactDto) => void) {
+export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: ArtifactDto) => void, onAutosaved: (artifact: ArtifactDto) => void = onSaved) {
   const [artifact, setArtifact] = useState(initial);
   const { draft, update, replace, reset, remount, revision } = useArtifactDraft(initial ?? placeholderDraft);
   const [sourceOpen, setSourceOpen] = useState(false);
@@ -40,6 +40,11 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
     setArtifact(next);
     onSaved(next);
   }, [onSaved]);
+  /** An autosave's answer: the editor already shows it, so the page around it can catch up later (`onAutosaved`). */
+  const autosaved = useCallback((next: ArtifactDto) => {
+    setArtifact(next);
+    onAutosaved(next);
+  }, [onAutosaved]);
 
   /** Unlocks editing with the editable copy once it has loaded. */
   const start = useCallback((loaded: ArtifactDto) => {
@@ -79,7 +84,7 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
     changedFrames,
   }), [artifact, draft, update, onUpdated, revision, sourceOpen, toggleSource, changedFrames]);
 
-  return { artifact, draft, replace, sourceOpen, toggleSource, onUpdated, restored, start, value, caughtUp, caughtUpWith, dismissCaughtUp };
+  return { artifact, draft, replace, sourceOpen, toggleSource, onUpdated, autosaved, restored, start, value, caughtUp, caughtUpWith, dismissCaughtUp };
 }
 
 type PageEditor = ReturnType<typeof usePageEditor>;
@@ -101,7 +106,7 @@ interface PageEditControlsProps {
  * the title (page-editor-chrome.tsx).
  */
 function PageEditControls({ artifact, editor, reviewed, pageFullWidth, save, signalEditing }: PageEditControlsProps) {
-  const autosave = useAutosave({ artifact, draft: editor.draft, replaceDraft: editor.replace, onUpdated: editor.onUpdated, save, signalEditing });
+  const autosave = useAutosave({ artifact, draft: editor.draft, replaceDraft: editor.replace, onUpdated: editor.autosaved, save, signalEditing });
   useLeaveGuard(autosave.dirty || autosave.status.kind === "saving");
   const fullWidth = usePageFullWidth(artifact, pageFullWidth);
   const { status, dirty, retryNow, loadTheirs, keepMine, agentSaved, dismissAgentSaved } = autosave;

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { ArtifactEditor } from "@/components/app/artifact-editor/artifact-editor";
 import type { SaveArtifact } from "@/components/app/artifact-editor/use-autosave";
+import { useQuietRefresh } from "@/components/app/artifact-editor/use-quiet-refresh";
 import { artifactListState } from "@/components/app/artifact-list-state";
 import { useHomeMoves, WorkspaceHomeProvider } from "@/components/app/home-moves";
 import type { AttachFilesApi } from "@/components/files/attached-files";
@@ -190,6 +191,8 @@ interface DashboardProps {
   newArtifactApi?: NewArtifactApi;
   /** The server decided this member sees the team's welcome card (src/lib/teams/welcome-rules.ts). Team workspaces only. */
   welcome?: boolean;
+  /** The page has a server copy to catch up after saves (useQuietRefresh): true on /app; the fixture has none. */
+  refreshAfterSaves?: boolean;
   /** Where "Got it" saves the closed welcome: the server action, or the fixture's stand-in. */
   dismissWelcome?: DismissWelcome;
 }
@@ -199,13 +202,19 @@ interface WorkspacePaneProps extends Omit<DetailPaneProps, "onCreate" | "save" |
   api: NewArtifactApi;
   /** The project the list is filtered to, for a new artifact. */
   project: string | null;
+  /** A blank page's artifact was saved: the server's copy of the workspace may catch up once the saves go quiet. */
+  afterSave: () => void;
 }
 
 /** The artifact pane: the blank page while New artifact has one open, else the selected artifact. */
-function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpdated, onDeleted, initialFull, loadArtifact, returned }: WorkspacePaneProps) {
+function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpdated, onDeleted, initialFull, loadArtifact, returned, afterSave }: WorkspacePaneProps) {
   // Memoized so the stored copies are merged into the seed only when they or the seed change, not on every render.
-  const { withStored } = fresh;
+  const { withStored, saved } = fresh;
   const full = useMemo(() => withStored(initialFull), [withStored, initialFull]);
+  const newSaved = useCallback((key: number, artifact: ArtifactDto) => {
+    saved(key, artifact);
+    afterSave();
+  }, [saved, afterSave]);
   if (fresh.session) {
     return (
       <NewArtifactPane
@@ -216,7 +225,7 @@ function WorkspacePane({ fresh, api, project, selected, viewerId, origin, onUpda
         project={project}
         sessionKey={fresh.session.key}
         focusRequest={fresh.session.focusRequest}
-        onSaved={fresh.saved}
+        onSaved={newSaved}
         onDeleted={onDeleted}
       />
     );
@@ -250,7 +259,7 @@ function useLinkLeavesNewArtifact(opened: unknown, leave: () => void) {
   useEffect(() => { if (opened) leave(); }, [opened, leave]);
 }
 
-export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed, loadArtifact, onLinkHandled, newArtifactApi = serverNewArtifactApi, welcome, dismissWelcome }: DashboardProps) {
+export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam, facets, projectRows, projectFilter, tagFacets, tagFilter, initialFull, projectsApi = serverProjectsApi, listPath = "/app", linkTarget, linkFailed, loadArtifact, onLinkHandled, newArtifactApi = serverNewArtifactApi, welcome, refreshAfterSaves = false, dismissWelcome }: DashboardProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -284,9 +293,12 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
   }, [refresh, setArtifacts, teams, scopeTeamId]);
   const moves = useHomeMoves({ teams, scopeTeam, viewerId, listPath, onReturned: comeBack, onChanged: saved });
 
+  // A save renders nothing on the server (updateArtifactAction); the workspace asks for itself once the saves go quiet.
+  const { soon: refreshSoon } = useQuietRefresh(refreshAfterSaves);
   function updated(artifact: ArtifactDto) {
     moves.settle(artifact.id);
     saved(artifact);
+    refreshSoon();
   }
 
   function deleted(id: string) {
@@ -353,6 +365,7 @@ export function Dashboard({ initialArtifacts, origin, viewerId, teams, scopeTeam
             initialFull={fullInHand}
             loadArtifact={loadArtifact}
             returned={moves.returned}
+            afterSave={refreshSoon}
           />
           </div>
         </div>

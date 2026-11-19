@@ -10,12 +10,13 @@ import { StaleSaveError } from "@/lib/save-guard";
  */
 
 const mocks = vi.hoisted(() => ({
+  revalidatePath: vi.fn(),
   session: vi.fn(),
   saveArtifactUpdate: vi.fn(),
   loadArtifactForViewer: vi.fn(),
 }));
 
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn(() => { throw new Error("redirect"); }), unstable_rethrow: vi.fn() }));
 vi.mock("@/lib/session", () => ({ getSession: mocks.session }));
 vi.mock("@/lib/abuse/rate-limit", () => ({ enforceRateLimit: () => Promise.resolve() }));
@@ -42,6 +43,14 @@ describe("updateArtifactAction", () => {
     const result = await updateArtifactAction("artifact-1", { content: "# Mine" }, {});
     expect(result.success).toBe(false);
     expect(mocks.saveArtifactUpdate).not.toHaveBeenCalled();
+  });
+
+  it("should make the server render no page when a person autosaves, so a save costs the save alone", async () => {
+    mocks.saveArtifactUpdate.mockResolvedValue({ artifact: { ...theirs, content: "# Mine" }, savedOverAgents: false });
+    const result = await updateArtifactAction("artifact-1", { content: "# Mine" }, { expectedUpdatedAt: base, session: "continue" });
+    expect(result.success).toBe(true);
+    // The editors ask for the page once the saves go quiet (useQuietRefresh).
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
   it("should pass the base version and the editing-session step to the store when a person autosaves", async () => {

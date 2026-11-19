@@ -68,6 +68,11 @@ async function latestFor(publicId: string, userId: string): Promise<ArtifactDto 
  * `savedOverAgents`; when another person saved since, nothing is written and
  * the result carries their newest version.
  * `options.session` groups an editor's autosaves into one version.
+ *
+ * It revalidates no path: that would make the server render the page the
+ * editor is on inside every autosave's response, and the editor already
+ * shows what it saved. The editors ask for the page once the saves go quiet
+ * (useQuietRefresh), which also drops the pages the browser keeps for Back.
  */
 export async function updateArtifactAction(
   id: string,
@@ -79,8 +84,6 @@ export async function updateArtifactAction(
     userId = await requireUserId();
     const saved = await saveArtifactUpdate(userId, id, input, "person", saveOptionsSchema.parse(options));
     if (!saved) return { success: false, error: "Artifact not found." };
-    revalidatePath("/app");
-    revalidatePath(`/artifact/${saved.artifact.publicId}`);
     return { success: true, data: saved.artifact, savedOverAgents: saved.savedOverAgents };
   } catch (error) {
     if (error instanceof StaleSaveError && userId) {

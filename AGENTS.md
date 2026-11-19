@@ -2138,6 +2138,28 @@ the UPDATE itself, one statement, never a read-then-write:
   is no push channel yet, so a tab that stays in view does not update until
   it is focused again.
 
+### What an autosave costs
+
+An autosave is one request and the server renders no page for it. The save
+action (`updateArtifactAction`) calls no `revalidatePath`: in a Server
+Function that renders the page the editor is on inside the save's response,
+and the artifact page then asked for itself again after every save, so each
+autosave cost two renders of the page (the owner, 2026-11-19: "slow to save
+when user makes change", #255). The editor already shows what it saved.
+The page around it catches up through `useQuietRefresh`
+(`src/components/app/artifact-editor/`): `soon` asks for the page once,
+`QUIET_REFRESH_MS` after the last save, which is longer than the longest gap
+between two autosaves, so typing that goes on renders nothing; `now` asks at
+once, for a change the editor does not show by itself (a restore, a newer
+save taken from the server); leaving with a refresh still owed asks at once,
+which also drops the pages the browser keeps for Back. The artifact page's
+`EditSurface` and `/app`'s `Dashboard` (`refreshAfterSaves`) use it; the
+fixtures do not, since they have no server copy. Do not put a
+`revalidatePath` or a per-save `router.refresh()` back on the autosave path;
+a save that must show at once on the server's page goes through `now`.
+`e2e/autosave-refresh-db.spec.ts` counts the requests against a real
+database.
+
 ### Workspaces and an artifact's home
 
 Decided by the owner on 16 Nov 2026: "if i move it to team - it should no
