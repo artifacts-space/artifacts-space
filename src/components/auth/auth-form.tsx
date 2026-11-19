@@ -198,7 +198,7 @@ export function AuthForm({ mode, googleEnabled, botCheck }: { mode: AuthMode; go
     setError("");
     try {
       const answer = await withinSignInLinkWait(authClient.signIn.magicLink({ email: email.trim(), callbackURL: workspaceUrl() }));
-      // The bot check's script never became ready, so the request never left: say so instead of staying busy.
+      // No answer in time (signInLinkWaitMs says how that can happen): stop being busy and say so.
       if (answer === SIGN_IN_LINK_STALLED) {
         setError(BOT_SUSPECTED_MESSAGE);
         return;

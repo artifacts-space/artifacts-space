@@ -61,11 +61,12 @@ test("should send the sign-in link request through a fetch that was replaced aft
  * request is held for good and the page's clock is moved past the wait.
  */
 test("should stop waiting and show the way on when the sign-in link request never gets an answer", async ({ page }) => {
-  await page.clock.install();
   await page.route("**/api/auth/sign-in/magic-link", () => new Promise<void>(() => undefined));
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill("ada@example.com");
   const send = page.getByRole("button", { name: "Email me a sign-in link" });
+  // Only the form's wait needs a clock the test can move: the page loads and hydrates on real time.
+  await page.clock.install();
   await send.click();
   await expect(send).toBeDisabled();
 

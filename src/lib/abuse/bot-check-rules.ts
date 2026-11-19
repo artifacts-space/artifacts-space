@@ -82,13 +82,22 @@ export const SIGN_IN_LINK_STALLED = Symbol("sign-in link request stalled");
  * The request itself cannot be withdrawn: if it does go out later, the link
  * is still sent, and the form's message already says to try again.
  */
-export async function withinSignInLinkWait<T>(request: Promise<T>, ms: number = signInLinkWaitMs): Promise<T | typeof SIGN_IN_LINK_STALLED> {
+export function withinSignInLinkWait<T>(request: Promise<T>, ms: number = signInLinkWaitMs): Promise<T | typeof SIGN_IN_LINK_STALLED> {
+  return withTimeout(request, ms, SIGN_IN_LINK_STALLED);
+}
+
+/**
+ * The promise's answer, or `fallback` when none came within `ms`. The timer
+ * never outlives the promise. Both waits here use it: the server's for the
+ * host's verdict, and the form's for its request.
+ */
+export async function withTimeout<T, F>(promise: Promise<T>, ms: number, fallback: F): Promise<T | F> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const stalled = new Promise<typeof SIGN_IN_LINK_STALLED>((resolve) => {
-    timer = setTimeout(() => { resolve(SIGN_IN_LINK_STALLED); }, ms);
+  const late = new Promise<F>((resolve) => {
+    timer = setTimeout(() => { resolve(fallback); }, ms);
   });
   try {
-    return await Promise.race([request, stalled]);
+    return await Promise.race([promise, late]);
   } finally {
     clearTimeout(timer);
   }
