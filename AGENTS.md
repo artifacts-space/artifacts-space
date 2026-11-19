@@ -1422,6 +1422,17 @@ deletes one only when it leaves every retained version (history pruning in
 artifact. Kept images never widen access: readers of the approved version get
 only that version's icon and cover (`served-images.ts`, `canReadFile`).
 
+The editors' controls sit on the picture (`editable-cover.tsx`), so their
+surface is solid in both modes (`controlClass`): the outline button's own
+dark surface is 30% opaque, and that or a blur makes the names unreadable
+over a high-contrast image. A removed cover is gone at once; the page around
+it was laid out by the server for a cover (no space above the heading, the
+icon pulled up across the cover's edge), so `RemovedCoverSpace` holds the
+difference until the server's page arrives, and nothing moves when it does.
+If the heading's spacing or the icon's pull-up changes in the artifact page,
+change those heights with it (`e2e/artifact-cover.spec.ts` compares the two
+positions).
+
 ### Media in documents
 
 Markdown artifacts embed uploads as image syntax alone in a paragraph,

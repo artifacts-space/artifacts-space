@@ -144,3 +144,59 @@ test("should move an image cover's focal point with the keyboard and save it whe
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await storedCovers(publicId)).artifact).toBe(`file:${fileId}@1`);
 });
+
+/** True when a CSS color lets what is behind it show through. */
+function seeThrough(color: string): boolean {
+  const alpha = /\/\s*([\d.]+%?)\s*\)$/.exec(color)?.[1] ?? /^rgba\([^)]*,\s*([\d.]+)\)$/.exec(color)?.[1];
+  if (alpha === undefined) return false;
+  return (alpha.endsWith("%") ? Number.parseFloat(alpha) / 100 : Number.parseFloat(alpha)) < 1;
+}
+
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`should give the cover's controls a solid surface in ${colorScheme} mode, so their names read over any image`, async ({ page }, testInfo) => {
+    await page.emulateMedia({ colorScheme });
+    await signIn(page);
+    const publicId = await createTestArtifact({ userId: await devUserId(), title: `Cover controls ${colorScheme} ${testInfo.project.name}`, content: "# Notes", visibility: "private", theme: null, cover: "dusk" });
+    created.push(publicId);
+
+    await page.goto(`/artifact/${publicId}`);
+    const cover = page.locator("[data-artifact-cover]");
+    await cover.hover();
+    for (const name of ["Change cover", "Remove cover"]) {
+      const surface = await cover.getByRole("button", { name }).evaluate((button) => getComputedStyle(button).backgroundColor);
+      expect(seeThrough(surface), `${name}: ${surface}`).toBe(false);
+    }
+  });
+}
+
+test("should take a removed cover away at once and keep the heading where the page without a cover has it, while the save is still on its way", async ({ page }, testInfo) => {
+  await signIn(page);
+  const publicId = await createTestArtifact({ userId: await devUserId(), title: `Cover removal ${testInfo.project.name}`, content: "# Notes", visibility: "private", theme: null, cover: "dusk", icon: "🚀" });
+  created.push(publicId);
+  await page.goto(`/artifact/${publicId}`);
+  const cover = page.locator("[data-artifact-cover]");
+  const icon = page.locator("[data-page-icon]");
+  await expect(cover).toBeVisible();
+
+  // Hold the save (a server action posts to the page's own address) until the test lets it go.
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(`**/artifact/${publicId}`, async (route) => {
+    if (route.request().method() === "POST") await held;
+    await route.continue();
+  });
+  await cover.hover();
+  await cover.getByRole("button", { name: "Remove cover" }).click();
+
+  await expect(cover).toHaveCount(0);
+  await expect(page.locator("[data-cover-removed]")).toBeAttached();
+  const header = await page.getByRole("banner").boundingBox();
+  const waiting = await icon.boundingBox();
+  expect(waiting && header && waiting.y >= header.y + header.height, "the icon is clear of the header while the save is on its way").toBe(true);
+
+  release();
+  await expect(page.getByRole("button", { name: "Add cover" })).toBeAttached();
+  await expect(page.locator("[data-cover-removed]")).toHaveCount(0);
+  await expect(icon).toHaveAttribute("data-page-icon", "in-flow");
+  expect((await icon.boundingBox())?.y, "nothing moves when the server's page takes over").toBe(waiting?.y);
+});

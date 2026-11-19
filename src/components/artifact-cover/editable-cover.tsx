@@ -14,7 +14,11 @@ import { CoverFrame } from "./cover-frame";
 import { CoverPicker } from "./cover-picker";
 import { useCoverSave } from "./use-cover-save";
 
-const controlClass = "h-7 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70";
+/**
+ * The controls sit on the picture, so their surface is solid in both modes: readable over a white, black, or busy
+ * image. The outline button's own dark surface is 30% opaque, and a blurred one let a high-contrast image through.
+ */
+const controlClass = "h-7 border-border bg-background text-foreground shadow-sm hover:bg-muted dark:border-border dark:bg-background dark:hover:bg-muted";
 /** On phones the controls are icons (their names stay for screen readers), so they never run under a page icon on the cover's left. Remove has its own fuller name, "Remove cover". */
 const phoneLabel = "max-sm:sr-only";
 
@@ -24,6 +28,22 @@ interface EditableCoverProps {
   cover: string | null;
   /** Lines the controls up with a full-width page column. */
   fullWidth: boolean;
+  /** The page has an icon, which the page draws across the cover's lower edge. */
+  hasIcon: boolean;
+}
+
+/**
+ * What takes the cover's place from the moment it is removed until the
+ * server's page arrives: the page around it was laid out for a cover (no
+ * space above the heading, the icon pulled up across the cover's edge), and
+ * without this the icon would sit under the header until then. Each height
+ * makes up the difference from the page without a cover, so nothing moves
+ * when that page takes over: with an icon, the heading's usual space plus
+ * what the icon is pulled up by; without one, what the heading's space is
+ * short by under a cover.
+ */
+function RemovedCoverSpace({ hasIcon }: { hasIcon: boolean }) {
+  return <div data-cover-removed aria-hidden className={hasIcon ? "h-20 sm:h-26" : "h-4 sm:h-6"} />;
 }
 
 /** Moves focus to the reposition slider when it appears, so the arrow keys work at once. A stable function, so React calls it once per mount. */
@@ -84,14 +104,15 @@ function useReposition(onSave: (position: number) => Promise<void>) {
  * gradient or an uploaded image), Reposition (image covers: drag, or the
  * arrow keys, then Save), and Remove. The controls show on hover or focus,
  * and always on touch screens. Saves go through the same edit path and
- * approval rule as a title change. Without a cover it renders nothing; "Add
- * cover" sits with the icon and theme controls above the title.
+ * approval rule as a title change. A removed cover is gone at once, and its
+ * place keeps the page's spacing (RemovedCoverSpace) until the server's page
+ * arrives; "Add cover" sits with the icon and theme controls above the title.
  */
-export function EditableCover({ publicId, cover: initial, fullWidth }: EditableCoverProps) {
+export function EditableCover({ publicId, cover: initial, fullWidth, hasIcon }: EditableCoverProps) {
   const { cover, saving, save } = useCoverSave(publicId, initial);
   const reposition = useReposition(async (position) => { await save(withCoverPosition(cover, position)); });
   const parsed = parseArtifactCover(cover);
-  if (!parsed) return null;
+  if (!parsed) return cover === null ? <RemovedCoverSpace hasIcon={hasIcon} /> : null;
   const { draft } = reposition;
   const repositioning = draft !== null;
 
@@ -117,7 +138,7 @@ export function EditableCover({ publicId, cover: initial, fullWidth }: EditableC
             className="absolute inset-0 flex cursor-grab touch-none items-center justify-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset active:cursor-grabbing"
             {...reposition.handlers}
           >
-            <p className="pointer-events-none rounded-lg bg-background/85 px-3 py-1.5 text-sm text-foreground backdrop-blur">Drag the image, or use the arrow keys</p>
+            <p className="pointer-events-none rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground shadow-sm">Drag the image, or use the arrow keys</p>
           </div>
           <div className={cn("absolute inset-x-0 bottom-3 mx-auto flex w-full justify-end gap-1.5", pageColumnClass(fullWidth))}>
             <Button type="button" variant="outline" size="sm" className={controlClass} onClick={() => { reposition.setDraft(null); }}>Cancel</Button>
