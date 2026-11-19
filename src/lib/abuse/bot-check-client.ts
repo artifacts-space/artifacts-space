@@ -16,9 +16,10 @@ let started = false;
  */
 export function startSignInLinkBotCheck(): void {
   if (started || typeof window === "undefined") return;
-  started = true;
   try {
     initBotId({ protect: signInLinkProtection });
+    // Only once it started: a start that threw is tried again when the form next mounts.
+    started = true;
   } catch (error) {
     console.error("[auth] Bot check did not start", error instanceof Error ? error.name : "unknown error");
   }

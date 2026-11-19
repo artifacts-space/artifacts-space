@@ -612,9 +612,12 @@ catch this, so test the generated SQL with `.toSQL()`, as
   strangers' addresses, 10 to 25 a day from as many networks, so the rate
   limits never saw them; the strangers reported the mail as spam, which puts
   everyone's sign-in email at risk (the owner's choice of BotID, 2026-11-19).
-  - It guards one request only: `POST /api/auth/sign-in/magic-link`, checked
-    in the auth route before the sign-in limits, so a refused script spends
-    no limit and sends nothing. Agents are this product's users: never add
+  - It guards one request only: `POST /api/auth/sign-in/magic-link`
+    (`SIGN_IN_LINK_PATH`, the one constant the server's `isMagicLinkRequest`
+    and the browser's protect list both read), checked in the auth route
+    after the sign-in limits: a burst meets the counters in Postgres first
+    and never reaches the check's outbound call, which takes a round trip to
+    the host and cannot be cancelled. Agents are this product's users: never add
     the check to MCP, the OAuth endpoints, the API, tokens, or anything else
     an agent or app calls (a route test fails if those are checked). A
     verified bot (`isVerifiedBot`: an assistant that signs its requests) is
@@ -631,13 +634,28 @@ catch this, so test the generated SQL with `.toSQL()`, as
     check add its headers; a `customFetchImpl` on the client would bypass it.
   - It fails open: off Vercel (`botCheckRuns`: development, tests,
     self-hosting), on an error, or with no verdict in `botCheckTimeoutMs`,
-    the request goes on to the limits. The refusal (403 `BOT_SUSPECTED`) is
-    the same for every address. Never log the request.
+    the link is sent. The refusal (403 `BOT_SUSPECTED`) is the same for
+    every address. A refusal logs one bare line (`[auth] Sign-in link
+    refused: suspected bot`), so a spike shows in the logs; never log the
+    request. The host also lists every check under the project's Firewall
+    tab (traffic filter: BotID).
+  - The switch, if real people are refused: a bypass rule in the Vercel
+    Firewall for the sign-in link path. It needs no deploy, and a request it
+    matched (`bypassed`) is let through whatever else the verdict says
+    (`refusesSignInLink`). Removing the check altogether is a revert.
+  - Nothing here proves that a real browser passes: BotID runs only on a
+    Vercel deployment, and previews are behind Vercel sign-in. After any
+    change to the browser side, ask for a link on a preview from a real
+    browser (an address at a domain that cannot receive mail sends nothing)
+    and confirm the answer is not `BOT_SUSPECTED`.
   - The privacy page describes it (what was collected, the cookies list,
     and the one exception to "No outside service loads in your browser").
     Change that page in the same pull request as any change to where or how
-    the check runs. Turning on Deep Analysis in the Vercel dashboard
-    (Firewall, Rules) is the owner's call; it needs no code change.
+    the check runs. It ships at the Basic level, which is free. Deep
+    Analysis (Vercel dashboard: Firewall, Rules; no code change) is the
+    owner's call: it is billed per check and brings in the host's bot
+    detection vendor, so the privacy page's list of processors changes with
+    it.
 
 ### Page host
 

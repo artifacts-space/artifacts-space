@@ -10,22 +10,28 @@
  * (MCP, the OAuth endpoints, the API, tokens) is ever checked. Keep it so.
  */
 
-/** The one request the browser proves itself for. The server checks the same request (isMagicLinkRequest). */
-export const signInLinkProtection: { path: string; method: string }[] = [{ path: "/api/auth/sign-in/magic-link", method: "POST" }];
+/** The path of the request that emails a sign-in link: the one the server checks (isMagicLinkRequest) and the browser proves itself for. */
+export const SIGN_IN_LINK_PATH = "/api/auth/sign-in/magic-link";
+
+/** The one request the browser proves itself for, in the shape the host's check takes. */
+export const signInLinkProtection: { path: string; method: "POST" }[] = [{ path: SIGN_IN_LINK_PATH, method: "POST" }];
 
 /** What the host's bot check says about a request. */
 export interface BotVerdict {
   isBot: boolean;
   isVerifiedBot: boolean;
+  /** A bypass rule in the host's firewall matched the request: the owner's switch, which needs no deploy. */
+  bypassed: boolean;
 }
 
 /**
  * True when a sign-in link request is refused: the check calls it a bot and
  * cannot name it. A verified bot (an assistant that signs its requests, which
- * a script cannot fake) is let through, like a person.
+ * a script cannot fake) is let through, like a person, and so is a request
+ * the owner's firewall bypass rule matched, whatever else the verdict says.
  */
 export function refusesSignInLink(verdict: BotVerdict): boolean {
-  return verdict.isBot && !verdict.isVerifiedBot;
+  return verdict.isBot && !verdict.isVerifiedBot && !verdict.bypassed;
 }
 
 /**

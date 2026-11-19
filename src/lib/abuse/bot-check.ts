@@ -18,15 +18,17 @@ async function verdictWithin(ms: number): Promise<BotVerdict | null> {
 /**
  * Asks the host's bot check about the current sign-in link request. Returns
  * a 403 to send instead, or null to go on. It fails open: off Vercel, on an
- * error, or without a verdict in time, the request goes on to the rate
- * limits, so a problem with the check never stops people signing in. Logs
- * nothing about the request.
+ * error, or without a verdict in time, the link is sent, so a problem with
+ * the check never stops people signing in. The check's own call cannot be
+ * cancelled, so a late verdict is dropped. A refusal is logged as one bare
+ * line, so a spike shows in the logs; nothing about the request ever is.
  */
 export async function refuseSuspectedBot(): Promise<Response | null> {
   if (!botCheckRuns({ VERCEL_ENV: process.env.VERCEL_ENV })) return null;
   try {
     const verdict = await verdictWithin(botCheckTimeoutMs);
     if (!verdict || !refusesSignInLink(verdict)) return null;
+    console.warn("[auth] Sign-in link refused: suspected bot");
     return Response.json({ code: BOT_SUSPECTED_CODE, message: BOT_SUSPECTED_MESSAGE }, { status: 403, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("[auth] Bot check failed", error instanceof Error ? error.name : "unknown error");

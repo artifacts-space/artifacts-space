@@ -42,13 +42,14 @@ async function refuseMagicLinkFlood(request: Request): Promise<Response | null> 
 }
 
 /**
- * A sign-in link request: the bot check first (a refused script spends no
- * limit and sends nothing), then the limits. Returns a response to send
- * instead, or null to go on. No other request is ever bot-checked: agents
- * reach us through MCP and the OAuth endpoints, which stay open to them.
+ * A sign-in link request: the limits first, as before the bot check existed
+ * (one counter read in Postgres, so a burst meets the cheapest gate and never
+ * reaches the check's outbound call), then the bot check. Returns a response
+ * to send instead, or null to go on. No other request is ever bot-checked:
+ * agents reach us through MCP and the OAuth endpoints, which stay open to them.
  */
 async function refuseSignInLink(request: Request): Promise<Response | null> {
-  return (await refuseSuspectedBot()) ?? (await refuseMagicLinkFlood(request));
+  return (await refuseMagicLinkFlood(request)) ?? (await refuseSuspectedBot());
 }
 
 /**

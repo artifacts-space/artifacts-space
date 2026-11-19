@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   handler: vi.fn<(request: Request) => Promise<Response>>(),
   hitRateLimit: vi.fn(),
-  checkBotId: vi.fn<() => Promise<{ isBot: boolean; isVerifiedBot: boolean }>>(),
+  checkBotId: vi.fn<() => Promise<{ isBot: boolean; isVerifiedBot: boolean; bypassed: boolean }>>(),
   hitRateLimits: vi.fn<(checks: readonly { name: string; subject: string }[]) => Promise<unknown>>(),
   peekRateLimit: vi.fn(),
   countRateLimitHit: vi.fn(),
@@ -145,9 +145,10 @@ describe("auth route sign-in links", () => {
     expect(mocks.handler).not.toHaveBeenCalled();
   });
 
-  it("should refuse a suspected bot with 403 on a deployment, before any limit is counted, and never send the link", async () => {
+  it("should refuse a suspected bot with 403 on a deployment, the same for every address, and never send the link", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
-    mocks.checkBotId.mockResolvedValue({ isBot: true, isVerifiedBot: false });
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    mocks.checkBotId.mockResolvedValue({ isBot: true, isVerifiedBot: false, bypassed: false });
     mocks.hitRateLimits.mockResolvedValue(null);
     const answers = await Promise.all(["member@example.com", "nobody@example.com"].map(async (email) => {
       const response = await POST(signIn(email));
@@ -155,23 +156,35 @@ describe("auth route sign-in links", () => {
     }));
     expect(answers[0]).toEqual({ status: 403, body: JSON.stringify({ code: "BOT_SUSPECTED", message: "We could not confirm that this request came from your browser. Reload the page and try again, or continue with GitHub or Google." }), cache: "no-store" });
     expect(answers[1]).toEqual(answers[0]);
-    expect(mocks.hitRateLimits).not.toHaveBeenCalled();
     expect(mocks.handler).not.toHaveBeenCalled();
   });
 
-  it("should send the link on a deployment when the check finds a person, a verified bot, or fails", async () => {
+  it("should answer a burst from the limits alone, without asking the bot check", async () => {
+    vi.stubEnv("VERCEL_ENV", "production");
+    mocks.checkBotId.mockResolvedValue({ isBot: false, isVerifiedBot: false, bypassed: false });
+    mocks.hitRateLimits.mockResolvedValue({ name: "magicLinkByNetworkMinute", retryAfterSeconds: 42 });
+    expect((await POST(signIn("ada@example.com"))).status).toBe(429);
+    expect(mocks.checkBotId).not.toHaveBeenCalled();
+    expect(mocks.handler).not.toHaveBeenCalled();
+  });
+
+  it("should send the link on a deployment when the check finds a person, a verified bot, a bypassed request, or fails", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.hitRateLimits.mockResolvedValue(null);
-    mocks.checkBotId.mockResolvedValueOnce({ isBot: false, isVerifiedBot: false }).mockResolvedValueOnce({ isBot: true, isVerifiedBot: true }).mockRejectedValueOnce(new Error("check unavailable"));
-    for (const email of ["a@example.com", "b@example.com", "c@example.com"]) expect((await POST(signIn(email))).status).toBe(200);
-    expect(mocks.handler).toHaveBeenCalledTimes(3);
-    expect(mocks.hitRateLimits).toHaveBeenCalledTimes(3);
+    mocks.checkBotId
+      .mockResolvedValueOnce({ isBot: false, isVerifiedBot: false, bypassed: false })
+      .mockResolvedValueOnce({ isBot: true, isVerifiedBot: true, bypassed: false })
+      .mockResolvedValueOnce({ isBot: true, isVerifiedBot: false, bypassed: true })
+      .mockRejectedValueOnce(new Error("check unavailable"));
+    for (const email of ["a@example.com", "b@example.com", "c@example.com", "d@example.com"]) expect((await POST(signIn(email))).status).toBe(200);
+    expect(mocks.handler).toHaveBeenCalledTimes(4);
+    expect(mocks.checkBotId).toHaveBeenCalledTimes(4);
   });
 
   it("should never bot-check what agents and apps call, or any sign-in link off Vercel", async () => {
     vi.stubEnv("VERCEL_ENV", "production");
-    mocks.checkBotId.mockResolvedValue({ isBot: true, isVerifiedBot: false });
+    mocks.checkBotId.mockResolvedValue({ isBot: true, isVerifiedBot: false, bypassed: false });
     mocks.hitRateLimit.mockResolvedValue({ allowed: true, retryAfterSeconds: 0 });
     mocks.hitRateLimits.mockResolvedValue(null);
     mocks.peekRateLimit.mockResolvedValue({ allowed: true, retryAfterSeconds: 0 });

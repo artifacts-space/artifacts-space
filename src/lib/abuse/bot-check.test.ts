@@ -4,7 +4,7 @@ import { BOT_SUSPECTED_CODE, BOT_SUSPECTED_MESSAGE, botCheckTimeoutMs } from "@/
 
 /* The host's bot check is mocked at its boundary: what each verdict, error, and delay does to the request. */
 
-const mocks = vi.hoisted(() => ({ checkBotId: vi.fn<() => Promise<{ isBot: boolean; isVerifiedBot: boolean }>>() }));
+const mocks = vi.hoisted(() => ({ checkBotId: vi.fn<() => Promise<{ isBot: boolean; isVerifiedBot: boolean; bypassed: boolean }>>() }));
 
 vi.mock("botid/server", () => ({ checkBotId: mocks.checkBotId }));
 
@@ -21,23 +21,27 @@ describe("refuseSuspectedBot", () => {
     vi.useRealTimers();
   });
 
-  it("should refuse with 403, uncached, when the check calls the request a bot", async () => {
-    mocks.checkBotId.mockResolvedValue({ isBot: true, isVerifiedBot: false });
+  it("should refuse with 403, uncached, and log one bare line when the check calls the request a bot", async () => {
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    mocks.checkBotId.mockResolvedValue({ isBot: true, isVerifiedBot: false, bypassed: false });
     const response = await refuseSuspectedBot();
+    expect(warned.mock.calls).toEqual([["[auth] Sign-in link refused: suspected bot"]]);
     expect(response?.status).toBe(403);
     expect(response?.headers.get("cache-control")).toBe("no-store");
     expect(await response?.json()).toEqual({ code: BOT_SUSPECTED_CODE, message: BOT_SUSPECTED_MESSAGE });
   });
 
-  it("should go on when the check finds a person or a verified bot", async () => {
-    mocks.checkBotId.mockResolvedValue({ isBot: false, isVerifiedBot: false });
-    expect(await refuseSuspectedBot()).toBeNull();
-    mocks.checkBotId.mockResolvedValue({ isBot: true, isVerifiedBot: true });
-    expect(await refuseSuspectedBot()).toBeNull();
+  it("should go on, and log nothing, when the check finds a person, a verified bot, or a bypassed request", async () => {
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    for (const verdict of [{ isBot: false, isVerifiedBot: false, bypassed: false }, { isBot: true, isVerifiedBot: true, bypassed: false }, { isBot: true, isVerifiedBot: false, bypassed: true }]) {
+      mocks.checkBotId.mockResolvedValue(verdict);
+      expect(await refuseSuspectedBot()).toBeNull();
+    }
+    expect(warned).not.toHaveBeenCalled();
   });
 
   it("should never ask the check when the server is not on Vercel", async () => {
-    mocks.checkBotId.mockResolvedValue({ isBot: true, isVerifiedBot: false });
+    mocks.checkBotId.mockResolvedValue({ isBot: true, isVerifiedBot: false, bypassed: false });
     for (const env of ["", "development"]) {
       vi.stubEnv("VERCEL_ENV", env);
       expect(await refuseSuspectedBot()).toBeNull();
