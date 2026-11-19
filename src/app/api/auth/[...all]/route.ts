@@ -1,3 +1,4 @@
+import { refuseSuspectedBot } from "@/lib/abuse/bot-check";
 import { networkKey } from "@/lib/abuse/network-key";
 import { hitRateLimit, hitRateLimits, rateLimitMessage } from "@/lib/abuse/rate-limit";
 import { isMagicLinkRequest, magicLinkChecks, magicLinkEmail } from "@/lib/auth/magic-link-limits";
@@ -41,13 +42,24 @@ async function refuseMagicLinkFlood(request: Request): Promise<Response | null> 
 }
 
 /**
+ * A sign-in link request: the limits first, as before the bot check existed
+ * (one counter read in Postgres, so a burst meets the cheapest gate and never
+ * reaches the check's outbound call), then the bot check. Returns a response
+ * to send instead, or null to go on. No other request is ever bot-checked:
+ * agents reach us through MCP and the OAuth endpoints, which stay open to them.
+ */
+async function refuseSignInLink(request: Request): Promise<Response | null> {
+  return (await refuseMagicLinkFlood(request)) ?? (await refuseSuspectedBot());
+}
+
+/**
  * Applies the abuse limits, then rewrites an authorization request's scope to
  * this server's policy (no scope means full access, and offline_access is
  * always added so clients get refresh tokens).
  */
 async function prepare(request: Request): Promise<Request | Response> {
   const url = new URL(request.url);
-  if (isMagicLinkRequest(request.method, url.pathname)) return (await refuseMagicLinkFlood(request)) ?? request;
+  if (isMagicLinkRequest(request.method, url.pathname)) return (await refuseSignInLink(request)) ?? request;
   if (publicOAuthEndpoint(request.method, url.pathname) !== "authorize") return request;
   try {
     const refusal = await refuseAbuse(request);

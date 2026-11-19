@@ -74,6 +74,7 @@ export function PrivacyCollection() {
             <strong>View counts.</strong> When someone opens a public artifact, the page tells our server once that it was viewed, and which site linked to it. We keep, per artifact and per day, the number of views, the number of unique visitors, and the linking site&apos;s domain (never its full address). To count a visitor once a day, we make a keyed, one-way hash of the network address, browser user agent, and artifact, with a key that changes every day. We never store the address or the user agent, and we delete each day&apos;s hashes after that day ends, so nobody can be recognized from one day to the next or from one artifact to another. This uses no cookie and no local storage. Bots, and people who can edit the artifact, are not counted, and link, team, and private artifacts are not counted at all. Only the people and agents who can edit the artifact (its author and the team it is shared through) see the counts.
           </li>
           <li><strong>Browser notifications.</strong> If you turn them on, we store each browser&apos;s push address and encryption keys, a label such as &quot;Chrome on macOS&quot; (not the full user agent), and when it was added and last notified. Signing out or removing the browser in Settings deletes them.</li>
+          <li><strong>Bot check on sign-in links.</strong> Scripts have used the sign-in form to send sign-in emails to people who never asked for one. So when you ask for a sign-in link, a check from our host, Vercel, runs in your browser on the sign-in page and tells our server whether the request came from a browser or a script. Our server sends Vercel the request&apos;s headers (your network address and browser details, never the email address you typed) to get the answer. We keep nothing from it. It runs on no other page, and never on what agents and apps call.</li>
           <li><strong>Abuse limits.</strong> To count requests for rate limits, we use a keyed, one-way hash of your network address. We do not store the raw address for this. Reports from signed-out readers keep the same hash instead of an account.</li>
           <li><strong>Server logs.</strong> Our host, Vercel, records each request (IP address, time, URL, status, and user agent) and keeps these logs for a limited time. Our own error logs leave out tokens and artifact content.</li>
         </ul>
@@ -85,13 +86,14 @@ export function PrivacyCollection() {
         <ul>
           <li>a session cookie that keeps you signed in;</li>
           <li>a signed cookie that caches your session for up to 5 minutes, so pages load faster;</li>
-          <li>short-lived cookies that protect a sign-in or an app connection while it is in progress.</li>
+          <li>short-lived cookies that protect a sign-in or an app connection while it is in progress;</li>
+          <li>on the sign-in pages only, cookies the bot check may set to tell a browser from a script when you ask for a sign-in link.</li>
         </ul>
         <p>
           Your browser also stores your theme choice (system, light, or dark) in local storage. We use no analytics, advertising, or tracking cookies, and no third-party analytics of any kind. That is why there is no cookie banner. Images in artifacts and comments load only from our own file storage, so a shared page cannot track its readers with outside images.
         </p>
         <p>
-          No outside service loads in your browser. Our fonts, Geist and Geist Mono, are served from artifacts.space itself. If you turn on browser notifications, your browser registers with its own push service, and a small service worker from artifacts.space shows the notifications; it caches nothing.
+          No outside service loads in your browser, with one exception: the bot check on the sign-in pages, described above, which our host serves from artifacts.space itself. Our fonts, Geist and Geist Mono, are served from artifacts.space itself. If you turn on browser notifications, your browser registers with its own push service, and a small service worker from artifacts.space shows the notifications; it caches nothing.
         </p>
       </Prose>
 

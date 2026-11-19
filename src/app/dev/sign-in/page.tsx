@@ -22,7 +22,7 @@ export default async function SignInFixturePage({ searchParams }: PageProps<"/de
   const params = await searchParams;
   return (
     <AuthShell>
-      <AuthForm mode={params.mode === "sign-up" ? "sign-up" : "sign-in"} googleEnabled={params.google === "1"} />
+      <AuthForm mode={params.mode === "sign-up" ? "sign-up" : "sign-in"} googleEnabled={params.google === "1"} botCheck={false} />
     </AuthShell>
   );
 }

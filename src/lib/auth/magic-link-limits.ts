@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { z } from "zod";
 
+import { SIGN_IN_LINK_PATH } from "@/lib/abuse/bot-check-rules";
 import type { RateLimitCheck } from "@/lib/abuse/rate-limit";
 
 /**
@@ -13,7 +14,7 @@ import type { RateLimitCheck } from "@/lib/abuse/rate-limit";
 
 /** True for the request that emails a sign-in link. */
 export function isMagicLinkRequest(method: string, pathname: string): boolean {
-  return method === "POST" && pathname.replace(/\/+$/, "") === "/api/auth/sign-in/magic-link";
+  return method === "POST" && pathname.replace(/\/+$/, "") === SIGN_IN_LINK_PATH;
 }
 
 const bodySchema = z.object({ email: z.string().trim().min(1).max(320) });
