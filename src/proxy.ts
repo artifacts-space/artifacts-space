@@ -100,8 +100,8 @@ function noindex<T extends Response>(response: T): T {
 
 /**
  * An artifact page this viewer cannot read. Signed out: to sign-in, and back
- * to the artifact afterwards (the owner, 2026-11-19: someone sent a link to
- * a private artifact was told it did not exist). The same for every id,
+ * to the artifact afterwards (the owner, 2026-11-19: someone who was sent a
+ * link to a private artifact was told it did not exist). The same for every id,
  * whether or not an artifact has it, so the redirect tells a stranger
  * nothing the 404 did not. Signed in and still not readable: the 404. No
  * cookie means signed out with no lookup; a stale cookie counts as signed
@@ -208,6 +208,7 @@ async function siteProxy(request: NextRequest) {
     return await checkRecord(request, check);
   } catch (error) {
     // The page repeats the check, so a failure here only costs the status code. Artifact pages stay noindex.
+    // That includes the session lookup an unreadable artifact needs when the request carries a cookie.
     console.error("[proxy] Route check failed", error instanceof Error ? error.name : "unknown error");
     return check.kind === "artifact" ? noindex(NextResponse.next()) : NextResponse.next();
   }

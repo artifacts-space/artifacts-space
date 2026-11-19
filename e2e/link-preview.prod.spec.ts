@@ -61,19 +61,21 @@ async function fetchPng(request: APIRequestContext, url: string) {
 
 async function page(request: APIRequestContext, path: string) {
   const response = await request.get(path, { headers: slackbot, failOnStatusCode: false });
-  return { status: response.status(), html: await response.text() };
+  return { status: response.status(), html: await response.text(), landedOn: localPath(response.url()) };
 }
 
 const previewPages = [
-  { name: "the home page", path: "/", status: 200 },
-  // Not a valid public id, so the read check answers 404 without a database, as for any private, team, or missing artifact.
-  { name: "an artifact a signed-out reader cannot open", path: "/artifact/not-a-real-id", status: 404 },
+  { name: "the home page", path: "/", landsOn: "/" },
+  // Not a valid public id, so the read check refuses it without a database, as for any private, team, or missing artifact.
+  // Slack is signed out, so it is sent to the sign-in page (src/proxy.ts unreadableArtifact), and unfurls that.
+  { name: "an artifact a signed-out reader cannot open", path: "/artifact/not-a-real-id", landsOn: `/sign-in?next=${encodeURIComponent("/artifact/not-a-real-id")}` },
 ];
 
-for (const { name, path, status } of previewPages) {
+for (const { name, path, landsOn } of previewPages) {
   test(`should give Slack the site title, description, and 1200x630 image when it unfurls ${name}`, async ({ request }) => {
     const response = await page(request, path);
-    expect(response.status).toBe(status);
+    expect(response.status).toBe(200);
+    expect(response.landedOn).toBe(landsOn);
     expect(headMeta(response.html, "og:title")).toBe(OG_WORDMARK);
     expect(headMeta(response.html, "og:description")).toBe(OG_DESCRIPTION);
     for (const key of ["og:image", "twitter:image"]) {

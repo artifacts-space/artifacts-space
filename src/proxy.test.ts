@@ -239,6 +239,17 @@ describe("proxy", () => {
     expect(mocks.getSession).toHaveBeenCalledTimes(1);
   });
 
+  it("should send the page on with noindex when the session check fails for an artifact that cannot be read", async () => {
+    mocks.checkArtifactPage.mockResolvedValue(page(false));
+    mocks.getSession.mockRejectedValue(new Error("down"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await proxy(request("/artifact/abc", { cookie: sessionCookie }));
+    // The page repeats the read check, so nothing is shown that should not be.
+    expect(response.status).toBe(200);
+    expect(location(response)).toBeNull();
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+  });
+
   it("should keep the Markdown version's own answer when an agent asks for an artifact it cannot read", async () => {
     mocks.checkArtifactPage.mockResolvedValue(page(false));
     const response = await proxy(request("/artifact/abc.md"));
@@ -431,8 +442,11 @@ describe("proxy on the landing and sign-in pages", () => {
   });
 
   it("should end a stale cookie on sign-in with no loop when the real proxy is followed hop by hop", async () => {
-    signedOut();
-    for (const start of ["/", "/sign-in", "/sign-up", "/app"]) {
+    // An artifact the visitor cannot read sends them to sign-in too; the sign-in page is what ends the cookie.
+    // The artifact check asks for the session alone, the entry pages with its headers: no session either way.
+    mocks.getSession.mockImplementation((input: { returnHeaders?: boolean }) => Promise.resolve(input.returnHeaders ? { headers: new Headers(), response: null } : null));
+    mocks.checkArtifactPage.mockResolvedValue(page(false));
+    for (const start of ["/", "/sign-in", "/sign-up", "/app", "/artifact/abc"]) {
       let cookie: string | null = `__Secure-${sessionCookie}`;
       let path = start;
       const visited: string[] = [];
