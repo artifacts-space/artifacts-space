@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSignInLinkBotCheck } from "@/lib/abuse/bot-check-client";
+import { BOT_SUSPECTED_MESSAGE, SIGN_IN_LINK_STALLED, withinSignInLinkWait } from "@/lib/abuse/bot-check-rules";
 import { authClient } from "@/lib/auth/client";
 import { isDevSignInEnabled } from "@/lib/auth/dev-user";
 import { signInErrorMessage } from "@/lib/auth/sign-in-error-rules";
@@ -196,7 +197,13 @@ export function AuthForm({ mode, googleEnabled, botCheck }: { mode: AuthMode; go
     setPending("email");
     setError("");
     try {
-      const { error: failure } = await authClient.signIn.magicLink({ email: email.trim(), callbackURL: workspaceUrl() });
+      const answer = await withinSignInLinkWait(authClient.signIn.magicLink({ email: email.trim(), callbackURL: workspaceUrl() }));
+      // The bot check's script never became ready, so the request never left: say so instead of staying busy.
+      if (answer === SIGN_IN_LINK_STALLED) {
+        setError(BOT_SUSPECTED_MESSAGE);
+        return;
+      }
+      const { error: failure } = answer;
       if (failure) {
         const undeliverable = undeliverableAddressMessage(failure.code, email.trim());
         setError(undeliverable ?? failure.message ?? genericError);

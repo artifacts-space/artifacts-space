@@ -684,7 +684,15 @@ catch this, so test the generated SQL with `.toSQL()`, as
     bot-detection vendor, Kasada, whose script loads on the sign-in pages
     before the request and may set its own cookies: the privacy page names
     it under the bot check and in the list of providers. Going back to
-    Basic is that one constant, and the privacy page with it.
+    Basic is that one constant, the one test that pins its value on purpose
+    (`bot-check-rules.test.ts`, so a silent downgrade fails), and the
+    privacy page.
+  - At this level the browser loads the vendor's script and waits for it to
+    be ready before it sends the request, and the host's code does not bound
+    that wait. The form does (`withinSignInLinkWait`, `signInLinkWaitMs`):
+    with no answer in that time it stops being busy and shows the refusal's
+    message, which names GitHub and Google. Keep any new sender of the
+    sign-in link request behind the same wait.
 
 ### Page host
 

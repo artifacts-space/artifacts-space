@@ -63,3 +63,33 @@ export const BOT_SUSPECTED_CODE = "BOT_SUSPECTED";
 
 /** What the sign-in form shows. It says nothing about the address, so it is the same for every address. */
 export const BOT_SUSPECTED_MESSAGE = "We could not confirm that this request came from your browser. Reload the page and try again, or continue with GitHub or Google.";
+
+/**
+ * How long the sign-in form waits for an answer to its request for a link.
+ * At Deep Analysis the browser loads the vendor's script and waits for it to
+ * be ready before the request is even sent, and nothing in the host's code
+ * bounds that wait: a script that loads but never becomes ready would leave
+ * the form busy for good, with no request for the server's own timeout to
+ * act on. Far longer than a slow connection needs for the whole exchange.
+ */
+export const signInLinkWaitMs = 20_000;
+
+/** What `withinSignInLinkWait` answers when the wait ran out. */
+export const SIGN_IN_LINK_STALLED = Symbol("sign-in link request stalled");
+
+/**
+ * The request's answer, or SIGN_IN_LINK_STALLED when none came within `ms`.
+ * The request itself cannot be withdrawn: if it does go out later, the link
+ * is still sent, and the form's message already says to try again.
+ */
+export async function withinSignInLinkWait<T>(request: Promise<T>, ms: number = signInLinkWaitMs): Promise<T | typeof SIGN_IN_LINK_STALLED> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stalled = new Promise<typeof SIGN_IN_LINK_STALLED>((resolve) => {
+    timer = setTimeout(() => { resolve(SIGN_IN_LINK_STALLED); }, ms);
+  });
+  try {
+    return await Promise.race([request, stalled]);
+  } finally {
+    clearTimeout(timer);
+  }
+}

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BOT_SUSPECTED_CODE, BOT_SUSPECTED_MESSAGE, botCheckTimeoutMs, signInLinkProtection } from "@/lib/abuse/bot-check-rules";
+import { BOT_SUSPECTED_CODE, BOT_SUSPECTED_MESSAGE, botCheckTimeoutMs, SIGN_IN_LINK_CHECK_LEVEL, signInLinkProtection } from "@/lib/abuse/bot-check-rules";
 
 /* The host's bot check is mocked at its boundary: what each verdict, error, and delay does to the request. */
 
@@ -35,7 +35,7 @@ describe("refuseSuspectedBot", () => {
     mocks.checkBotId.mockResolvedValue({ isBot: false, isVerifiedBot: false, bypassed: false });
     await refuseSuspectedBot();
     const asked = mocks.checkBotId.mock.calls[0]?.[0]?.advancedOptions?.checkLevel;
-    expect(asked).toBe("deepAnalysis");
+    expect(asked).toBe(SIGN_IN_LINK_CHECK_LEVEL);
     for (const route of signInLinkProtection) expect(route.advancedOptions.checkLevel).toBe(asked);
   });
 
