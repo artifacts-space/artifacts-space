@@ -54,6 +54,10 @@ export default defineConfig({
   outputDir: "./test-results",
   timeout: 120_000,
   workers: 1,
+  // In CI a failed test runs once more. A shard takes 5 to 14 minutes, and about one run in ten failed on a
+  // timing miss that passed when run again (issue 257). A test that passes on its retry is reported as flaky,
+  // so it stays visible: fix it, do not get used to it. Locally a test fails the first time, so a miss is seen.
+  retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
   use: {
     baseURL: `http://localhost:${String(port)}`,

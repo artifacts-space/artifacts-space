@@ -76,6 +76,11 @@ only matrix key and list 1, 2, 3, ... in order (a step fails otherwise), and
 never rename the gate. The gate keeps `needs: e2e` with `if: always()`:
 without `always()` a failed shard would skip the gate, and a skipped required
 check counts as passing.
+In CI a failed browser test runs once more (`retries` in
+`playwright.config.ts`); locally it does not. A test that passes on its retry
+is listed as flaky at the end of the shard's log: treat it as a bug to fix,
+in the test or in the app, never as noise. A flaky test that this hides for
+long enough will fail twice in a row one day. Do not raise the retry count.
 The shards run inside Playwright's Docker image, pinned by digest, which
 already holds Chromium and its system libraries, so CI never installs
 packages from Ubuntu's mirrors. When you bump `@playwright/test`, bump the
