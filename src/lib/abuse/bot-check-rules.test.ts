@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { botCheckRuns, refusesSignInLink, SIGN_IN_LINK_PATH, signInLinkProtection } from "@/lib/abuse/bot-check-rules";
+import { botCheckRuns, refusesSignInLink, SIGN_IN_LINK_CHECK_LEVEL, SIGN_IN_LINK_PATH, signInLinkProtection } from "@/lib/abuse/bot-check-rules";
 import { isMagicLinkRequest } from "@/lib/auth/magic-link-limits";
 
 describe("refusesSignInLink", () => {
@@ -38,7 +38,8 @@ describe("botCheckRuns", () => {
 describe("signInLinkProtection", () => {
   it("should name only the request the server checks when the browser proves itself", () => {
     expect(SIGN_IN_LINK_PATH).toBe("/api/auth/sign-in/magic-link");
-    expect(signInLinkProtection).toEqual([{ path: SIGN_IN_LINK_PATH, method: "POST" }]);
+    expect(SIGN_IN_LINK_CHECK_LEVEL).toBe("deepAnalysis");
+    expect(signInLinkProtection).toEqual([{ path: SIGN_IN_LINK_PATH, method: "POST", advancedOptions: { checkLevel: SIGN_IN_LINK_CHECK_LEVEL } }]);
     for (const { method, path } of signInLinkProtection) expect(isMagicLinkRequest(method, path)).toBe(true);
   });
 });

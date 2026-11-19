@@ -1,15 +1,15 @@
 import { checkBotId } from "botid/server";
 
-import { BOT_SUSPECTED_CODE, BOT_SUSPECTED_MESSAGE, botCheckRuns, botCheckTimeoutMs, refusesSignInLink, type BotVerdict } from "@/lib/abuse/bot-check-rules";
+import { BOT_SUSPECTED_CODE, BOT_SUSPECTED_MESSAGE, botCheckRuns, botCheckTimeoutMs, refusesSignInLink, SIGN_IN_LINK_CHECK_LEVEL, type BotVerdict } from "@/lib/abuse/bot-check-rules";
 
-/** The verdict, or null when none came within `ms`. The timer never outlives the check. */
+/** The verdict at the level the browser was told to prove (SIGN_IN_LINK_CHECK_LEVEL), or null when none came within `ms`. The timer never outlives the check. */
 async function verdictWithin(ms: number): Promise<BotVerdict | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<null>((resolve) => {
     timer = setTimeout(() => { resolve(null); }, ms);
   });
   try {
-    return await Promise.race([checkBotId(), late]);
+    return await Promise.race([checkBotId({ advancedOptions: { checkLevel: SIGN_IN_LINK_CHECK_LEVEL } }), late]);
   } finally {
     clearTimeout(timer);
   }

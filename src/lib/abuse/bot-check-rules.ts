@@ -13,8 +13,20 @@
 /** The path of the request that emails a sign-in link: the one the server checks (isMagicLinkRequest) and the browser proves itself for. */
 export const SIGN_IN_LINK_PATH = "/api/auth/sign-in/magic-link";
 
+/**
+ * How hard the host's check looks at the sign-in link request. Deep Analysis
+ * is the paid level (the owner, 2026-11-19): the free one checks only that
+ * the challenge was solved, which a script that drives a whole browser does,
+ * and those scripts are what sent sign-in emails to strangers. The browser
+ * and the server must name the same level, or the check fails for everyone:
+ * both read this constant, and bot-check.test.ts holds them together.
+ */
+export const SIGN_IN_LINK_CHECK_LEVEL = "deepAnalysis";
+
 /** The one request the browser proves itself for, in the shape the host's check takes. */
-export const signInLinkProtection: { path: string; method: "POST" }[] = [{ path: SIGN_IN_LINK_PATH, method: "POST" }];
+export const signInLinkProtection: { path: string; method: "POST"; advancedOptions: { checkLevel: typeof SIGN_IN_LINK_CHECK_LEVEL } }[] = [
+  { path: SIGN_IN_LINK_PATH, method: "POST", advancedOptions: { checkLevel: SIGN_IN_LINK_CHECK_LEVEL } },
+];
 
 /** What the host's bot check says about a request. */
 export interface BotVerdict {
