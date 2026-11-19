@@ -58,7 +58,8 @@ export default defineConfig({
   // timing miss that passed when run again (issue 257). A test that passes on its retry is reported as flaky,
   // so it stays visible: fix it, do not get used to it. Locally a test fails the first time, so a miss is seen.
   retries: process.env.CI ? 1 : 0,
-  reporter: [["list"]],
+  // In CI, a test that passed only on its retry is also listed in the job's summary (flaky-summary-reporter.ts).
+  reporter: process.env.CI ? [["list"], ["./e2e/support/flaky-summary-reporter.ts"]] : [["list"]],
   use: {
     baseURL: `http://localhost:${String(port)}`,
     // A trace of the second attempt only, so a flaky test leaves something to read (CI uploads test-results/).
