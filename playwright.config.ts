@@ -61,6 +61,8 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: `http://localhost:${String(port)}`,
+    // A trace of the second attempt only, so a flaky test leaves something to read (CI uploads test-results/).
+    trace: "on-first-retry",
   },
   projects: [
     { name: "phone", testIgnore: prodSpecs, use: { ...devices["Pixel 7"], browserName: "chromium" } },

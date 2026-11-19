@@ -180,8 +180,11 @@ jobs:
       # Playwright's Docker guide: Chromium can run out of shared memory
       # without the host's IPC namespace.
       options: --ipc=host
-    # Shards should take under 12 minutes; the headroom covers a cold cache.
-    timeout-minutes: 25
+    # Shards should take under 12 minutes (the slowest ran close to 15 in
+    # Nov 2026). The headroom covers a cold cache and the one retry a failed
+    # test gets (`retries` in playwright.config.ts): a test that hangs to its
+    # 2-minute timeout twice costs 4 minutes and a worker restart.
+    timeout-minutes: 30
     strategy:
       # Let every shard finish, so one run shows every failing test.
       fail-fast: false
@@ -241,11 +244,15 @@ jobs:
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with: *next-cache
       - run: pnpm test:e2e --shard=${{ matrix.shard }}/${{ strategy.job-total }}
-      - if: failure()
+      # Also when the shard passed: a test that passed on its retry leaves
+      # that attempt's trace here, which is what there is to fix it from.
+      # A shard with nothing to keep uploads nothing.
+      - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-results-shard-${{ matrix.shard }}
           path: test-results/
+          if-no-files-found: ignore
           retention-days: 7
 
   # "Component gallery" is the required check. It passes only when every shard
