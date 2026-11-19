@@ -15,10 +15,11 @@ export const metadata: Metadata = {
  * Development-only page for the artifact page share e2e test: the artifact
  * page's header with fixture data and no database. `?as=reader` shows it to
  * someone who may not share (the read-only status); otherwise to its owner,
- * with Share saving in memory. Returns 404 in every other environment.
+ * with Share saving in memory. `?theme=<preset id>` gives the page that
+ * theme, as a themed artifact's page has it. Returns 404 in every other environment.
  */
 export default async function ArtifactShareFixturePage({ searchParams }: PageProps<"/dev/artifact-share">) {
   if (process.env.NODE_ENV !== "development") notFound();
-  const { as } = await searchParams;
-  return <ArtifactShareFixture as={as === "reader" ? "reader" : "owner"} />;
+  const { as, theme } = await searchParams;
+  return <ArtifactShareFixture as={as === "reader" ? "reader" : "owner"} themeId={typeof theme === "string" ? theme : null} />;
 }

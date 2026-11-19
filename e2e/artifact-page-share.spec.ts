@@ -1,5 +1,7 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/test";
+
+import { readColors } from "./support/colors";
 
 /*
  * Share on the artifact's own page, on /dev/artifact-share (the page's
@@ -117,3 +119,39 @@ test("should keep the owner's header on one line at 375px with a 44px Share on t
   expect(box?.width).toBeGreaterThanOrEqual(minimum);
   expect(box?.height).toBeGreaterThanOrEqual(minimum);
 });
+
+/** The theme tokens an element draws its surface, text, and border with, as the browser resolved them. */
+function surfaceTokens(locator: Locator) {
+  return locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return ["--popover", "--popover-foreground", "--border", "--background", "--foreground"].map((name) => style.getPropertyValue(name).trim());
+  });
+}
+
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`should give the page's dialog and toast the artifact theme's colors, readable, when the site is ${colorScheme}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    // What the site's own palette gives a dialog, to tell the theme's from it.
+    await (await openAsOwner(page)).click();
+    const dialog = page.getByRole("dialog", { name: "Share “Launch checklist”" });
+    await expect(dialog).toBeVisible();
+    const siteTokens = await surfaceTokens(dialog);
+
+    await page.goto("/dev/artifact-share?theme=ink");
+    const themed = page.locator("[data-page-theme=set]");
+    await header(page).getByRole("button", { name: "Private. Share settings" }).click();
+    await expect(dialog).toBeVisible();
+    // The dialog is in a portal outside the themed page, and still draws with the page's tokens.
+    const pageTokens = await surfaceTokens(themed);
+    expect(await surfaceTokens(dialog)).toEqual(pageTokens);
+    expect(pageTokens).not.toEqual(siteTokens);
+    expect((await readColors(dialog.getByRole("heading", { name: "Share “Launch checklist”" }))).contrast).toBeGreaterThanOrEqual(4.5);
+
+    await dialog.getByRole("radiogroup", { name: "Who can read it" }).getByRole("radio", { name: /^Team/ }).click();
+    await dialog.getByRole("button", { name: "Move to Platform" }).click();
+    const toast = page.locator("[data-sonner-toast]").filter({ hasText: "Moved “Launch checklist” to Platform." });
+    await expect(toast).toBeVisible();
+    expect(await surfaceTokens(toast)).toEqual(pageTokens);
+    expect((await readColors(toast.locator("[data-title]"))).contrast).toBeGreaterThanOrEqual(4.5);
+  });
+}

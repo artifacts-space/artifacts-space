@@ -1375,6 +1375,19 @@ kept per preset and per default. Restore (owners and admins only) saves the
 old state again as a new revision through the normal checks; never update or
 re-date an old revision, and never file artifact versions from team settings.
 
+A themed artifact's page also themes what is drawn outside its own element:
+dialogs (History), menus, and popovers render in portals at the end of the
+body, and toasts above every page, so they kept the site's colors on a
+themed page (the owner, 2026-11-19, #262). `ArtifactPageTheme` with
+`overlays` (the artifact page only) mounts `OverlayTheme`, which puts the
+same color tokens and mode lock on the body while the page is shown
+(`applyOverlayTheme`, `src/lib/themes/overlay-theme.ts`) and takes them off
+when the theme changes or the page goes away. One per page: a second would
+fight over the body, which is why the gallery's specimens do not set it. The
+workspace's panes still theme the document alone.
+`e2e/artifact-page-share.spec.ts` (`/dev/artifact-share?theme=ink`) checks a
+dialog and a toast; `e2e/artifact-theme-overlays-db.spec.ts` the real page.
+
 ### Projects in the sidebar
 
 An artifact's project lives in the artifact's home scope
