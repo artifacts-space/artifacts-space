@@ -23,3 +23,33 @@ test("should show the way on and keep the address when a sign-in link request is
   await expect(page.getByRole("heading", { name: "Check your email" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /GitHub/ })).toBeEnabled();
 });
+
+/**
+ * The bot check replaces window.fetch after the page has loaded and adds the
+ * browser's proof to the sign-in link request there. The form's request must
+ * go through that replaced function: an auth client that kept the fetch from
+ * when its module loaded sent no proof, and a deployment refused every
+ * person (#252). Here a stand-in replaces fetch the same way and adds a
+ * header; the request the form sends must carry it.
+ */
+test("should send the sign-in link request through a fetch that was replaced after the page loaded, as the bot check does", async ({ page }) => {
+  let proof: string | undefined;
+  await page.route("**/api/auth/sign-in/magic-link", (route) => {
+    proof = route.request().headers()["x-replaced-fetch"];
+    return route.fulfill({ status: 200, json: { status: true } });
+  });
+  await page.goto("/sign-in");
+  await page.getByLabel("Email").fill("ada@example.com");
+  await page.evaluate(() => {
+    const before = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+      headers.set("x-replaced-fetch", "1");
+      return before(input, { ...init, headers });
+    };
+  });
+  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+
+  await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+  expect(proof).toBe("1");
+});
