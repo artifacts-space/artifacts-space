@@ -606,6 +606,38 @@ catch this, so test the generated SQL with `.toSQL()`, as
   Better Auth swallows what `sendInvitationEmail` throws, so a refused
   invitation email reaches `inviteMemberAction` through
   `invitation-send-refusal.ts`; the action then deletes the new invitation.
+- Bot check on sign-in links (`src/lib/abuse/bot-check-rules.ts`,
+  `bot-check.ts`, `bot-check-client.ts`; Vercel BotID, the `botid` package).
+  Scripts drove browsers to the sign-in form and asked for links to
+  strangers' addresses, 10 to 25 a day from as many networks, so the rate
+  limits never saw them; the strangers reported the mail as spam, which puts
+  everyone's sign-in email at risk (the owner's choice of BotID, 2026-11-19).
+  - It guards one request only: `POST /api/auth/sign-in/magic-link`, checked
+    in the auth route before the sign-in limits, so a refused script spends
+    no limit and sends nothing. Agents are this product's users: never add
+    the check to MCP, the OAuth endpoints, the API, tokens, or anything else
+    an agent or app calls (a route test fails if those are checked). A
+    verified bot (`isVerifiedBot`: an assistant that signs its requests) is
+    let through like a person.
+  - The browser side starts from `AuthForm` alone (`startSignInLinkBotCheck`,
+    `initBotId`), so no other page loads it, and only when the sign-in page
+    passes `botCheck` (`botCheckRuns` at build time): the check fetches the
+    host's script before the request, so on a self-hosted server, where that
+    script does not exist, starting it would fail every request for a link. Do not move it to
+    `instrumentation-client.ts`, which runs on every page, and do not use the
+    `BotIdClient` component: its inline script does not run after a client
+    navigation to the sign-in page, and every such person would be refused.
+    The auth client resolves `fetch` at call time, which is what lets the
+    check add its headers; a `customFetchImpl` on the client would bypass it.
+  - It fails open: off Vercel (`botCheckRuns`: development, tests,
+    self-hosting), on an error, or with no verdict in `botCheckTimeoutMs`,
+    the request goes on to the limits. The refusal (403 `BOT_SUSPECTED`) is
+    the same for every address. Never log the request.
+  - The privacy page describes it (what was collected, the cookies list,
+    and the one exception to "No outside service loads in your browser").
+    Change that page in the same pull request as any change to where or how
+    the check runs. Turning on Deep Analysis in the Vercel dashboard
+    (Firewall, Rules) is the owner's call; it needs no code change.
 
 ### Page host
 

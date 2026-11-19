@@ -13,6 +13,7 @@ import { ConsentNotice } from "@/components/legal-links";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useSignInLinkBotCheck } from "@/lib/abuse/bot-check-client";
 import { authClient } from "@/lib/auth/client";
 import { isDevSignInEnabled } from "@/lib/auth/dev-user";
 import { signInErrorMessage } from "@/lib/auth/sign-in-error-rules";
@@ -154,14 +155,20 @@ function SocialButton({ provider, pending, onClick }: { provider: SocialProvider
 /**
  * Sign in or sign up with GitHub, Google, or an emailed magic link. Google
  * shows only when the page says it is configured (`isGoogleSignInEnabled`),
- * so a deploy without it never offers a button that cannot work.
+ * so a deploy without it never offers a button that cannot work. `botCheck`:
+ * the page says the host's bot check exists here (`botCheckRuns`), so the
+ * form starts it; where it does not (a self-hosted server), starting it would
+ * break the request for a link.
  */
-export function AuthForm({ mode, googleEnabled }: { mode: AuthMode; googleEnabled: boolean }) {
+export function AuthForm({ mode, googleEnabled, botCheck }: { mode: AuthMode; googleEnabled: boolean; botCheck: boolean }) {
   const text = copy[mode];
   const [email, setEmail] = useState("");
   const [sentTo, setSentTo] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState<Pending>(null);
+
+  // The request for a sign-in link carries the browser's proof from here on (bot-check-rules.ts).
+  useSignInLinkBotCheck(botCheck);
 
   async function continueWith(provider: SocialProvider) {
     setPending(provider);
