@@ -19,6 +19,7 @@ const sessionDays = Math.round(sessionLifetimeSeconds / 86_400);
 
 const providers = [
   { name: "Vercel", role: "hosts the website, the MCP server, and scheduled cleanup jobs, and keeps request logs.", data: "request data, logs, and everything the service handles in transit" },
+  { name: "Kasada", role: "through Vercel, tells browsers from scripts when someone asks for a sign-in link.", data: "signals from your browser and device on the sign-in pages, and that request's network address and browser details" },
   { name: "Neon", role: "runs our Postgres database.", data: "account, team, artifact, and comment records, hashes of the tokens we issue, and the access token GitHub issues if you sign in with GitHub" },
   { name: "Cloudflare R2", role: "stores uploaded files.", data: "files and their names" },
   { name: "Sendir", role: "sends our transactional email.", data: "the recipient's email address and the email itself" },

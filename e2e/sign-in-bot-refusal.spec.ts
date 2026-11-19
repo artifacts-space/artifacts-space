@@ -1,6 +1,6 @@
 import { allowPageError, expect, test } from "./support/test";
 
-import { BOT_SUSPECTED_CODE, BOT_SUSPECTED_MESSAGE } from "../src/lib/abuse/bot-check-rules";
+import { BOT_SUSPECTED_CODE, BOT_SUSPECTED_MESSAGE, signInLinkWaitMs } from "../src/lib/abuse/bot-check-rules";
 
 /**
  * The sign-in form when the server refuses a sign-in link request as a
@@ -52,4 +52,26 @@ test("should send the sign-in link request through a fetch that was replaced aft
 
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
   expect(proof).toBe("1");
+});
+
+/**
+ * At Deep Analysis the browser waits for the bot check's script before it
+ * sends the request, and that wait has no end of its own. The form's does:
+ * with no answer in time it stops being busy and shows the way on. Here the
+ * request is held for good and the page's clock is moved past the wait.
+ */
+test("should stop waiting and show the way on when the sign-in link request never gets an answer", async ({ page }) => {
+  await page.route("**/api/auth/sign-in/magic-link", () => new Promise<void>(() => undefined));
+  await page.goto("/sign-in");
+  await page.getByLabel("Email").fill("ada@example.com");
+  const send = page.getByRole("button", { name: "Email me a sign-in link" });
+  // Only the form's wait needs a clock the test can move: the page loads and hydrates on real time.
+  await page.clock.install();
+  await send.click();
+  await expect(send).toBeDisabled();
+
+  await page.clock.fastForward(signInLinkWaitMs + 1000);
+  await expect(page.getByRole("alert").filter({ hasText: "We could not confirm" })).toHaveText(BOT_SUSPECTED_MESSAGE);
+  await expect(send).toBeEnabled();
+  await expect(page.getByLabel("Email")).toHaveValue("ada@example.com");
 });

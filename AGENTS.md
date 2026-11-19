@@ -633,7 +633,7 @@ catch this, so test the generated SQL with `.toSQL()`, as
     The check adds its headers in the `window.fetch` it installs then, so
     the auth client must look `fetch` up when a request is sent:
     `customFetchImpl: fetchWhenSent` in `src/lib/auth/client.ts` does that
-    (next bullet). What bypasses the check is any reference to `fetch` taken
+    (the bullet on the auth client, below). What bypasses the check is any reference to `fetch` taken
     when a module loads, Better Auth's own default included.
   - It fails open: off Vercel (`botCheckRuns`: development, tests,
     self-hosting), on an error, or with no verdict in `botCheckTimeoutMs`,
@@ -670,11 +670,29 @@ catch this, so test the generated SQL with `.toSQL()`, as
   - The privacy page describes it (what was collected, the cookies list,
     and the one exception to "No outside service loads in your browser").
     Change that page in the same pull request as any change to where or how
-    the check runs. It ships at the Basic level, which is free. Deep
-    Analysis (Vercel dashboard: Firewall, Rules; no code change) is the
-    owner's call: it is billed per check and brings in the host's bot
-    detection vendor, so the privacy page's list of processors changes with
-    it.
+    the check runs.
+  - The level is Deep Analysis, the paid one (the owner, 2026-11-19: the
+    free Basic level only checks that the challenge was solved, which a
+    script driving a whole browser does). It is set in code, which takes
+    precedence over the project's dashboard setting:
+    `SIGN_IN_LINK_CHECK_LEVEL` in `bot-check-rules.ts`, read by the
+    browser's protect list and by the server's `checkBotId`. The two must
+    name the same level or the check fails for everyone;
+    `bot-check.test.ts` holds them together. Vercel bills each `checkBotId`
+    call at this level ($1 per 1,000 on Pro when this was written), which is
+    one more reason the limits run first. It brings in Vercel's
+    bot-detection vendor, Kasada, whose script loads on the sign-in pages
+    before the request and may set its own cookies: the privacy page names
+    it under the bot check and in the list of providers. Going back to
+    Basic is that one constant, the one test that pins its value on purpose
+    (`bot-check-rules.test.ts`, so a silent downgrade fails), and the
+    privacy page.
+  - At this level the browser loads the vendor's script and waits for it to
+    be ready before it sends the request, and the host's code does not bound
+    that wait. The form does (`withinSignInLinkWait`, `signInLinkWaitMs`):
+    with no answer in that time it stops being busy and shows the refusal's
+    message, which names GitHub and Google. Keep any new sender of the
+    sign-in link request behind the same wait.
 
 ### Page host
 

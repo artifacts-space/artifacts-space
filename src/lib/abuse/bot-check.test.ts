@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BOT_SUSPECTED_CODE, BOT_SUSPECTED_MESSAGE, botCheckTimeoutMs } from "@/lib/abuse/bot-check-rules";
+import { BOT_SUSPECTED_CODE, BOT_SUSPECTED_MESSAGE, botCheckTimeoutMs, SIGN_IN_LINK_CHECK_LEVEL, signInLinkProtection } from "@/lib/abuse/bot-check-rules";
 
 /* The host's bot check is mocked at its boundary: what each verdict, error, and delay does to the request. */
 
-const mocks = vi.hoisted(() => ({ checkBotId: vi.fn<() => Promise<{ isBot: boolean; isVerifiedBot: boolean; bypassed: boolean }>>() }));
+const mocks = vi.hoisted(() => ({ checkBotId: vi.fn<(options?: { advancedOptions?: { checkLevel?: string } }) => Promise<{ isBot: boolean; isVerifiedBot: boolean; bypassed: boolean }>>() }));
 
 vi.mock("botid/server", () => ({ checkBotId: mocks.checkBotId }));
 
@@ -29,6 +29,14 @@ describe("refuseSuspectedBot", () => {
     expect(response?.status).toBe(403);
     expect(response?.headers.get("cache-control")).toBe("no-store");
     expect(await response?.json()).toEqual({ code: BOT_SUSPECTED_CODE, message: BOT_SUSPECTED_MESSAGE });
+  });
+
+  it("should ask the server for the same level the browser was told to prove, since a mismatch fails the check for everyone", async () => {
+    mocks.checkBotId.mockResolvedValue({ isBot: false, isVerifiedBot: false, bypassed: false });
+    await refuseSuspectedBot();
+    const asked = mocks.checkBotId.mock.calls[0]?.[0]?.advancedOptions?.checkLevel;
+    expect(asked).toBe(SIGN_IN_LINK_CHECK_LEVEL);
+    for (const route of signInLinkProtection) expect(route.advancedOptions.checkLevel).toBe(asked);
   });
 
   it("should go on, and log nothing, when the check finds a person, a verified bot, or a bypassed request", async () => {

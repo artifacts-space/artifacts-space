@@ -13,8 +13,20 @@
 /** The path of the request that emails a sign-in link: the one the server checks (isMagicLinkRequest) and the browser proves itself for. */
 export const SIGN_IN_LINK_PATH = "/api/auth/sign-in/magic-link";
 
+/**
+ * How hard the host's check looks at the sign-in link request. Deep Analysis
+ * is the paid level (the owner, 2026-11-19): the free one checks only that
+ * the challenge was solved, which a script that drives a whole browser does,
+ * and those scripts are what sent sign-in emails to strangers. The browser
+ * and the server must name the same level, or the check fails for everyone:
+ * both read this constant, and bot-check.test.ts holds them together.
+ */
+export const SIGN_IN_LINK_CHECK_LEVEL = "deepAnalysis";
+
 /** The one request the browser proves itself for, in the shape the host's check takes. */
-export const signInLinkProtection: { path: string; method: "POST" }[] = [{ path: SIGN_IN_LINK_PATH, method: "POST" }];
+export const signInLinkProtection: { path: string; method: "POST"; advancedOptions: { checkLevel: typeof SIGN_IN_LINK_CHECK_LEVEL } }[] = [
+  { path: SIGN_IN_LINK_PATH, method: "POST", advancedOptions: { checkLevel: SIGN_IN_LINK_CHECK_LEVEL } },
+];
 
 /** What the host's bot check says about a request. */
 export interface BotVerdict {
@@ -51,3 +63,42 @@ export const BOT_SUSPECTED_CODE = "BOT_SUSPECTED";
 
 /** What the sign-in form shows. It says nothing about the address, so it is the same for every address. */
 export const BOT_SUSPECTED_MESSAGE = "We could not confirm that this request came from your browser. Reload the page and try again, or continue with GitHub or Google.";
+
+/**
+ * How long the sign-in form waits for an answer to its request for a link.
+ * At Deep Analysis the browser loads the vendor's script and waits for it to
+ * be ready before the request is even sent, and nothing in the host's code
+ * bounds that wait: a script that loads but never becomes ready would leave
+ * the form busy for good, with no request for the server's own timeout to
+ * act on. Far longer than a slow connection needs for the whole exchange.
+ */
+export const signInLinkWaitMs = 20_000;
+
+/** What `withinSignInLinkWait` answers when the wait ran out. */
+export const SIGN_IN_LINK_STALLED = Symbol("sign-in link request stalled");
+
+/**
+ * The request's answer, or SIGN_IN_LINK_STALLED when none came within `ms`.
+ * The request itself cannot be withdrawn: if it does go out later, the link
+ * is still sent, and the form's message already says to try again.
+ */
+export function withinSignInLinkWait<T>(request: Promise<T>, ms: number = signInLinkWaitMs): Promise<T | typeof SIGN_IN_LINK_STALLED> {
+  return withTimeout(request, ms, SIGN_IN_LINK_STALLED);
+}
+
+/**
+ * The promise's answer, or `fallback` when none came within `ms`. The timer
+ * never outlives the promise. Both waits here use it: the server's for the
+ * host's verdict, and the form's for its request.
+ */
+export async function withTimeout<T, F>(promise: Promise<T>, ms: number, fallback: F): Promise<T | F> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<F>((resolve) => {
+    timer = setTimeout(() => { resolve(fallback); }, ms);
+  });
+  try {
+    return await Promise.race([promise, late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}

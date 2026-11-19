@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { botCheckRuns, refusesSignInLink, SIGN_IN_LINK_PATH, signInLinkProtection } from "@/lib/abuse/bot-check-rules";
+import { botCheckRuns, refusesSignInLink, SIGN_IN_LINK_CHECK_LEVEL, SIGN_IN_LINK_PATH, SIGN_IN_LINK_STALLED, signInLinkProtection, signInLinkWaitMs, withinSignInLinkWait } from "@/lib/abuse/bot-check-rules";
 import { isMagicLinkRequest } from "@/lib/auth/magic-link-limits";
 
 describe("refusesSignInLink", () => {
@@ -38,7 +38,33 @@ describe("botCheckRuns", () => {
 describe("signInLinkProtection", () => {
   it("should name only the request the server checks when the browser proves itself", () => {
     expect(SIGN_IN_LINK_PATH).toBe("/api/auth/sign-in/magic-link");
-    expect(signInLinkProtection).toEqual([{ path: SIGN_IN_LINK_PATH, method: "POST" }]);
+    expect(SIGN_IN_LINK_CHECK_LEVEL).toBe("deepAnalysis");
+    expect(signInLinkProtection).toEqual([{ path: SIGN_IN_LINK_PATH, method: "POST", advancedOptions: { checkLevel: SIGN_IN_LINK_CHECK_LEVEL } }]);
     for (const { method, path } of signInLinkProtection) expect(isMagicLinkRequest(method, path)).toBe(true);
+  });
+});
+
+describe("withinSignInLinkWait", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should give the request's answer when it comes in time, and leave no timer running", async () => {
+    vi.useFakeTimers();
+    expect(await withinSignInLinkWait(Promise.resolve("sent"))).toBe("sent");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("should answer that the request stalled when nothing came within the wait", async () => {
+    vi.useFakeTimers();
+    const answer = withinSignInLinkWait(new Promise<string>(() => undefined));
+    await vi.advanceTimersByTimeAsync(signInLinkWaitMs - 1);
+    await expect(Promise.race([answer, Promise.resolve("still waiting")])).resolves.toBe("still waiting");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await answer).toBe(SIGN_IN_LINK_STALLED);
+  });
+
+  it("should pass the request's own failure on", async () => {
+    await expect(withinSignInLinkWait(Promise.reject(new Error("offline")))).rejects.toThrow("offline");
   });
 });
