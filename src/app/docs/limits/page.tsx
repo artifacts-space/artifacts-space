@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { DocsH, FactTable, Note, Prose } from "@/components/docs/docs-content";
 import { RegistryPage } from "@/components/docs/docs-page";
+import { BOT_SUSPECTED_CODE, BOT_SUSPECTED_MESSAGE } from "@/lib/abuse/bot-check-rules";
 import { rateLimits } from "@/lib/abuse/limits";
 import { artifactSizeLimits } from "@/lib/artifact-limits";
 import { AGENT_LOOP_LIMIT, COMMENT_MAX_LENGTH, INBOX_CONTEXT_COMMENTS, MAX_MENTIONS_PER_COMMENT } from "@/lib/comments/config";
@@ -171,8 +172,10 @@ export default function LimitsPage() {
         <p>The email provider allows {SENDIR_DAILY_RECIPIENTS} recipients a day, reset at midnight UTC. Sign-in links must always get through, so every other email shares {Math.round(NON_SIGN_IN_SHARE * 100)}% of that: <strong>{nonSignInDailyLimit()} emails a day</strong> for team invitations, mention emails, and report emails together. Sign-in links never count against it.</p>
         <p>When the budget is spent, invitations are refused with this message, and mention and report emails are skipped (the inbox and the team page still show them):</p>
         <blockquote>{INVITATION_BUDGET_MESSAGE}</blockquote>
-        <p>Sign-in links have their own rate limits, listed under Sign-in and OAuth above: at most {rateLimits.magicLinkByNetworkMinute.limit} a minute from one network and {rateLimits.magicLinkByEmailMinute.limit} a minute to one address. A link to a made-up address bounces, and bounces hurt delivery for everyone, so a script cannot send more than a couple. On the hosted service, the request for a link also passes a bot check in the browser, since scripts spread over many networks stay under these limits; nothing agents and apps call is checked. The refusal is the same whether or not the address has an account:</p>
+        <p>Sign-in links have their own rate limits, listed under Sign-in and OAuth above: at most {rateLimits.magicLinkByNetworkMinute.limit} a minute from one network and {rateLimits.magicLinkByEmailMinute.limit} a minute to one address. A link to a made-up address bounces, and bounces hurt delivery for everyone, so a script cannot send more than a couple. The refusal is the same whether or not the address has an account:</p>
         <blockquote>{sampleRefusal("magicLinkByNetworkMinute", 40)}</blockquote>
+        <p>Scripts spread over many networks stay under these limits. So on the hosted service, the browser also proves itself when it asks for a link, and the server checks that proof before it sends one. Nothing agents and apps call is checked. A request the server takes for a script is refused with 403 <code>{BOT_SUSPECTED_CODE}</code> and this message, the same for every address:</p>
+        <blockquote>{BOT_SUSPECTED_MESSAGE}</blockquote>
       </Prose>
 
       <DocsH page={page} id="comments" />
