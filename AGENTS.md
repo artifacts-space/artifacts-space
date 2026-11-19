@@ -342,7 +342,8 @@ catch this, so test the generated SQL with `.toSQL()`, as
   or not an artifact has it, so it tells a stranger nothing the 404 did not:
   never redirect only for artifacts that exist. The Markdown version
   (`.md`, or `Accept: text/markdown`) keeps its 404: an agent cannot use a
-  sign-in form. A link unfurler is signed out too: it follows the redirect
+  sign-in form. A sign-in page with a return address (`?next=`) is noindex
+  (`next.config.ts`), so the redirect never puts one in a search engine. A link unfurler is signed out too: it follows the redirect
   and shows the sign-in page's card, which is the site's
   (`e2e/link-preview.prod.spec.ts`). `src/proxy.test.ts` holds this in CI and
   `e2e/artifact-sign-in-redirect-db.spec.ts` against a real database.

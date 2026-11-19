@@ -65,16 +65,17 @@ async function page(request: APIRequestContext, path: string) {
 }
 
 const previewPages = [
-  { name: "the home page", path: "/", landsOn: "/" },
+  { name: "the home page", path: "/", landsOn: "/", status: 200 },
+  { name: "a page that does not exist", path: "/no-such-page", landsOn: "/no-such-page", status: 404 },
   // Not a valid public id, so the read check refuses it without a database, as for any private, team, or missing artifact.
   // Slack is signed out, so it is sent to the sign-in page (src/proxy.ts unreadableArtifact), and unfurls that.
-  { name: "an artifact a signed-out reader cannot open", path: "/artifact/not-a-real-id", landsOn: `/sign-in?next=${encodeURIComponent("/artifact/not-a-real-id")}` },
+  { name: "an artifact a signed-out reader cannot open", path: "/artifact/not-a-real-id", landsOn: `/sign-in?next=${encodeURIComponent("/artifact/not-a-real-id")}`, status: 200 },
 ];
 
-for (const { name, path, landsOn } of previewPages) {
+for (const { name, path, landsOn, status } of previewPages) {
   test(`should give Slack the site title, description, and 1200x630 image when it unfurls ${name}`, async ({ request }) => {
     const response = await page(request, path);
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(status);
     expect(response.landedOn).toBe(landsOn);
     expect(headMeta(response.html, "og:title")).toBe(OG_WORDMARK);
     expect(headMeta(response.html, "og:description")).toBe(OG_DESCRIPTION);

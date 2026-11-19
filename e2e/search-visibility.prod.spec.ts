@@ -13,6 +13,17 @@ test("should send noindex, nofollow on an artifact page when its search setting 
   expect(response.headers()["x-robots-tag"]).toBe("noindex, nofollow");
 });
 
+test("should keep the sign-in page an unreadable artifact redirects to out of search engines, and leave the plain sign-in page as it was", async ({ request }) => {
+  // Not a valid public id, so the read check refuses it without a database (a valid one fails open here, with noindex).
+  const landed = await request.get("/artifact/not-a-real-id", { failOnStatusCode: false });
+  expect(new URL(landed.url()).pathname).toBe("/sign-in");
+  expect(landed.headers()["x-robots-tag"]).toBe("noindex, nofollow");
+  for (const path of ["/sign-in?next=%2Fapp", "/sign-up?next=%2Fapp"]) {
+    expect((await request.get(path)).headers()["x-robots-tag"], path).toBe("noindex, nofollow");
+  }
+  expect((await request.get("/sign-in")).headers()["x-robots-tag"]).toBeUndefined();
+});
+
 test("should send noindex, nofollow on the Markdown and raw versions of an artifact", async ({ request }) => {
   for (const path of [`/artifact/${publicId}.md`, `/artifact/${publicId}/raw`]) {
     const response = await request.get(path, { failOnStatusCode: false });

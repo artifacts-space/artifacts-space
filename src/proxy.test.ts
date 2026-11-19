@@ -446,6 +446,7 @@ describe("proxy on the landing and sign-in pages", () => {
     // The artifact check asks for the session alone, the entry pages with its headers: no session either way.
     mocks.getSession.mockImplementation((input: { returnHeaders?: boolean }) => Promise.resolve(input.returnHeaders ? { headers: new Headers(), response: null } : null));
     mocks.checkArtifactPage.mockResolvedValue(page(false));
+    mocks.hitRateLimits.mockResolvedValue(null);
     for (const start of ["/", "/sign-in", "/sign-up", "/app", "/artifact/abc"]) {
       let cookie: string | null = `__Secure-${sessionCookie}`;
       let path = start;
