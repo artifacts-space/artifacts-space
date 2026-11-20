@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { actorOf, toMcpActor } from "./actors";
+import { actorOf, listPeople, toMcpActor } from "./actors";
 
 describe("toMcpActor", () => {
   const ada = { handle: "ada", kind: "person" as const, name: "Ada Lovelace", ownerName: null };
@@ -34,5 +34,26 @@ describe("actorOf", () => {
     expect(actorOf(actors, "u1")).toEqual({ handle: "ada", kind: "person" });
     expect(actorOf(actors, "gone")).toBeNull();
     expect(actorOf(actors, null)).toBeNull();
+  });
+});
+
+describe("listPeople", () => {
+  const actors = new Map([
+    ["u1", { handle: "ada", kind: "person" as const, name: { untrustedText: "Ada" } }],
+    ["u2", { handle: "bot", kind: "agent" as const, for: { untrustedText: "Charles" } }],
+    ["u3", { handle: "hidden", kind: "person" as const, name: { untrustedText: "Hidden Person" } }],
+  ]);
+
+  it("should give each person the rows name once, in full, keyed by handle", () => {
+    const shown = [{ handle: "ada", kind: "person" as const }, { handle: "bot", kind: "agent" as const }, { handle: "ada", kind: "person" as const }, null];
+    expect(listPeople(shown, actors)).toEqual({ ada: { kind: "person", name: { untrustedText: "Ada" } }, bot: { kind: "agent", for: { untrustedText: "Charles" } } });
+  });
+
+  it("should name nobody the rows leave out, though their actor was loaded", () => {
+    expect(listPeople([{ handle: "ada", kind: "person" }], actors)).not.toHaveProperty("hidden");
+  });
+
+  it("should leave out someone without a handle, whom the row already names in full", () => {
+    expect(listPeople([{ handle: null, kind: "person", name: { untrustedText: "No Handle" } }], actors)).toEqual({});
   });
 });

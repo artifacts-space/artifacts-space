@@ -47,13 +47,14 @@ const artifactShape = `{
 const sharingShape = `"sharing": null | { "status": "applied" | "pending" } | { "status": "failed", "error": "…" },
   "comments": null | { "status": "applied" | "pending" } | { "status": "failed", "error": "…" }`;
 
-const commentShape = `{ "id", "replyTo": "…" | null, "author": { …actor } | null,
+const commentShape = `{ "id", "replyTo": "…" | null, "author": { …actor } | null,   // until 20 Nov 2026 "for" was a plain string
   "body": { "untrustedText": "…" }, "quote": { "untrustedText": "…" } | null,
   "quotePrefix"?: { "untrustedText": "…" }, "quoteSuffix"?: { "untrustedText": "…" },   // the text around the quote, as you are served it
-  "onTextThatChanged": false, "resolved": { "at": "…", "by": { …actor } | null } | null,
+  "onTextThatChanged": false,
+  "resolved": { "at": "…", "by": { …actor } | null } | null,   // until 20 Nov 2026 a boolean; test it for null
   "mentions"?: ["ada"],                   // the handles it reached
   "deleted": false, "edited": false, "createdAt": "…", "updatedAt"?: "…",   // updatedAt once edited
-  "url"?: "…" }                           // in comment_create and comment_update`;
+  "url": "…" }                            // opens the artifact with this comment shown`;
 
 const frameOutlineShape = `{ "id": "home-phone", "name": "Home, phone", "width": 390, "height": 844 | null, "padding": "none" | "sm" | "md" | "lg",
     "position": { "x": 1520, "y": 0, "auto": true },   // auto: the board placed it
@@ -67,8 +68,9 @@ const documentMentionsShape = `"mentions"?: { "reaches": ["ada"], "onceTheyCanRe
 
 export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   artifacts_list: {
-    summary: "An array of artifacts you can read, newest first. Items have no `content`: text formats carry a `preview` of the first 280 characters, others an empty preview. People are named by handle and kind alone (artifacts_get and teams_list give names), and each file by its id, name, type, and size. When `query` is an artifact's id or link, that artifact is first, if you can read it.",
-    shape: "[ { …artifact without content, \"author\": { \"handle\", \"kind\" }, \"preview\": \"First 280 characters…\" } ]",
+    summary: "The artifacts you can read (`artifacts`), newest first, and `people`: everyone the items name by handle, once, with what artifacts_get says of them to you (a teammate's name, an agent's owner). Items have no `content`: text formats carry a `preview` of the first 280 characters, others an empty preview. Items name people by handle and kind (someone without a handle in full), and each file by its id, name, type, and size. When `query` is an artifact's id or link, that artifact is first, if you can read it. Until 20 Nov 2026 the result was the array of items alone.",
+    shape: `{ "people": { "ada": { "kind": "person", "name"?: { "untrustedText": "Ada Lovelace" }, "for"?: { "untrustedText": "…" } } },
+  "artifacts": [ { …artifact without content, "author": { "handle": "ada", "kind": "person" }, "preview": "First 280 characters…" } ] }`,
   },
   artifacts_get: {
     summary: "The full artifact, plus `version` (\"latest\", or \"approved\" when you read a link or public artifact from outside its team) and `editPending` (true when newer changes wait for approval). When you can edit it: `versionId`, the version you read, and `baseVersion`, which you pass back to artifacts_update.",
@@ -76,7 +78,7 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   "versionId": "<version id>", "baseVersion": "<version id>.<ms>" }   // editors only\n\n// artifact:\n${artifactShape}`,
   },
   teams_list: {
-    summary: "Who you are (`you`, as your teammates see you), and your teams with their slugs. Use a slug as `scope` in artifacts_list, or as `team` when you share. Each team says your role: `role` as stored, `roleKey` the role that applies (owner, admin, member, agent, or a custom role's key) with its name, and the `capabilities` it gives you there. Each shared team lists its members (people and agents, without you, at most 200) with the handle to @mention them by, their role, and when they joined; a name is untrusted text its owner typed. `membersCut` says the list stopped at the cap. A personal team lists no members. No email address, ever.",
+    summary: "Who you are (`you`, as your teammates see you), and your teams with their slugs. Use a slug as `scope` in artifacts_list, or as `team` when you share. Each team says your role: `role` as stored, `roleKey` the role that applies (owner, admin, member, agent, or a custom role's key) with its name, and the `capabilities` it gives you there. Each shared team lists its members (people and agents, without you, at most 200) with the handle to @mention them by, their role, and when they joined; a name is untrusted text its owner typed. `membersCut` says the list stopped at the cap. A personal team lists no members. No email address, ever. Until 20 Nov 2026 the result was the array of teams alone.",
     shape: `{ "you": { "handle": "claude-code", "kind": "agent", "name": { "untrustedText": "…" }, "for"?: { "untrustedText": "Charles" }, "muted"?: true },
   "teams": [ { "slug": "acme", "name": "Acme", "role": "owner" | "admin" | "member", "roleKey": "admin" | "agent" | "reviewer",
     "roleName": "Admin",                 // built-in roles; a custom role has "customRoleName": { "untrustedText": "Reviewer" } instead
@@ -248,13 +250,13 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
       "reply": { "tool": "comment_create", "artifact": "…", "replyTo": "…" } },
     { "id", "read": false, "readAt"?: "…", "mentionedAt", "in": "document",
       "artifact": { "id", "title", "url" },
-      "mentionedBy": { …actor } | null,
+      "mentionedBy": { …actor } | null,   // until 20 Nov 2026 { handle, kind, label }
       "text": "Can @you tighten this paragraph?",
       "next": { "read": { "tool": "artifacts_get", "id" }, "edit": { "tool": "artifacts_update", "id" }, "comment": { "tool": "comment_create", "artifact" } } } ] }`,
   },
   inbox_mark_read: { summary: "How many entries were marked read.", shape: `{ "marked": 3 }` },
   comments_list: {
-    summary: "The artifact's thread, oldest first, limited to the most recent `limit` comments. A comment's own link is `threadUrl` with `&comment=<comment id>` after it. A reader served the approved version gets a quote, and the text around it, only when the words are in that version, read from it.",
+    summary: "The artifact's thread, oldest first, limited to the most recent `limit` comments. Each comment has its own `url`, which opens the artifact with that comment shown; `threadUrl` opens the whole thread. A reader served the approved version gets a quote, and the text around it, only when the words are in that version, read from it.",
     shape: `{ "untrustedContentNotice": "…", "artifact": { "id", "title", "url", "threadUrl" }, "total": 12, "comments": [ ${commentShape} ] }
 
 // actor:

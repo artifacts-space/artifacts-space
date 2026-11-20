@@ -34,7 +34,7 @@ import { UserFacingError } from "@/lib/user-facing-error";
 
 import { artifactRefField } from "./artifact-ref-field";
 import { SEARCH_QUERY_MAX_CHARS, SEARCH_TEXT_MAX_CHARS, searchWithReferenced } from "./artifact-ref-search";
-import { toMcpArtifact, toMcpListItem } from "./artifact-view";
+import { toMcpArtifact, toMcpList } from "./artifact-view";
 import { asSaved, baseVersionField, baseVersionOf, editConflictResult } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
 import { savedMentions } from "./mention-tools";
@@ -275,7 +275,7 @@ function registerReadTools(server: ToolServer, userId: string) {
       const items = await searchWithReferenced({ userId, query, filtered, limit, search });
       // Every author and saver in the list, looked up together: one round trip, never one per item.
       const named = await withActors(view, items);
-      return items.map((item) => toMcpListItem(item, named));
+      return toMcpList(items, named);
     }),
   );
 

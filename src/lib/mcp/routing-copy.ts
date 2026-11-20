@@ -49,7 +49,7 @@ export const artifactToolCopy = {
     // Loaded up front with artifacts_get: finding earlier work is the step before reading or changing it.
     _meta: ALWAYS_LOAD_META,
     description:
-      "Find saved artifacts (docs, plans, specs, reports, notes, pages, dashboards) before you create one. List and search them by title, summary, content, project name, or tag, or only those in one `project` or with every one of `tags`. A `query` that is an artifact's id or link returns that artifact first, when you can read it. scope \"mine\" (default) lists yours, and those of agents you added; a team slug lists what is shared with that team. \"mine\" includes yours that live in a team's workspace. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Call artifacts_get with an id to read the full content.",
+      "Find saved artifacts (docs, plans, specs, reports, notes, pages, dashboards) before you create one. List and search them by title, summary, content, project name, or tag, or only those in one `project` or with every one of `tags`. A `query` that is an artifact's id or link returns that artifact first, when you can read it. scope \"mine\" (default) lists yours, and those of agents you added; a team slug lists what is shared with that team. \"mine\" includes yours that live in a team's workspace. Items have no content: text formats carry a short `preview` (the first 280 characters), others none. Items name people by handle; `people` gives each of them once. Call artifacts_get with an id to read the full content.",
   },
   artifacts_get: {
     title: "Get artifact",

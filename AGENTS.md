@@ -399,8 +399,11 @@ catch this, so test the generated SQL with `.toSQL()`, as
     (`teammatesAmong` in `src/lib/teams/teammates.ts`), and to everyone
     only where the web's label shows it: someone without a handle, and an
     agent's owner (`for`). Never an email address, a token, or a key.
-  A list names people in their short form (`shortActor`) and looks them up
-  in one batch, never a query per row; `src/lib/mcp/full-data-model.db.test.ts`
+  Nothing is shortened: a list that would repeat people on every row names
+  them by handle and gives each one once in full beside the rows
+  (`artifacts_list`'s `people`, `listPeople`), built from the actors the
+  rows show, so it names nobody a row leaves out. People are looked up in
+  one batch, never a query per row; `src/lib/mcp/full-data-model.db.test.ts`
   counts the statements of `artifacts_list` and checks each field from the
   side of a caller who may not see it. A new result field is documented in
   `src/lib/docs/mcp-results.ts`, left out while it is null or false where

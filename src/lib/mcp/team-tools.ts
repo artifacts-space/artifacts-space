@@ -182,7 +182,7 @@ function registerCommentTools(server: ToolServer, userId: string) {
         const { thread, comments } = await listComments(userId, artifact, served);
         return {
           untrustedContentNotice: UNTRUSTED_NOTICE,
-          // A comment's own link is threadUrl with "&comment=<comment id>" after it.
+          // The whole thread; each comment carries its own link (url).
           artifact: { id: thread.artifact.publicId, title: thread.title, url: siteUrl(`/artifact/${thread.artifact.publicId}`), threadUrl: threadUrl(thread.artifact.publicId) },
           total: comments.length,
           comments: await toMcpComments(thread.artifact.publicId, userId, comments.slice(-limit), served),

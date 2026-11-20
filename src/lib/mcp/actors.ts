@@ -66,9 +66,33 @@ export function actorOf(actors: McpActors, userId: string | null | undefined): M
 /**
  * The short form for a list, where the same people come back on many rows:
  * handle and kind, with the name only when there is no handle to go by.
- * artifacts_get and teams_list give the rest.
+ * The list's `people` (listPeople) gives the rest, once per person.
  */
 export function shortActor(actor: McpActor | null): McpActor | null {
   if (!actor) return null;
   return actor.handle ? { handle: actor.handle, kind: actor.kind } : actor;
+}
+
+/** One entry of a list's `people`: an actor without its handle, which is the key. */
+export type McpPerson = Omit<McpActor, "handle">;
+
+/**
+ * Every person a list names by handle, once, in full: what each row would
+ * carry if it named them in full. Built from the actors the rows show
+ * (`shown`), never from the ids loaded, so the map names nobody a row
+ * leaves out (a first author for a caller who may not edit). `actors` is
+ * the same map the rows were built from, so a name is there exactly when
+ * the caller would get it on artifacts_get.
+ */
+export function listPeople(shown: readonly (McpActor | null | undefined)[], actors: McpActors): Record<string, McpPerson> {
+  const byHandle = new Map<string, McpActor>();
+  for (const actor of actors.values()) if (actor.handle) byHandle.set(actor.handle, actor);
+  const people: Record<string, McpPerson> = {};
+  for (const actor of shown) {
+    const full = actor?.handle ? byHandle.get(actor.handle) : undefined;
+    if (!full?.handle || full.handle in people) continue;
+    const { handle, ...person } = full;
+    people[handle] = person;
+  }
+  return people;
 }

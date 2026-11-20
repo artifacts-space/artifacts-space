@@ -4,7 +4,7 @@ import type { ArtifactDto } from "@/lib/artifact-types";
 import type { FileDto } from "@/lib/files/types";
 
 import type { McpActor } from "./actors";
-import { artifactActorIds, toMcpArtifact, toMcpListItem, type McpViewContext } from "./artifact-view";
+import { artifactActorIds, toMcpArtifact, toMcpList, toMcpListItem, type McpViewContext } from "./artifact-view";
 
 const dto: ArtifactDto = {
   id: "internal-uuid",
@@ -97,6 +97,12 @@ describe("toMcpArtifact", () => {
     const item = toMcpListItem({ ...dto, preview: "" }, context("member"));
     expect(item.author).toEqual({ handle: "lee", kind: "person" });
     expect(item.updatedBy).toEqual({ handle: "ann", kind: "person" });
+  });
+
+  it("should give a list each person its rows name once, in full, and never a first author a reader's row leaves out", () => {
+    const handedOver = { ...dto, originalAuthorId: "first", visibility: "public" as const, preview: "" };
+    expect(toMcpList([handedOver], context("member")).people).toEqual({ lee: { kind: "person", name: { untrustedText: "Lee" } }, ann: { kind: "person", name: { untrustedText: "Ann" } }, "old-hand": { kind: "person" } });
+    expect(toMcpList([handedOver], context("outsider", [])).people).not.toHaveProperty("old-hand");
   });
 
   it("should ask for the author, the first author, and the saver when it lists whose actors to load", () => {

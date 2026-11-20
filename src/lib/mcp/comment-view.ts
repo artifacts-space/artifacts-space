@@ -24,7 +24,7 @@ export interface McpCommentContext {
   teammates: ReadonlySet<string>;
   /** Whether an inline comment's words are no longer in the text the caller is served (textChangedCheck). By default, only a withheld quote counts. */
   onTextThatChanged?: boolean;
-  /** The comment's own link, for results about one comment. */
+  /** The comment's own link: it opens the artifact with this comment shown. */
   url?: string;
 }
 
@@ -87,11 +87,11 @@ export async function toMcpCommentResult(view: CommentView, viewerId: string, pu
 }
 
 /**
- * Comments for an agent, each told whether its words are still in the
+ * Comments for an agent, each with its own link, and each told whether its words are still in the
  * content the agent is served. Pass `teammates` when the request already
  * looked them up for a larger set (the inbox).
  */
 export async function toMcpComments(publicId: string, viewerId: string, views: readonly CommentView[], served?: ServedAnchors, teammates?: ReadonlySet<string>) {
   const [changed, known] = await Promise.all([textChangedCheck(publicId, viewerId, views, served), teammates ?? commentTeammates(viewerId, views)]);
-  return views.map((view) => toMcpComment(view, { teammates: known, onTextThatChanged: changed(view) }));
+  return views.map((view) => toMcpComment(view, { teammates: known, onTextThatChanged: changed(view), url: threadUrl(publicId, view.id) }));
 }

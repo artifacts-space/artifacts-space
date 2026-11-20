@@ -105,7 +105,7 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
   }
 
   async function findOne(title: string) {
-    const found = (await call<McpListItem[]>("artifacts_list", { query: title })).filter((item) => item.title === title);
+    const found = (await call<{ artifacts: McpListItem[] }>("artifacts_list", { query: title })).artifacts.filter((item) => item.title === title);
     expect(found).toHaveLength(1);
     return call<McpRead>("artifacts_get", { id: found[0]?.id ?? "" });
   }
@@ -159,7 +159,7 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
   });
 
   it("should find the onboarding artifacts newest first when the reviewer searches for onboarding", async () => {
-    const found = await call<McpListItem[]>("artifacts_list", { query: "onboarding" });
+    const { artifacts: found } = await call<{ artifacts: McpListItem[] }>("artifacts_list", { query: "onboarding" });
 
     expect(found.map((item) => item.title)).toEqual(["Onboarding guide", "Onboarding checklist", "Onboarding notes"]);
     const times = found.map((item) => Date.parse(item.updatedAt));

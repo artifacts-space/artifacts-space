@@ -54,6 +54,7 @@ function cannedResult(tool: string, args: unknown): unknown {
   }
   if (tool === "teams_list") return { you: { handle: "eval-agent", kind: "agent" }, teams: [{ slug: "acme", name: "Acme", role: "owner", roleKey: "owner", roleName: "Owner", capabilities: [], personal: false, teamSharingNeedsApproval: false }] };
   if (tool === "artifacts_get") return { error: "Artifact not found." };
+  if (tool === "artifacts_list") return { people: {}, artifacts: [] };
   if (tool.endsWith("_list")) return [];
   return { ok: true, note: "Routing eval stub: nothing was changed." };
 }

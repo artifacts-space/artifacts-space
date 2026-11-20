@@ -34,7 +34,7 @@ interface ToolResult {
 type Json = Record<string, unknown>;
 interface Actor { handle: string | null; kind: string; name?: { untrustedText: string }; for?: { untrustedText: string } }
 interface ReadArtifact extends Json { can: string[]; author: Actor | null; updatedBy: Actor | null; firstAuthor?: Actor; home?: string; files: Json[]; content?: string; version?: string }
-interface ReadComment extends Json { id: string; author: Actor | null; quote: { untrustedText: string } | null; quotePrefix?: { untrustedText: string }; quoteSuffix?: { untrustedText: string }; resolved: { at: string; by: Actor | null } | null; onTextThatChanged: boolean }
+interface ReadComment extends Json { id: string; url: string; author: Actor | null; quote: { untrustedText: string } | null; quotePrefix?: { untrustedText: string }; quoteSuffix?: { untrustedText: string }; resolved: { at: string; by: Actor | null } | null; onTextThatChanged: boolean }
 interface Member { handle: string; kind: string; name: { untrustedText: string }; roleKey?: string; customRoleName?: { untrustedText: string }; joinedAt?: string; for?: { untrustedText: string }; muted?: true }
 interface ListedTeam { slug: string; role: string; roleKey: string; roleName?: string; capabilities: string[]; members?: Member[] }
 interface Teams { you: Member; teams: ListedTeam[] }
@@ -42,12 +42,13 @@ interface Teams { you: Member; teams: ListedTeam[] }
 /** What each tool the tests call returns. artifacts_versions is a list, or one version with `version`. */
 interface Results {
   artifacts_get: ReadArtifact;
-  artifacts_list: ReadArtifact[];
+  artifacts_list: { people: Record<string, Omit<Actor, "handle">>; artifacts: ReadArtifact[] };
   comments_list: { artifact: { threadUrl: string }; comments: ReadComment[] };
   teams_list: Teams;
   artifacts_versions: Json[] & Json;
   inbox_list: { unread: number; mentions: Json[] };
   inbox_mark_read: Json;
+  artifacts_delete: { deleted: boolean };
 }
 
 describe.runIf(Boolean(databaseUrl))("the full data model over MCP", async () => {
@@ -226,9 +227,13 @@ describe.runIf(Boolean(databaseUrl))("the full data model over MCP", async () =>
 
   it("should list each artifact with the same identity and rights as a read, in a fixed number of statements whatever the number of items", async () => {
     const call = await connect(ids.bob);
-    const listed = (await call("artifacts_list", { scope: ids.crew })).json.find((item) => item.id === doc.publicId);
+    const { json } = await call("artifacts_list", { scope: ids.crew });
+    const listed = json.artifacts.find((item) => item.id === doc.publicId);
     expect(listed).toMatchObject({ can: ["edit", "comment"], home: "team", author: { handle: handle("owner"), kind: "person" }, firstAuthor: { handle: handle("former"), kind: "person" } });
-    expect(listed?.author).not.toHaveProperty("name");
+    // Each person once, in full, as artifacts_get names them to this caller: a teammate's name, an agent's owner, and the member who left by handle alone.
+    expect(json.people[handle("owner")]).toEqual({ kind: "person", name: { untrustedText: "Owner Person" } });
+    expect(json.people[handle("bot")]).toEqual({ kind: "agent", name: { untrustedText: "Crew Bot" }, for: { untrustedText: "Owner Person" } });
+    expect(json.people[handle("former")]).toEqual({ kind: "person" });
     expect(listed?.files).toEqual([
       { id: files.chart, filename: "chart.png", contentType: "image/png", size: 2048 },
       { id: files.sow, filename: "sow.pdf", contentType: "application/pdf", size: 4096 },
@@ -244,12 +249,44 @@ describe.runIf(Boolean(databaseUrl))("the full data model over MCP", async () =>
     expect(four).toBe(one);
   });
 
+  it("should let the person who added an agent delete its artifact, as can says, and nobody else on the team", async () => {
+    const note = { id: randomUUID(), publicId: generatePublicId() };
+    await getDb().insert(artifact).values({
+      id: note.id, publicId: note.publicId, userId: ids.bot, updatedBy: ids.bot, kind: "markdown", title: "Bot note", content: "# Bot note",
+      visibility: "team", teamId: ids.crew, comments: "team", shareId: randomUUID().replaceAll("-", ""),
+    });
+    const bob = await connect(ids.bob);
+    expect((await bob("artifacts_get", { id: note.publicId })).json.can).toEqual(["edit", "comment"]);
+    await expect(bob("artifacts_delete", { id: note.publicId })).rejects.toThrow(/cannot delete it/);
+
+    // The owner confirmed it on 2026-11-20: whoever acts for the author deletes as the author would.
+    const owner = await connect(ids.owner);
+    const read = (await owner("artifacts_get", { id: note.publicId })).json;
+    expect(read).toMatchObject({ actsForAuthor: true, isAuthor: false });
+    expect(read.can).toContain("delete");
+    expect((await owner("artifacts_delete", { id: note.publicId })).json.deleted).toBe(true);
+    await expect(owner("artifacts_get", { id: note.publicId })).rejects.toThrow(/not found/);
+  });
+
+  it("should give a reader outside the team who lists the artifact no name the read does not give them, and no first author", async () => {
+    const call = await connect(ids.outsider);
+    const { json, text } = await call("artifacts_list", { query: doc.publicId });
+    expect(json.artifacts.map((item) => item.id)).toEqual([doc.publicId]);
+    expect(json.people).toEqual({ [handle("owner")]: { kind: "person" }, [handle("ada")]: { kind: "person" } });
+    expect(json.artifacts[0]).not.toHaveProperty("firstAuthor");
+    expect(text).not.toContain(handle("former"));
+    expect(text).not.toMatch(/Owner Person|Ada Lovelace|Crew Bot/);
+    expect(text).not.toContain("gamma");
+  });
+
   it("should give a teammate the quotes, the text around them, and names, and say who resolved a thread and when", async () => {
     const call = await connect(ids.bob);
     const { json } = await call("comments_list", { artifact: doc.publicId });
     const byId = new Map(json.comments.map((item) => [item.id, item]));
 
     expect(json.artifact.threadUrl).toContain(`artifact=${doc.publicId}`);
+    // Each comment carries its own link, as a single-comment result does.
+    for (const item of json.comments) expect(item.url).toBe(`https://artifacts.test/app?artifact=${doc.publicId}&comment=${item.id}`);
     expect(byId.get(comments.onLatest)).toMatchObject({ quote: { untrustedText: "gamma" }, quotePrefix: { untrustedText: "We ship the " }, quoteSuffix: { untrustedText: " on Friday." }, onTextThatChanged: false });
     expect(byId.get(comments.onApproved)?.author).toEqual({ handle: handle("ada"), kind: "person", name: { untrustedText: "Ada Lovelace" } });
     expect(byId.get(comments.onApproved)?.resolved).toEqual({ at: expect.any(String) as unknown, by: { handle: handle("owner"), kind: "person", name: { untrustedText: "Owner Person" } } });

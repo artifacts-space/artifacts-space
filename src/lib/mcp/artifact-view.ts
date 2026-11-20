@@ -6,7 +6,7 @@ import { harnessFor } from "@/lib/harness/harnesses";
 import type { SheetFormat } from "@/lib/sheet-format/rules";
 import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
 
-import { actorOf, shortActor, type McpActor, type McpActors } from "./actors";
+import { actorOf, listPeople, shortActor, type McpActor, type McpActors } from "./actors";
 import { callerAccess, isMemberOfTeam, type CallerAccess, type CallerCan } from "./caller-rules";
 
 /** An attached file as an agent reads it. Fields that are unset, null, or false are left out. */
@@ -89,7 +89,7 @@ export interface McpArtifact {
   actsForAuthor?: true;
   /** What the caller may do with it, by the rules each tool enforces again: edit, share, comment, delete. */
   can: CallerCan[];
-  /** Who wrote it (its owner). Null when they are gone. In artifacts_list, this and the two below are short: handle and kind (see shortActor). */
+  /** Who wrote it (its owner). Null when they are gone. In artifacts_list, this and the two below are handle and kind; the list's `people` gives each person once in full (listPeople). */
   author: McpActor | null;
   /** Editors only: who wrote it first, when a team owner took it over from a member who left. */
   firstAuthor?: McpActor;
@@ -239,4 +239,15 @@ export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, reader:
 /** Maps a list item to the compact agent-facing shape: a preview, never the content, and each file without its dates. */
 export function toMcpListItem(item: ArtifactListItemDto, context: McpViewContext): McpArtifact {
   return { ...toMcpShape(item, context, { full: false }), preview: item.preview };
+}
+
+/**
+ * artifacts_list's result: the items, which name people by handle and kind,
+ * and `people`, each of them once in full (listPeople). Nothing about a
+ * person is left out of a list; it is only not repeated on every row.
+ */
+export function toMcpList(items: readonly ArtifactListItemDto[], context: McpViewContext) {
+  const artifacts = items.map((item) => toMcpListItem(item, context));
+  const shown = artifacts.flatMap((item) => [item.author, item.firstAuthor, item.updatedBy]);
+  return { people: listPeople(shown, context.actors), artifacts };
 }

@@ -86,7 +86,7 @@ describe("fullWidth in reads", () => {
   it("should show fullWidth on each item when an agent lists artifacts", async () => {
     data.listArtifacts.mockResolvedValue([listItem(false)]);
     const result = await call("artifacts_list", {});
-    expect(JSON.parse(result.text)).toMatchObject([{ fullWidth: false }]);
+    expect(JSON.parse(result.text)).toMatchObject({ artifacts: [{ fullWidth: false }] });
   });
 });
 

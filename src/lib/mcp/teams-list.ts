@@ -46,6 +46,8 @@ function teamEntry(team: TeamMembership) {
   const roleName = isBuiltInRoleKey(team.roleKey) ? { roleName: team.roleName } : { customRoleName: untrusted(team.roleName) };
   return {
     slug: team.slug,
+    // Plain, as artifact titles and project names are in every result: the team's own name, set by its owners and admins.
+    // Member names are wrapped because any member (an agent too) types their own. Wrapping this one would change a field agents already read.
     name: team.name,
     role: team.role,
     roleKey: team.roleKey,
