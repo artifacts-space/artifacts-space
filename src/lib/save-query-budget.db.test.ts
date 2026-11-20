@@ -33,6 +33,12 @@ function textOf(sent: unknown): string {
   return typeof text === "string" ? text : "";
 }
 
+/** Resolves after `ms` milliseconds; at once for zero or less. */
+function wait(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
 /** How many round trips deep the statements go: one that starts after another finished waits for it. */
 function depthOf(statements: readonly Statement[]): number {
   let depth = 0;
@@ -55,6 +61,25 @@ describe.runIf(Boolean(databaseUrl))("the database work of one autosave", async 
   const tag = randomUUID().slice(0, 8);
   const owner = `savebudget-${tag}-owner`;
 
+  /**
+   * How long every statement takes here, at the least. On production each
+   * statement is one HTTPS round trip of about the same length, so how deep
+   * a save goes is how many of them wait for another. A local database
+   * answers in a millisecond or two, unevenly: when one of two chains that
+   * run side by side answered faster (the rate limit's read and write beside
+   * the artifact's read), its second statement started before the other
+   * chain's first had finished, and `depthOf` counted one round trip more
+   * than the save has (CI, 20 Nov 2026: 7 for 6). Holding each answer until
+   * this long after its statement started makes every round trip the same
+   * length, so the count follows what waits for what, not which answer came
+   * first. That holds while every local query answers within this time, which
+   * is far above a local query's one or two milliseconds; a query slower than
+   * this (a cold connection on a busy runner) could still add a wave. Checked
+   * by hand on 20 Nov 2026: with the artifact's read held 40 ms longer than
+   * the rest, the count was 7 every time without this floor, and 6 with it.
+   */
+  const roundTripMs = 100;
+
   /** Runs `work` and returns every statement it sent, with a counter for order (the clock is too coarse for a local database). */
   async function statementsOf(work: () => Promise<unknown>): Promise<Statement[]> {
     const statements: Statement[] = [];
@@ -65,12 +90,22 @@ describe.runIf(Boolean(databaseUrl))("the database work of one autosave", async 
       const text = textOf(sent);
       const entry: Statement = { text: text.replace(/\s+/g, " "), started: (tick += 1), finished: Number.POSITIVE_INFINITY };
       statements.push(entry);
-      return real(...args).finally(() => { entry.finished = tick += 1; });
+      const answersAt = performance.now() + roundTripMs;
+      return real(...args)
+        .then(async (answer) => {
+          await wait(answersAt - performance.now());
+          return answer;
+        })
+        .finally(() => { entry.finished = tick += 1; });
     }) as never);
+    // One rate limit hit in 50 also sweeps old buckets (CLEANUP_CHANCE in rate-limit.ts): one more statement, and one more
+    // round trip, on that save only. The budget is the save's own path, so the sweep never runs here.
+    const sweep = vi.spyOn(Math, "random").mockReturnValue(0.5);
     try {
       await work();
     } finally {
       spy.mockRestore();
+      sweep.mockRestore();
     }
     return statements;
   }

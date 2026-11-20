@@ -2357,8 +2357,12 @@ production each statement is its own HTTPS round trip (`neon-http`). An
 autosave that continues a session on a private or team artifact is 13
 statements, 6 round trips deep (it was 18 and 13, #255), and
 `src/lib/save-query-budget.db.test.ts` holds it there: a change that adds a
-statement to the save path fails that test and has to say why. How it stays
-short:
+statement to the save path fails that test and has to say why. The test
+gives every statement the same length (`roundTripMs`), as production's round
+trips are, so it counts what waits for what, not which local answer came
+first (it once counted 7 when the rate limit's two statements beat the
+artifact's read), and it keeps the rate limiter's sweep of old buckets
+(one hit in 50) out of the count. How it stays short:
 
 - Checks that need nothing of each other start together and refuse in a
   fixed order (`firstRefusal` in `src/lib/artifact-save.ts`): the rate
