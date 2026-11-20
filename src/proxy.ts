@@ -21,7 +21,10 @@ import { getTeamForMember } from "@/lib/teams/queries";
  * Cache Components the page shell streams first, so a notFound() or redirect() in
  * the page can only send a 200. These checks run before the page renders:
  * signed-out workspace pages redirect to sign-in, and unknown or unreadable
- * artifacts and teams get a 404. The pages still run their own checks.
+ * artifacts and teams get a 404. An artifact a signed-out visitor cannot
+ * read redirects to sign-in instead, with the artifact as the return
+ * address: the link may be theirs to open once they sign in. The pages
+ * still run their own checks.
  *
  * Artifact pages, and their 404s, carry X-Robots-Tag: noindex, nofollow unless
  * search engines may index them (src/lib/search/search-rules.ts); the page's
@@ -96,13 +99,30 @@ function noindex<T extends Response>(response: T): T {
 }
 
 /**
- * The artifact page: 404 when the viewer cannot read it, noindex unless search
- * engines may list it. Both answers come from one query (checkArtifactPage);
- * when it fails, proxy() sends the page on with noindex.
+ * An artifact page this viewer cannot read. Signed out: to sign-in, and back
+ * to the artifact afterwards (the owner, 2026-11-19: someone who was sent a
+ * link to a private artifact was told it did not exist). The same for every id,
+ * whether or not an artifact has it, so the redirect tells a stranger
+ * nothing the 404 did not. Signed in and still not readable: the 404. No
+ * cookie means signed out with no lookup; a stale cookie counts as signed
+ * out, and the sign-in page expires it.
+ */
+async function unreadableArtifact(request: NextRequest, viewer: () => Promise<string | null>) {
+  const signedIn = Boolean(getSessionCookie(request)) && (await viewer()) !== null;
+  return noindex(signedIn ? notFound(request) : toSignIn(request));
+}
+
+/**
+ * The artifact page: readable or not (unreadableArtifact), and noindex unless
+ * search engines may list it. Both answers come from one query
+ * (checkArtifactPage); when it fails, proxy() sends the page on with noindex.
+ * The session is looked up at most once, whichever of the two asks first.
  */
 async function checkArtifact(request: NextRequest, publicId: string) {
-  const { readable, indexable } = await checkArtifactPage(publicId, () => viewerId(request));
-  if (!readable) return noindex(notFound(request));
+  let lookup: Promise<string | null> | undefined;
+  const viewer = () => (lookup ??= viewerId(request));
+  const { readable, indexable } = await checkArtifactPage(publicId, viewer);
+  if (!readable) return unreadableArtifact(request, viewer);
   return indexable ? NextResponse.next() : noindex(NextResponse.next());
 }
 
@@ -188,6 +208,7 @@ async function siteProxy(request: NextRequest) {
     return await checkRecord(request, check);
   } catch (error) {
     // The page repeats the check, so a failure here only costs the status code. Artifact pages stay noindex.
+    // That includes the session lookup an unreadable artifact needs when the request carries a cookie.
     console.error("[proxy] Route check failed", error instanceof Error ? error.name : "unknown error");
     return check.kind === "artifact" ? noindex(NextResponse.next()) : NextResponse.next();
   }

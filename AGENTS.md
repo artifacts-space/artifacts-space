@@ -313,6 +313,10 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
     pages reach no database, or the local test database with
     `E2E_LOCAL_DB=1`. Playwright starts its own server, never reusing one.
     Never run `next dev` for e2e against `.env.local`'s database yourself.
+    With `PLAYWRIGHT_PORT` set, set `BETTER_AUTH_URL` to that same origin
+    for the database-backed specs (`BETTER_AUTH_URL=http://localhost:<port>`):
+    dev sign-in follows a link built from it, and the default sends the
+    browser to port 3000, where another project's server may answer.
 
 ### Tripwire: no correlated subqueries in single-table selects
 
@@ -342,6 +346,21 @@ catch this, so test the generated SQL with `.toSQL()`, as
   than that, so someone who loses access can still load the page's files
   from an address they already hold until it ends. The token names no
   viewer; never log one.
+- An artifact page a visitor cannot read (`unreadableArtifact` in
+  `src/proxy.ts`): signed out, it redirects to sign-in with the artifact as
+  the return address (the owner, 2026-11-19: someone who was sent a link
+  to a private artifact was told it did not exist); signed in and still not
+  readable, it is the 404. The redirect is the same for every id, whether
+  or not an artifact has it, so it tells a stranger nothing the 404 did not:
+  never redirect only for artifacts that exist. The Markdown version
+  (`.md`, or `Accept: text/markdown`) keeps its 404: an agent cannot use a
+  sign-in form. A sign-in page with a return address (`?next=`) is noindex
+  (`next.config.ts`), so a search engine that follows the redirect lists
+  neither the artifact's address nor that sign-in page. A link unfurler is
+  signed out too: it follows the redirect and shows the sign-in page's
+  card, which is the site's (`e2e/link-preview.prod.spec.ts`).
+  `src/proxy.test.ts` holds this in CI and
+  `e2e/artifact-sign-in-redirect-db.spec.ts` against a real database.
 - Every MCP tool is classified read or write in `src/lib/mcp/tool-access.ts`.
   A tool missing from that list cannot be registered, and read-only
   connections never see write tools. Its MCP annotations come from the same

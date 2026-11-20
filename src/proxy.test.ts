@@ -207,11 +207,55 @@ describe("proxy", () => {
     expect(response.headers.get("x-robots-tag")).toBeNull();
   });
 
-  it("should send noindex, nofollow on the 404 when the viewer cannot read the artifact", async () => {
+  it("should send a signed-out visitor to sign-in, and back to the artifact afterwards, when they cannot read it", async () => {
     mocks.checkArtifactPage.mockResolvedValue(page(false, true));
-    const response = await proxy(request("/artifact/abc"));
+    const response = await proxy(request("/artifact/abc?comments=1"));
+    expect(response.status).toBe(307);
+    expect(location(response)).toBe(`${origin}/sign-in?next=${encodeURIComponent("/artifact/abc?comments=1")}`);
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    // No cookie is signed out: nothing is looked up to decide it.
+    expect(mocks.getSession).not.toHaveBeenCalled();
+  });
+
+  it("should treat a stale session cookie as signed out when the artifact cannot be read", async () => {
+    mocks.checkArtifactPage.mockResolvedValue(page(false));
+    mocks.getSession.mockResolvedValue(null);
+    const response = await proxy(request("/artifact/abc", { cookie: sessionCookie }));
+    expect(response.status).toBe(307);
+    expect(location(response)).toBe(`${origin}/sign-in?next=${encodeURIComponent("/artifact/abc")}`);
+  });
+
+  it("should send noindex, nofollow on the 404 when a signed-in viewer cannot read the artifact, with one session lookup", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "user-1" } });
+    // As the real check does for a private artifact: it asks who the viewer is before it answers.
+    mocks.checkArtifactPage.mockImplementation(async (_publicId: string, viewer: () => Promise<string | null>) => {
+      await viewer();
+      return page(false, true);
+    });
+    const response = await proxy(request("/artifact/abc", { cookie: sessionCookie }));
     expect(response.status).toBe(404);
     expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    expect(mocks.getSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("should send the page on with noindex when the session check fails for an artifact that cannot be read", async () => {
+    mocks.checkArtifactPage.mockResolvedValue(page(false));
+    mocks.getSession.mockRejectedValue(new Error("down"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await proxy(request("/artifact/abc", { cookie: sessionCookie }));
+    // The page repeats the read check, so nothing is shown that should not be.
+    expect(response.status).toBe(200);
+    expect(location(response)).toBeNull();
+    expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+  });
+
+  it("should keep the Markdown version's own answer when an agent asks for an artifact it cannot read", async () => {
+    mocks.checkArtifactPage.mockResolvedValue(page(false));
+    const response = await proxy(request("/artifact/abc.md"));
+    expect(location(response)).toBeNull();
+    expect(response.headers.get("x-middleware-rewrite")).toContain("/abc");
+    expect(mocks.checkArtifactPage).not.toHaveBeenCalled();
   });
 
   it("should stay noindex when the page check fails", async () => {
@@ -398,8 +442,15 @@ describe("proxy on the landing and sign-in pages", () => {
   });
 
   it("should end a stale cookie on sign-in with no loop when the real proxy is followed hop by hop", async () => {
-    signedOut();
-    for (const start of ["/", "/sign-in", "/sign-up", "/app"]) {
+    // An artifact the visitor cannot read sends them to sign-in too; the sign-in page is what ends the cookie.
+    // The artifact check asks for the session alone, the entry pages with its headers: no session either way.
+    mocks.getSession.mockImplementation((input: { returnHeaders?: boolean }) => Promise.resolve(input.returnHeaders ? { headers: new Headers(), response: null } : null));
+    mocks.checkArtifactPage.mockResolvedValue(page(false));
+    // The artifact hop's rate limit hashes the network with this secret before it asks; without it the limit fails open in its catch.
+    vi.stubEnv("BETTER_AUTH_SECRET", "test-network-key-secret");
+    mocks.hitRateLimits.mockResolvedValue(null);
+    const logged = vi.spyOn(console, "error");
+    for (const start of ["/", "/sign-in", "/sign-up", "/app", "/artifact/abc"]) {
       let cookie: string | null = `__Secure-${sessionCookie}`;
       let path = start;
       const visited: string[] = [];
@@ -416,6 +467,9 @@ describe("proxy on the landing and sign-in pages", () => {
       // With the cookie gone, / is the static landing page.
       expect(location(await proxy(request("/")))).toBeNull();
     }
+    expect(logged, "no check failed on the way").not.toHaveBeenCalled();
+    logged.mockRestore();
+    vi.unstubAllEnvs();
   });
 
   it("should show the sign-in page when the session check fails", async () => {

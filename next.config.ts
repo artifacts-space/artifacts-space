@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
       // Vendored emoji data and theme fonts live under versioned paths, so they never change in place.
       { source: "/emoji/:version/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
       { source: "/fonts/:version/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
+      // A sign-in page with a return address is one of many addresses for the same page, and an artifact a signed-out
+      // visitor cannot read redirects to it (src/proxy.ts unreadableArtifact): search engines list none of them.
+      ...["/sign-in", "/sign-up"].map((source) => ({ source, has: [{ type: "query" as const, key: "next" }], headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] })),
       // The notifications service worker: always checked for updates, and it may load nothing from elsewhere.
       { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }, { key: "Content-Security-Policy", value: "default-src 'self'; frame-ancestors 'none'" }] },
     ]),
