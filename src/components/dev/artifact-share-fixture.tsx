@@ -7,10 +7,13 @@ import type { ShareTeam } from "@/components/app/share-teams-context";
 import { ArtifactHeader } from "@/components/artifact-page/artifact-header";
 import { ArtifactHeaderMenu } from "@/components/artifact-page/artifact-header-menu";
 import { ArtifactPageShare } from "@/components/artifact-page/page-share";
+import { ArtifactPageTheme } from "@/components/artifact-page/artifact-page-theme";
 import { PageEditorChromeProvider } from "@/components/artifact-page/page-editor-chrome";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
 import { commentSettings, type ArtifactDto } from "@/lib/artifact-types";
 import { pageColumnClass } from "@/lib/page-width/rules";
+import { presetTheme } from "@/lib/themes/resolve";
+import type { Theme } from "@/lib/themes/schema";
 import { decideSharing } from "@/lib/sharing/rules";
 import { defaultActor, defaultRoleCapabilities } from "@/lib/teams/capability-rules";
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
@@ -73,10 +76,10 @@ function sentenceFor(artifact: ArtifactDto) {
 const widestDownload = { href: "#download", filename: "launch-checklist.csv" };
 
 /** The page header around the artifact's title, as the artifact page lays it out. */
-function FixturePage({ artifact, share }: { artifact: ArtifactDto; share: React.ReactNode }) {
+function FixturePage({ artifact, share, theme = null }: { artifact: ArtifactDto; share: React.ReactNode; theme?: Theme | null }) {
   const column = pageColumnClass(false);
   return (
-    <div className="min-h-screen">
+    <ArtifactPageTheme theme={theme} overlays className="min-h-screen" data-page-theme={theme ? "set" : "site"}>
       <PageEditorChromeProvider>
         <StickyChrome>
           {/* The owner gets the widest header there is (a CSV editor's: Download CSV too), so the phone-width check covers it. */}
@@ -89,7 +92,7 @@ function FixturePage({ artifact, share }: { artifact: ArtifactDto; share: React.
           {artifact.visibility}:{artifact.teamId ?? "none"}
         </p>
       </main>
-    </div>
+    </ArtifactPageTheme>
   );
 }
 
@@ -99,11 +102,13 @@ function FixturePage({ artifact, share }: { artifact: ArtifactDto; share: React.
  * read-only status), with no database. The artifact page share e2e test
  * uses it.
  */
-export function ArtifactShareFixture({ as }: { as: "owner" | "reader" }) {
+export function ArtifactShareFixture({ as, themeId = null }: { as: "owner" | "reader"; themeId?: string | null }) {
+  // `?theme=<preset id>`: the page wears that theme, as a themed artifact's page does (overlays included).
+  const theme = themeId ? (presetTheme(themeId) ?? null) : null;
   const initial = useMemo(() => fixtureArtifact({ id: "fixture-share", kind: "markdown", title: "Launch checklist", content: "# Launch checklist" }), []);
   const [artifact, setArtifact] = useState(initial);
   const [actions] = useState(() => memoryShareStore(initial));
-  if (as === "reader") return <FixturePage artifact={{ ...artifact, visibility: "team", teamId: "fixture-platform" }} share={null} />;
+  if (as === "reader") return <FixturePage artifact={{ ...artifact, visibility: "team", teamId: "fixture-platform" }} share={null} theme={theme} />;
   const share = <ArtifactPageShare artifact={artifact} teams={fixtureTeams} sentence={sentenceFor(artifact)} shareUrl={`https://artifacts.space/artifact/${artifact.publicId}`} actions={actions} onSaved={setArtifact} />;
-  return <FixturePage artifact={artifact} share={share} />;
+  return <FixturePage artifact={artifact} share={share} theme={theme} />;
 }

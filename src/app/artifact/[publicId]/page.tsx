@@ -423,7 +423,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
 
   return (
     // The header, comments, and footer wear the artifact theme's colors (none for an unthemed artifact) and swap with it.
-    <ArtifactPageTheme theme={theme} className="min-h-screen">
+    <ArtifactPageTheme theme={theme} overlays className="min-h-screen">
       {/* An HTML artifact's page runs in a sandbox on this deployment's page host. */}
       <ServerPageHost>
       {/* For editors, the in-place editor below publishes its save status and More menu to the header above it. */}
