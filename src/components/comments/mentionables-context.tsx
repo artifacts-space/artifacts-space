@@ -8,8 +8,7 @@ import type { ActionResult } from "@/lib/artifact-types";
 import { composerMentionMap, type MentionDirectory, type Mentionable } from "@/lib/comments/mention-autocomplete";
 import type { MentionKind } from "@/lib/comments/mentions";
 
-import { mentionListView, takeMentionAnswer, type MentionListLoaded } from "./mention-list-load";
-import type { MentionListState } from "./mention-suggestions";
+import { mentionListView, takeMentionAnswer, type MentionListLoaded, type MentionListState } from "./mention-list-load";
 import { useRetryOnFocus } from "./use-retry-on-focus";
 
 interface MentionablesValue {

@@ -1,6 +1,11 @@
 import type { MentionDirectory } from "@/lib/comments/mention-autocomplete";
 
-import type { MentionListState } from "./mention-suggestions";
+/**
+ * What is known about who can be mentioned: the list is here ("ready"), on
+ * its way, or could not be loaded. The hint claims that nobody can be
+ * mentioned, or that nothing matches, only of a list that is here.
+ */
+export type MentionListState = "ready" | "loading" | "unavailable";
 
 /**
  * What one request for the list of people to mention brought: the list, or
