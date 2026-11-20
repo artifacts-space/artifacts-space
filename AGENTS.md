@@ -2148,11 +2148,14 @@ autosave cost two renders of the page (the owner, 2026-11-19: "slow to save
 when user makes change", #255). The editor already shows what it saved.
 The page around it catches up through `useQuietRefresh`
 (`src/components/app/artifact-editor/`): `soon` asks for the page once,
-`QUIET_REFRESH_MS` after the last save, which is longer than the longest gap
+`QUIET_REFRESH_MS` after the last save, which is twice the longest gap
 between two autosaves, so typing that goes on renders nothing; `now` asks at
-once, for a change the editor does not show by itself (a restore, a newer
-save taken from the server); leaving with a refresh still owed asks at once,
-which also drops the pages the browser keeps for Back. The artifact page's
+once, for a change that reaches the page outside the autosave (a restore, a
+newer save taken when the tab came back, "Made with"); what the autosave
+hands back, someone else's merged version included, goes through `soon`,
+since the editor shows it from its own copy. Leaving with a refresh still
+owed asks at once: that request is for the page being opened, and it makes
+the browser drop the pages it kept, so Back asks the server again. The artifact page's
 `EditSurface` and `/app`'s `Dashboard` (`refreshAfterSaves`) use it; the
 fixtures do not, since they have no server copy. Do not put a
 `revalidatePath` or a per-save `router.refresh()` back on the autosave path;

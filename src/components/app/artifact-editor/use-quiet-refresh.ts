@@ -11,10 +11,15 @@ import { quietRefresher } from "./quiet-refresh-rules";
  * revalidates nothing): the editor already shows what was saved. `soon` asks
  * for the page once the saves go quiet (quiet-refresh-rules.ts), so what the
  * server draws around the editor, and the pages the browser keeps for Back,
- * catch up; `now` asks at once, for a change the editor does not show by
- * itself (a restore, a newer save taken from the server). Leaving with a
- * refresh still owed asks at once. `enabled` false does nothing: the dev
- * fixtures have no server copy.
+ * catch up; `now` asks at once, for a change that reaches the page outside
+ * the autosave (a restore, a newer save the page took when its tab came
+ * back, the "Made with" choice). What the autosave itself hands back goes
+ * through `soon`, someone else's newer version it merged or loaded
+ * included: the editor shows that at once from its own copy. Leaving with
+ * a refresh still owed asks at once: the request is for the page being
+ * opened, and it makes the browser drop the pages it kept, so Back asks the
+ * server for this one again (e2e/autosave-refresh-db.spec.ts). `enabled`
+ * false does nothing: the dev fixtures have no server copy.
  */
 export function useQuietRefresh(enabled = true) {
   const router = useRouter();

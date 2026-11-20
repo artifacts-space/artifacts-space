@@ -37,7 +37,7 @@ const loadFailed = "Editing is not available right now. Reload the page to try a
  */
 export function EditSurface({ publicId, title, updatedAt, reviewed, fullWidth, files, children }: EditSurfaceProps) {
   const [error, setError] = useState("");
-  // The page around the editor catches up once the typing stops; a restore or a newer save from the server shows at once.
+  // The page around the editor catches up once the autosaves go quiet; a restore or a newer save taken when the tab came back shows at once.
   const refresh = useQuietRefresh();
   const editor = usePageEditor(null, refresh.now, refresh.soon);
   const { start } = editor;

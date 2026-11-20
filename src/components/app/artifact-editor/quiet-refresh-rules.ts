@@ -1,11 +1,12 @@
-import { AUTOSAVE_DELAY_MS, AUTOSAVE_MAX_WAIT_MS } from "./autosave-rules";
+import { AUTOSAVE_MAX_WAIT_MS } from "./autosave-rules";
 
 /**
  * How long after the last autosave the page asks the server for itself
- * again: longer than the longest gap between two autosaves while typing goes
- * on (autosave-rules.ts), so nothing is rendered until the typing stops.
+ * again: twice the longest gap between two autosaves while typing goes on
+ * (autosave-rules.ts), so nothing is rendered until the typing stops, even
+ * when a save's answer is seconds late.
  */
-export const QUIET_REFRESH_MS = AUTOSAVE_MAX_WAIT_MS + AUTOSAVE_DELAY_MS;
+export const QUIET_REFRESH_MS = AUTOSAVE_MAX_WAIT_MS * 2;
 
 /**
  * When a page asks the server for itself after saves, kept apart from React

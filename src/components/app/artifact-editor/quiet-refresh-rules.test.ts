@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AUTOSAVE_MAX_WAIT_MS } from "./autosave-rules";
+import { AUTOSAVE_MAX_WAIT_MS, AUTOSAVE_MIN_INTERVAL_MS } from "./autosave-rules";
 import { QUIET_REFRESH_MS, quietRefresher } from "./quiet-refresh-rules";
 
 describe("quietRefresher", () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
-  it("should wait longer than the longest gap between two autosaves, so typing that goes on renders nothing", () => {
-    expect(QUIET_REFRESH_MS).toBeGreaterThan(AUTOSAVE_MAX_WAIT_MS);
+  it("should wait well past the longest gap between two autosaves, so typing that goes on renders nothing even when a save answers late", () => {
+    expect(QUIET_REFRESH_MS).toBeGreaterThanOrEqual(AUTOSAVE_MAX_WAIT_MS + AUTOSAVE_MIN_INTERVAL_MS);
   });
 
   it("should ask once, after the saves go quiet, when several saves follow each other", () => {
