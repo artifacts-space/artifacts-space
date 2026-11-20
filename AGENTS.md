@@ -2308,6 +2308,9 @@ short:
   fixed order (`firstRefusal` in `src/lib/artifact-save.ts`): the rate
   limit (started beside the read of the artifact, `startSaveLimit`), the
   agent rule, and the quota. Do not turn them back into a chain of awaits.
+  Because the limit starts before the artifact is read, an attempt that
+  files nothing (the artifact is gone, the content is refused) counts
+  against it too.
 - The history is read once after the write (`readHistory` in
   `src/lib/versions/history.ts`): the latest version and the protected
   versions, together. The latest version comes without its text
@@ -2315,7 +2318,10 @@ short:
   row by hash, and returns the text only when it can point at uploaded
   files, which the rule that keeps a dropped file restorable reads
   (`dropsShownImage`; `content-file-lifecycle.db.test.ts` fails without it).
-  Never read `latestVersion` (the whole row) on the save path.
+  Never read `latestVersion` (the whole row) on the private or team save
+  path. A link or public save still reads it (`planSave` in
+  `src/lib/versions/save-write.ts`): it decides whether the write reuses
+  the latest version, inside the one statement that writes both.
 - History is pruned only when a save added a version row (`fileSave`'s
   `added`, `newVersion` for a link or public artifact). A save that merged
   into the session's version adds nothing to prune; versions that age out

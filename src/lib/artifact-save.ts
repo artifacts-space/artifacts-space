@@ -81,7 +81,8 @@ function saveLimit(context: Pick<SaveContext, "options" | "restoredFromId">) {
  * artifact instead of after it: the two need nothing of each other. Hand the
  * promise to writeArtifactSave as `limited`, which waits for it before it
  * writes. It never rejects unheard: a caller that returns early (the artifact
- * is gone) may drop it.
+ * is gone) may drop it. The attempt is counted all the same: a save that
+ * comes back null, or whose content is refused, has spent one of the limit.
  */
 export function startSaveLimit(editorId: string, options: SaveOptions): Promise<void> {
   const limited = enforceRateLimit(saveLimit({ options }), editorId);

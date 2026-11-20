@@ -430,7 +430,9 @@ async function saveChanges(changes: ArtifactChanges, context: SaveContext): Prom
  */
 export async function saveArtifactUpdate(userId: string, id: string, input: ArtifactUpdateInput, actor: SharingActor = "person", options: SaveOptions = {}): Promise<SavedArtifact | null> {
   const sent = artifactUpdateSchema.parse(input);
-  // The save's limit is counted beside the read of the artifact, not after it.
+  // The save's limit is counted beside the read of the artifact, not after it. So an attempt that files nothing
+  // counts too: an artifact that is gone or no longer editable (null below), content that is refused. That is
+  // deliberate: the limit is on attempts, and the editor's own pace keeps it far from the cap either way.
   const limited = startSaveLimit(userId, options);
   const before = await getEditableArtifact(userId, { id });
   if (!before) return null;
