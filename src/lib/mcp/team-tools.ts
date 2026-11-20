@@ -237,9 +237,9 @@ function registerCommentChangeTools(server: ToolServer, userId: string) {
     ({ comment: commentId, body }) =>
       respond(async () => {
         const result = await updateComment({ actorId: userId, commentId, body });
-        // An inline comment is told whether its words are still in the text the agent is served.
+        // An inline comment is told whether its words are still in the text the agent is served; toMcpComments shapes it in full (link included), with one teammates lookup.
         const [checked] = result.comment.anchor ? await toMcpComments(result.publicId, userId, [result.comment]) : [];
-        return { comment: await toMcpCommentResult(result.comment, userId, result.publicId, checked?.onTextThatChanged), mentions: toMcpMentions(result.mentions) };
+        return { comment: checked ?? (await toMcpCommentResult(result.comment, userId, result.publicId)), mentions: toMcpMentions(result.mentions) };
       }),
   );
 

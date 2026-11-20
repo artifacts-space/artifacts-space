@@ -79,11 +79,11 @@ export function toMcpComment(view: CommentView, context: McpCommentContext) {
   };
 }
 
-/** One comment for a write result, with its own link. */
-export async function toMcpCommentResult(view: CommentView, viewerId: string, publicId: string | null, onTextThatChanged?: boolean) {
+/** One comment for a write result, with its own link. An inline comment that needs the changed-text check goes through toMcpComments instead. */
+export async function toMcpCommentResult(view: CommentView, viewerId: string, publicId: string | null) {
   const teammates = await commentTeammates(viewerId, [view]);
   const url = publicId ? threadUrl(publicId, view.id) : undefined;
-  return toMcpComment(view, { teammates, ...(onTextThatChanged === undefined ? {} : { onTextThatChanged }), ...(url ? { url } : {}) });
+  return toMcpComment(view, { teammates, ...(url ? { url } : {}) });
 }
 
 /**
