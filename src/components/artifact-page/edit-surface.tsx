@@ -1,11 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { loadEditableArtifactAction } from "@/app/artifact/[publicId]/edit-actions";
 import { serverCaptureApi } from "@/components/artifact-view/canvas/capture/capture-api";
 import { ServerCatchUp } from "@/components/app/artifact-editor/use-catch-up";
+import { useQuietRefresh } from "@/components/app/artifact-editor/use-quiet-refresh";
 import { FrameCaptureHost } from "@/components/artifact-view/canvas/capture/frame-capture-host";
 import type { FileDto } from "@/lib/files/types";
 
@@ -36,11 +36,10 @@ const loadFailed = "Editing is not available right now. Reload the page to try a
  * same page is editable in place (PageEditFrame) with no Edit button.
  */
 export function EditSurface({ publicId, title, updatedAt, reviewed, fullWidth, files, children }: EditSurfaceProps) {
-  const router = useRouter();
   const [error, setError] = useState("");
-  const [, startRefresh] = useTransition();
-  const refresh = useCallback(() => { startRefresh(() => { router.refresh(); }); }, [router]);
-  const editor = usePageEditor(null, refresh);
+  // The page around the editor catches up once the autosaves go quiet; a restore or a newer save taken when the tab came back shows at once.
+  const refresh = useQuietRefresh();
+  const editor = usePageEditor(null, refresh.now, refresh.soon);
   const { start } = editor;
 
   useEffect(() => {

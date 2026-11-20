@@ -112,6 +112,7 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
       teams={teams}
       scopeTeam={scopeTeam}
       welcome={welcome}
+      refreshAfterSaves
     />
     </ServerCatchUp>
     </ServerFrameCaptures>
