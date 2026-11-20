@@ -156,6 +156,14 @@ function alphaOf(color: string): number {
   return alpha.endsWith("%") ? Number.parseFloat(alpha) / 100 : Number.parseFloat(alpha);
 }
 
+/** Where a visible element is. An element with no box fails the test here, so a comparison never passes on two missing readings. */
+async function measured(locator: Locator) {
+  await expect(locator).toBeVisible();
+  const box = await locator.boundingBox();
+  if (!box) throw new Error("The element has no box to measure.");
+  return box;
+}
+
 /** The surfaces drawn over the cover right now: every button in it, and the reposition hint when shown. */
 async function surfacesOver(cover: Locator): Promise<{ name: string; color: string }[]> {
   return cover.locator("button, [role=slider] p").evaluateAll((nodes) => nodes.map((node) => ({ name: node.getAttribute("aria-label") ?? node.textContent.trim(), color: getComputedStyle(node).backgroundColor })));
@@ -210,18 +218,18 @@ for (const icon of ["🚀", null]) {
 
     await expect(cover).toHaveCount(0);
     await expect(page.locator("[data-cover-removed]")).toBeAttached();
-    const header = await page.getByRole("banner").boundingBox();
-    const waiting = { icon: await iconRow.boundingBox(), heading: await heading.boundingBox() };
-    expect(waiting.icon && header && waiting.icon.y >= header.y + header.height, "the icon row is clear of the header while the save is on its way").toBe(true);
+    const header = await measured(page.getByRole("banner"));
+    const waiting = { icon: await measured(iconRow), heading: await measured(heading) };
+    expect(waiting.icon.y, "the icon row is clear of the header while the save is on its way").toBeGreaterThanOrEqual(header.y + header.height);
 
     release();
     await expect(page.getByRole("button", { name: "Add cover" })).toBeAttached();
     await expect(page.locator("[data-cover-removed]")).toHaveCount(0);
     await expect(iconRow).toHaveAttribute("data-page-icon", "in-flow");
     // The page does not move when the server's page takes over: the title, and so everything under it, keeps its place.
-    const settled = { icon: await iconRow.boundingBox(), heading: await heading.boundingBox() };
-    expect(settled.heading?.y).toBe(waiting.heading?.y);
+    const settled = { icon: await measured(iconRow), heading: await measured(heading) };
+    expect(settled.heading.y).toBe(waiting.heading.y);
     // The icon's box over a cover is not its row without one, so the row may settle by a few pixels, never more.
-    expect(Math.abs((settled.icon?.y ?? 0) - (waiting.icon?.y ?? 0))).toBeLessThanOrEqual(8);
+    expect(Math.abs(settled.icon.y - waiting.icon.y)).toBeLessThanOrEqual(8);
   });
 }
