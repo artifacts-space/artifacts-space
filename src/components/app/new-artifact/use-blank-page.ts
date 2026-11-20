@@ -128,7 +128,7 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
   useEffect(() => { draftRef.current = draft; }, [draft]);
 
   const active = options !== undefined;
-  const { uploads, fileIdsForCreate, removeUpload, problem: uploadProblem, tracker } = useBlankUploads({ options, artifact, onUpdated });
+  const { uploads, fileIdsForCreate, removeUpload, problem: uploadProblem, clearProblem: clearUploadProblem, tracker } = useBlankUploads({ options, artifact, onUpdated });
   const current = useCallback(() => ({ draft: draftRef.current, fileIds: fileIdsForCreate() }), [fileIdsForCreate]);
   const save = useCreateOnceSave(options?.api, options?.project ?? null, current, tracker);
 
@@ -161,6 +161,8 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
       return;
     }
     if (route === "upload") {
+      // A new drop is the person trying again: what was said about the last one goes.
+      clearUploadProblem();
       uploads.addFiles(content.files);
       return;
     }
@@ -170,7 +172,7 @@ export function useBlankPage(options: BlankPageOptions | undefined, editor: Edit
       .then((detection) => { if (detection && takesFirstContent(routeRef.current)) apply(detection); else asBlocks(); })
       // Not readable as text: it goes into the document, as any other file would.
       .catch(asBlocks);
-  }, [apply, uploads, intoDocument]);
+  }, [apply, uploads, intoDocument, clearUploadProblem]);
 
   const dismissDetected = useCallback(() => { setDetected(null); }, []);
   return {

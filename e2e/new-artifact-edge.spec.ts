@@ -114,6 +114,8 @@ async function expectSettledAndNextDropAttaches(page: Page) {
   await dropFiles(body(page), ["Next.pdf"]);
   await expect.poll(async () => (await storedNew(page))[0]?.files.map((file) => file.filename) ?? [], { timeout: 15_000 }).toContain("Next.pdf");
   await expect(page.getByRole("list", { name: "Uploads" })).toHaveCount(0);
+  // The new drop was the person trying again: nothing is still said about the earlier one.
+  await expect(page.getByText(attachProblem, { exact: true })).toHaveCount(0);
 }
 
 test("should show the file once, clear the list, and take the next drop when a lost answer's check finds it attached", async ({ page }) => {
@@ -450,4 +452,7 @@ test("should still attach a file dropped while an earlier attach was on its way 
   await expect(page.getByText(attachProblem, { exact: true })).toBeVisible();
   await expect.poll(async () => (await storedNew(page))[0]?.files.map((file) => file.filename), { timeout: 15_000 }).toEqual(["Later.pdf"]);
   expect(await discarded(page)).toHaveLength(1);
+  // The later file went in at once; that must not take away what was said about the refused one.
+  await expect(page.getByRole("list", { name: "Uploads" })).toHaveCount(0);
+  await expect(page.getByText(attachProblem, { exact: true })).toBeVisible();
 });

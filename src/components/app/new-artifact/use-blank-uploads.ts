@@ -97,7 +97,11 @@ async function settleUnknownAttach(api: Api, publicId: string, ids: readonly str
  * outcome is known the files show as Checking and new drops wait; every way
  * out takes them off the list (the finally), so the list is never left busy.
  * `round` changes after each attach, so files that finished meanwhile are
- * taken next.
+ * taken next. A `problem` stays until the person drops files again
+ * (`clearProblem`): a later attach that went well says nothing about the
+ * files that did not, and when it followed at once (a file dropped while
+ * the refused one was on its way) it took the message away before anyone
+ * could read it.
  */
 function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, holdRef: React.RefObject<Set<string>>, onUpdated: (artifact: ArtifactDto) => void) {
   const [problem, setProblem] = useState<string | null>(null);
@@ -116,7 +120,7 @@ function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, h
       for (const id of [...settled.landed, ...settled.missing]) holdRef.current.delete(id);
       discardAll(api, settled.missing);
       if (settled.loaded) onUpdated(settled.loaded);
-      setProblem(settled.message);
+      if (settled.message) setProblem(settled.message);
     };
     void attachWithRecheck(api, stored.id, ids, () => { uploadsRef.current.markChecking(ids); })
       .then(async (result) => {
@@ -126,7 +130,6 @@ function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, h
         }
         for (const id of ids) holdRef.current.delete(id);
         if (result.success) {
-          setProblem(null);
           onUpdated(result.data);
           return;
         }
@@ -141,7 +144,8 @@ function useAttach(api: Api | undefined, uploadsRef: React.RefObject<Uploads>, h
         setRound((count) => count + 1);
       });
   }, [api, holdRef, onUpdated, uploadsRef]);
-  return { attach, problem, round };
+  const clearProblem = useCallback(() => { setProblem(null); }, []);
+  return { attach, problem, clearProblem, round };
 }
 
 /**
@@ -173,7 +177,7 @@ export function useBlankUploads({ options, artifact, onUpdated }: BlankUploadsOp
   const holdRef = useRef(new Set<string>());
   const uploadsRef = useRef(uploads);
   useEffect(() => { uploadsRef.current = uploads; }, [uploads]);
-  const { attach, problem, round } = useAttach(api, uploadsRef, holdRef, onUpdated);
+  const { attach, problem, clearProblem, round } = useAttach(api, uploadsRef, holdRef, onUpdated);
 
   const readyKey = useMemo(() => uploads.readyFiles.map((file) => file.id).join(","), [uploads.readyFiles]);
   const attachedKey = useMemo(() => artifact.files.map((file) => file.id).join(","), [artifact.files]);
@@ -211,7 +215,7 @@ export function useBlankUploads({ options, artifact, onUpdated }: BlankUploadsOp
 
   useLeaveGuard(uploads.busy);
   useForgetUnusedUploads({ api, ready: uploads.readyFiles, attachedKey, handedRef, holdRef, standingRef });
-  return { uploads, fileIdsForCreate, removeUpload, problem, tracker };
+  return { uploads, fileIdsForCreate, removeUpload, problem, clearProblem, tracker };
 }
 
 interface ForgetOptions {
