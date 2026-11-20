@@ -131,6 +131,11 @@ describe("comment_update", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     teammates.teammatesAmong.mockResolvedValue(new Set<string>());
+    vi.stubEnv("BETTER_AUTH_URL", "https://artifacts.example.com");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("should edit as the token's user when the agent passes its comment id", async () => {
@@ -144,7 +149,6 @@ describe("comment_update", () => {
   });
 
   it("should flag an edited inline comment whose words left the text, with its link, and look teammates up once", async () => {
-    vi.stubEnv("BETTER_AUTH_URL", "https://artifacts.example.com");
     const publicId = "c".repeat(22);
     const inline = { ...view, anchored: true, anchor: { quote: "on Monday", prefix: "", suffix: "" }, edited: true };
     service.updateComment.mockResolvedValue({ comment: inline, mentions: { notified: [], refused: [] }, publicId });
@@ -154,11 +158,9 @@ describe("comment_update", () => {
 
     expect(result).toMatchObject({ comment: { quote: { untrustedText: "on Monday" }, onTextThatChanged: true, url: `https://artifacts.example.com/app?artifact=${publicId}&comment=c1` } });
     expect(teammates.teammatesAmong).toHaveBeenCalledTimes(1);
-    vi.unstubAllEnvs();
   });
 
   it("should give an edited comment that is not inline its link and no changed-text flag", async () => {
-    vi.stubEnv("BETTER_AUTH_URL", "https://artifacts.example.com");
     const publicId = "d".repeat(22);
     service.updateComment.mockResolvedValue({ comment: { ...view, edited: true }, mentions: { notified: [], refused: [] }, publicId });
 
@@ -166,7 +168,6 @@ describe("comment_update", () => {
 
     expect(result).toMatchObject({ comment: { quote: null, onTextThatChanged: false, url: `https://artifacts.example.com/app?artifact=${publicId}&comment=c1` } });
     expect(access.getViewableArtifact).not.toHaveBeenCalled();
-    vi.unstubAllEnvs();
   });
 
   it("should pass the service's refusal through when the comment is someone else's", async () => {
