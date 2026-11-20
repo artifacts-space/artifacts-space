@@ -143,6 +143,32 @@ describe("comment_update", () => {
     expect(result).toMatchObject({ comment: { id: "c1", edited: true, body: { untrustedText: "New text @charles" } }, mentions });
   });
 
+  it("should flag an edited inline comment whose words left the text, with its link, and look teammates up once", async () => {
+    vi.stubEnv("BETTER_AUTH_URL", "https://artifacts.example.com");
+    const publicId = "c".repeat(22);
+    const inline = { ...view, anchored: true, anchor: { quote: "on Monday", prefix: "", suffix: "" }, edited: true };
+    service.updateComment.mockResolvedValue({ comment: inline, mentions: { notified: [], refused: [] }, publicId });
+    access.getViewableArtifact.mockResolvedValue({ view: { content: "We ship the beta on Friday." } });
+
+    const result = await call("comment_update", { comment: "c1", body: "Still Monday?" });
+
+    expect(result).toMatchObject({ comment: { quote: { untrustedText: "on Monday" }, onTextThatChanged: true, url: `https://artifacts.example.com/app?artifact=${publicId}&comment=c1` } });
+    expect(teammates.teammatesAmong).toHaveBeenCalledTimes(1);
+    vi.unstubAllEnvs();
+  });
+
+  it("should give an edited comment that is not inline its link and no changed-text flag", async () => {
+    vi.stubEnv("BETTER_AUTH_URL", "https://artifacts.example.com");
+    const publicId = "d".repeat(22);
+    service.updateComment.mockResolvedValue({ comment: { ...view, edited: true }, mentions: { notified: [], refused: [] }, publicId });
+
+    const result = await call("comment_update", { comment: "c1", body: "x" });
+
+    expect(result).toMatchObject({ comment: { quote: null, onTextThatChanged: false, url: `https://artifacts.example.com/app?artifact=${publicId}&comment=c1` } });
+    expect(access.getViewableArtifact).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+
   it("should pass the service's refusal through when the comment is someone else's", async () => {
     service.updateComment.mockRejectedValue(new UserFacingError("You can only change your own comments."));
     await expect(call("comment_update", { comment: "c2", body: "x" })).rejects.toThrow("You can only change your own comments.");
