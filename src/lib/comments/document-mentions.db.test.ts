@@ -29,6 +29,10 @@ describe.runIf(Boolean(databaseUrl))("mentions in a document's own text", async 
   const { generatePublicId } = await import("@/lib/public-id");
   const { deliverDocumentMentions, deliverDocumentMentionsAfterSharing } = await import("./document-mentions");
   const { listInbox, markInboxRead } = await import("./inbox");
+  const { loadActors } = await import("@/lib/agents/queries");
+  const { getViewableArtifact } = await import("@/lib/access");
+  const { readViewMentions } = await import("./document-mention-view");
+  const { documentMentionDirectory, documentMentionHandles } = await import("./mentionables");
 
   const tag = randomUUID().slice(0, 8);
   const id = (name: string) => `docmention-${tag}-${name}`;
@@ -264,6 +268,34 @@ describe.runIf(Boolean(databaseUrl))("mentions in a document's own text", async 
     await markNotificationsRead(ids.ada, entry ? [entry.id] : []);
 
     expect((await mentionsOf(doc.id))[0]?.readAt).not.toBeNull();
+  });
+
+  it("should offer the writer their teammates and agents to mention, a private draft's too, and never an outsider or themselves", async () => {
+    const draft = await makeDoc("# Draft\n", { visibility: "private", teamId: null, comments: "off" });
+    const writer = (await loadActors([ids.writer])).get(ids.writer);
+    if (!writer) throw new Error("The writer is gone.");
+
+    const directory = await documentMentionDirectory(draft, writer);
+
+    expect(directory.candidates.map((candidate) => [candidate.handle, candidate.kind, candidate.name])).toEqual([
+      [handle("ada"), "person", "Ada"],
+      [handle("claude"), "agent", "Claude"],
+      [handle("helper"), "agent", "Helper"],
+    ]);
+    expect(directory.self?.handle).toBe(handle("writer"));
+  });
+
+  it("should show as chips in the read view only the handles the text delivered, by kind", async () => {
+    const doc = await makeDoc("# Plan\n");
+    const saved = await save(doc, `Over to @${handle("claude")} and @${handle("ada")}, not @${handle("outsider")}.\n`);
+
+    expect([...(await documentMentionHandles(doc.id))].sort()).toEqual([[handle("ada"), "person"], [handle("claude"), "agent"]]);
+
+    const viewable = await getViewableArtifact(saved.publicId, ids.ada);
+    if (!viewable) throw new Error("Ada cannot read the artifact.");
+    expect([...(await readViewMentions(viewable)).keys()].sort()).toEqual([handle("ada"), handle("claude")]);
+    // Text with no @ in it asks the database nothing.
+    expect(await readViewMentions({ ...viewable, view: { ...viewable.view, content: "# Plan\n" } })).toEqual(new Map());
   });
 
   it("should deliver through the real save path when a person saves the artifact", async () => {

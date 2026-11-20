@@ -1,7 +1,9 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { agent, mention, teamMember, user } from "@/db/schema";
+import type { ArtifactMetaRecord } from "@/lib/artifact-columns";
+import type { Actor } from "@/lib/agents/identity";
 import { listTeamIdsForUser } from "@/lib/teams/queries";
 
 import { mentionFacts } from "./delivery";
@@ -76,4 +78,39 @@ export async function resolvedMentions(commentIds: string[]): Promise<Map<string
     byComment.set(row.commentId, list);
   }
   return byComment;
+}
+
+/**
+ * Who the writer can name in a document's own text, for the editor's
+ * suggestions and chips: the artifact's author and the writer's teammates,
+ * without muted agents. Unlike a comment's list, someone who cannot read the
+ * artifact yet is kept: a mention in a draft reaches them once it is shared
+ * with them (document-mentions.ts). Names come only for teammates.
+ */
+export async function documentMentionDirectory(artifact: ArtifactMetaRecord, writer: Actor): Promise<MentionDirectory> {
+  const [teammates, threadMutes] = await Promise.all([teammateIds(writer.userId), threadMutedAgentIds(artifact.id)]);
+  const ids = [...new Set([artifact.userId, ...teammates])].filter((id) => id !== writer.userId);
+  const facts = await mentionFacts(ids, artifact, writer.userId, threadMutes, "document");
+  // The save's own rule (document-mentions.ts), except that reading the artifact is not required yet.
+  const nameable = facts.filter((fact) => mentionRefusal({ ...fact, canView: true }, false) === null);
+  const names = await namesById(nameable.flatMap((fact) => (fact.sharesTeamWithWriter && fact.userId ? [fact.userId] : [])));
+  const candidates = nameable
+    .flatMap((fact) => (fact.userId ? [{ userId: fact.userId, handle: fact.handle, name: names.get(fact.userId) ?? "", kind: fact.kind }] : []))
+    .sort((a, b) => a.handle.localeCompare(b.handle));
+  return { candidates, self: writer.handle ? { userId: writer.userId, handle: writer.handle, name: writer.name, kind: writer.kind } : null };
+}
+
+/**
+ * The handles an artifact's own text mentioned and delivered, with their
+ * kind: the ones a read view shows as chips. Unknown or unreachable @text
+ * stays plain, as in a comment.
+ */
+export async function documentMentionHandles(artifactId: string): Promise<Map<string, ResolvedMention["kind"]>> {
+  const rows = await getDb()
+    .select({ handle: user.username, agentId: agent.userId })
+    .from(mention)
+    .innerJoin(user, eq(user.id, mention.recipientId))
+    .leftJoin(agent, eq(agent.userId, user.id))
+    .where(and(eq(mention.artifactId, artifactId), isNull(mention.commentId)));
+  return new Map(rows.flatMap((row) => (row.handle ? [[row.handle, row.agentId ? "agent" : "person"] as const] : [])));
 }

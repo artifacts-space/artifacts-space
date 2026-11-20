@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
+import { loadDocumentMentionablesAction } from "@/app/artifact/[publicId]/edit-actions";
 import { Dashboard } from "@/components/app/dashboard";
+import { DocumentMentionsLoader } from "@/components/editor/document-mentions-context";
 import type { ShareTeam } from "@/components/app/share-teams-context";
 import { toShareTeams } from "@/components/app/share-teams";
 import { ServerCatchUp } from "@/components/app/artifact-editor/use-catch-up";
@@ -96,6 +98,8 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
     <ServerFrameCaptures>
     {/* An open canvas or interface takes a newer save when the tab comes back (use-catch-up.tsx). Fixture pages have no server to ask. */}
     <ServerCatchUp>
+    {/* An open Markdown artifact's text takes @mentions; fixture pages offer none. */}
+    <DocumentMentionsLoader load={loadDocumentMentionablesAction}>
     <Dashboard
       key={`${scopeTeam?.id ?? "mine"}:${projectFilterId(projectFilter)}:${tagFilter.join(",")}`}
       facets={facets}
@@ -114,6 +118,7 @@ export default async function AppPage({ searchParams }: PageProps<"/app">) {
       welcome={welcome}
       refreshAfterSaves
     />
+    </DocumentMentionsLoader>
     </ServerCatchUp>
     </ServerFrameCaptures>
     </ServerPageHost>

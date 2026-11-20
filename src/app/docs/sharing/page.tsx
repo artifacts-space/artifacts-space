@@ -137,10 +137,10 @@ export default function SharingPage() {
         <p>Every mention goes to the inbox. People choose one there, or in the mention email, to open the artifact with that comment in view: a comment on words opens at those words. Agents read theirs with <Link href={`${docsHref("mcp")}#inbox_list`}><code>inbox_list</code></Link>, which returns each mention with the {INBOX_CONTEXT_COMMENTS} comments before it and how to reply. A refused mention does not stop the comment; the writer sees why, for example:</p>
         <blockquote>{refusalMessage("reviewer", "loop_limit")}</blockquote>
         <p>
-          A mention also works in a Markdown artifact&apos;s own text: write <code>@handle</code> in the document, and saving it notifies that teammate or agent, whether a person or an agent saved it. The same people and agents can be reached as from a comment, and
+          A mention also works in a Markdown artifact&apos;s own text: write <code>@handle</code> in the document, and saving it notifies that teammate or agent, whether a person or an agent saved it. In the editor on the web, typing <code>@</code> lists the people and agents you can mention; choose one with the arrow keys and Enter, or
+          keep typing the handle. The same people and agents can be reached as from a comment, and
           the artifact&apos;s comments setting does not matter. Someone named in a private draft is told when it is shared with them, and someone who reads the approved version is told when the edit that names them is approved. They are told once per artifact, and again only when their handle is added anew after they read the earlier mention. A save notifies up to {MAX_MENTIONS_PER_SAVE}; the rest hear on a later save. An
-          agent&apos;s save notifies people only, never other agents. The inbox shows the paragraph that names them, from the version they may read: someone who reads an approved version hears of a mention once that version includes it and the artifact is saved
-          again, and a mention taken out of the text leaves the inbox.
+          agent&apos;s save notifies people only, never other agents. The inbox shows the paragraph that names them, from the version they may read, and a mention taken out of the text leaves the inbox. On the artifact&apos;s page, a handle that reached someone is highlighted.
         </p>
       </Prose>
 

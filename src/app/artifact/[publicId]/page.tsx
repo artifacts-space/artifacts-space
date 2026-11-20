@@ -39,6 +39,8 @@ import { InlineCommentsProvider } from "@/components/inline-comments/inline-comm
 import { LastEdited } from "@/components/history/last-edited";
 import { ViewBeacon } from "@/components/views/view-beacon";
 import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
+import { readViewMentions } from "@/lib/comments/document-mention-view";
+import type { MentionKind } from "@/lib/comments/mentions";
 import { canSeeComments } from "@/lib/comments/setting-rules";
 import { filesForViewer } from "@/lib/files/download";
 import { csvFileName, mayExportCsv } from "@/lib/csv-export/rules";
@@ -140,12 +142,15 @@ function PendingEditNotice({ viewable }: { viewable: ViewableArtifact }) {
   );
 }
 
+/** What the body draws from: the artifact, its files, and the @handles its text shows as chips (readViewMentions). */
+interface BodyProps { viewable: ViewableArtifact; files: FileDto[]; mentions: ReadonlyMap<string, MentionKind> }
+
 /** The artifact itself: the shared cached render for an approved version, or a fresh render of the latest. */
-function ArtifactBody({ viewable, files }: { viewable: ViewableArtifact; files: FileDto[] }) {
+function ArtifactBody({ viewable, files, mentions }: BodyProps) {
   const { view, version } = viewable;
   const pageKey = viewable.record.publicId;
   if (version.versionId) return <ApprovedArticle versionId={version.versionId} savedAt={viewable.served.updatedAt.toISOString()} files={files} pageKey={pageKey} />;
-  return <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} pageKey={pageKey} />;
+  return <ArtifactView kind={view.kind} content={view.content} title={view.title} language={view.language} files={files} pageKey={pageKey} mentions={mentions} />;
 }
 
 /** Who saved the version this reader sees, or null when they are gone. Shares the byline's lookup when it is the author (loadActor). */
@@ -288,8 +293,8 @@ function SignUpAndReport({ copy, publicId, visibility }: { copy: VisibilityCopy;
  * rich editor's space under the text, and its format bar on touch screens),
  * so nothing below moves when editing unlocks.
  */
-function BodyReadView({ viewable, files }: { viewable: ViewableArtifact; files: FileDto[] }) {
-  const body = <ArtifactBody viewable={viewable} files={files} />;
+function BodyReadView({ viewable, files, mentions }: BodyProps) {
+  const body = <ArtifactBody viewable={viewable} files={files} mentions={mentions} />;
   // Readers comment on a Markdown artifact's words here; editors get the same in the editor that replaces this view.
   if (!viewable.canEdit) return <InlineCommentSurface>{body}</InlineCommentSurface>;
   if (viewable.view.kind === "markdown") return <div data-editor-space="" className="pointer-coarse:pt-12"><div className="min-h-[50dvh] pb-24">{body}</div></div>;
@@ -302,11 +307,12 @@ function BodyReadView({ viewable, files }: { viewable: ViewableArtifact; files: 
  * once editing loads). In a Markdown artifact, readers right-click a block
  * to copy a link to it.
  */
-function LinkableBody({ viewable, files, canComment }: { viewable: ViewableArtifact; files: FileDto[]; canComment: boolean }) {
+function LinkableBody({ canComment, ...body }: BodyProps & { canComment: boolean }) {
+  const { viewable } = body;
   return (
     <InlineBody canComment={canComment}>
       <ReaderBlockMenu publicId={viewable.record.publicId} enabled={viewable.view.kind === "markdown"}>
-        <BodyReadView viewable={viewable} files={files} />
+        <BodyReadView {...body} />
       </ReaderBlockMenu>
     </InlineBody>
   );
@@ -402,7 +408,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
   const { record, view } = viewable;
   // getSession is deduplicated per request, so these reuse load()'s lookup.
   const copy = visibilityCopy(record.visibility);
-  const [byline, files, session, editor, organizers, resolved, themeChoices, csvDownload, share] = await Promise.all([
+  const [byline, files, session, editor, organizers, resolved, themeChoices, csvDownload, share, mentions] = await Promise.all([
     loadArtifactByline(record, viewable.isTeamMember),
     filesForViewer(viewable),
     getSession(),
@@ -413,6 +419,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
     getSession().then((session) => loadThemeChoices(viewable, session?.user.id ?? null)),
     getSession().then((session) => csvDownloadSetting(viewable, session?.user.id ?? null)),
     getSession().then((session) => loadShare(viewable, session?.user.id ?? null)),
+    readViewMentions(viewable),
   ]);
   const sentence = visibilitySentence(copy, byline);
   const { theme, presetId, source } = resolved;
@@ -461,7 +468,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
                     <SheetFill artifactKey={record.publicId}>
                       {/* Banding and column alignment, the same for every reader; editors change them from the grid. */}
                       <SheetFormatFor viewable={viewable}>
-                        <LinkableBody viewable={viewable} files={files} canComment={canComment} />
+                        <LinkableBody viewable={viewable} files={files} mentions={mentions} canComment={canComment} />
                       </SheetFormatFor>
                     </SheetFill>
                   </article>

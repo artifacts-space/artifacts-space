@@ -1,7 +1,9 @@
-import { getViewableArtifact } from "@/lib/access";
+import { getViewableArtifact, type ViewableArtifact } from "@/lib/access";
 import { loadActors } from "@/lib/agents/queries";
 
 import { mentionBlock } from "./document-mention-rules";
+import { documentMentionHandles } from "./mentionables";
+import type { MentionKind } from "./mentions";
 
 /**
  * What a stored document mention shows its recipient now: the block of the
@@ -37,4 +39,18 @@ export async function servedMentions(userId: string, publicIds: readonly string[
     if (block !== null) found.set(publicId, { title: artifact.served.title, icon: artifact.served.icon, block });
   });
   return found;
+}
+
+const noChips: ReadonlyMap<string, MentionKind> = new Map();
+
+/**
+ * The @handles a page's read view shows as chips: the mentions this
+ * artifact's text delivered. Only for a fresh render of the latest Markdown
+ * that has an "@" in it. An approved version's render is shared by every
+ * reader outside the team and cached by version, so it keeps plain text.
+ */
+export async function readViewMentions(viewable: Pick<ViewableArtifact, "record" | "view" | "version">): Promise<ReadonlyMap<string, MentionKind>> {
+  const { view, version, record } = viewable;
+  if (version.versionId || view.kind !== "markdown" || !view.content.includes("@")) return noChips;
+  return documentMentionHandles(record.id);
 }

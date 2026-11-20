@@ -6,8 +6,10 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { CommentMentions } from "@/components/comments/comment-mentions";
 import { cn } from "@/lib/utils";
 
+import { useDocumentMentions } from "./document-mentions-context";
 import { HighlightedTextarea } from "./highlighted-textarea";
 import { BlockHandlesFrame, useBlockHandles } from "./rich/block-menu/block-controls";
 import { TableBubbleMenu, TextBubbleMenu } from "./rich/bubble-menus";
@@ -91,6 +93,9 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const coarse = useCoarsePointer();
   const blocks = useBlockHandles(blockHandles === true);
+  // @mentions, where the page around this editor offers them (a saved artifact's document).
+  const mentions = useDocumentMentions();
+  const hasMentions = mentions !== null;
 
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
@@ -106,8 +111,9 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
         onMediaRefused: () => { setMediaRefused(true); },
       }),
       ...blocks.extensions,
+      ...(hasMentions ? [CommentMentions] : []),
     ],
-    [media, blocks.extensions],
+    [media, blocks.extensions, hasMentions],
   );
 
   const editor = useEditor({
@@ -124,6 +130,11 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
     },
     onSelectionUpdate: () => { setLinkOpen(false); },
   });
+
+  // People to mention load after the editor: their chips are drawn once they arrive.
+  useEffect(() => {
+    if (editor && !editor.isDestroyed && mentions) editor.commands.setMentionSource(mentions);
+  }, [editor, mentions]);
 
   function showMarkdown() {
     setLinkOpen(false);

@@ -128,14 +128,21 @@ function pickMention(editor: Editor, handle: string) {
 
 type MentionProps = SuggestionProps<Mentionable, Mentionable>;
 
-function renderMentionMenu(source: () => MentionSource, listId: string): ReturnType<NonNullable<SuggestionOptions<Mentionable, Mentionable>["render"]>> {
+/**
+ * `onOpen` gets a way to redraw the open list from the current source, and
+ * null when the list closes: the people to mention can arrive while an "@"
+ * is already being typed, and the list must not wait for the next key.
+ */
+function renderMentionMenu(source: () => MentionSource, listId: string, onOpen: (refresh: (() => void) | null) => void): ReturnType<NonNullable<SuggestionOptions<Mentionable, Mentionable>["render"]>> {
   let renderer: ReactRenderer<MentionMenuHandle, MentionMenuProps> | null = null;
   let unmount: (() => void) | null = null;
+  let shown: MentionProps | null = null;
   const propsFor = (props: MentionProps): MentionMenuProps => {
     const { self, candidates } = source();
     return {
       listId,
-      items: props.items,
+      // Matched here, not taken from the plugin: its items are from when the query last changed.
+      items: matchMentionables(candidates, props.query),
       query: props.query,
       self,
       hasCandidates: candidates.length > 0,
@@ -145,13 +152,18 @@ function renderMentionMenu(source: () => MentionSource, listId: string): ReturnT
   };
   return {
     onStart: (props) => {
+      shown = props;
+      onOpen(() => { if (shown) renderer?.updateProps(propsFor(shown)); });
       renderer = new ReactRenderer(MentionMenu, { props: propsFor(props), editor: props.editor, className: mentionPopoverClass });
       renderer.element.setAttribute("data-slot", "mention-menu");
       // Inside the box, so the dialog or card around it counts a press on the list as its own.
       (props.editor.view.dom.parentElement ?? document.body).appendChild(renderer.element);
       unmount = props.mount(renderer.element);
     },
-    onUpdate: (props) => { renderer?.updateProps(propsFor(props)); },
+    onUpdate: (props) => {
+      shown = props;
+      renderer?.updateProps(propsFor(props));
+    },
     onKeyDown: ({ event }: SuggestionKeyDownProps) => renderer?.ref?.onKeyDown(event) ?? false,
     onExit: (props) => {
       unmount?.();
@@ -159,6 +171,8 @@ function renderMentionMenu(source: () => MentionSource, listId: string): ReturnT
       renderer?.destroy();
       renderer = null;
       unmount = null;
+      shown = null;
+      onOpen(null);
       setComboboxState(props.editor, listId, null);
     },
   };
@@ -199,11 +213,11 @@ const noSource: MentionSource = { candidates: [], self: null, resolved: new Map(
  * Markdown and the server's mention parsing are as before), and chips on
  * handles that reach someone.
  */
-export const CommentMentions = Extension.create<Record<string, never>, { source: MentionSource }>({
+export const CommentMentions = Extension.create<Record<string, never>, { source: MentionSource; refreshList: (() => void) | null }>({
   name: "commentMentions",
 
   addStorage() {
-    return { source: noSource };
+    return { source: noSource, refreshList: null };
   },
 
   addCommands() {
@@ -211,6 +225,8 @@ export const CommentMentions = Extension.create<Record<string, never>, { source:
       setMentionSource: (next) => ({ tr, dispatch }) => {
         this.storage.source = next;
         if (dispatch) tr.setMeta(highlightKey, true);
+        // An "@" already being typed shows the new list at once.
+        if (dispatch) this.storage.refreshList?.();
         return true;
       },
     };
@@ -235,7 +251,7 @@ export const CommentMentions = Extension.create<Record<string, never>, { source:
         command: ({ editor, props }) => { pickMention(editor, props.handle); },
         offset: { mainAxis: 4 },
         floatingUi: { middleware: [shift({ padding: 8 })] },
-        render: () => renderMentionMenu(source, listId),
+        render: () => renderMentionMenu(source, listId, (refresh) => { storage.refreshList = refresh; }),
       }),
       new Plugin<DecorationSet>({
         key: highlightKey,

@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { loadEditableArtifactAction } from "@/app/artifact/[publicId]/edit-actions";
+import { loadDocumentMentionablesAction, loadEditableArtifactAction } from "@/app/artifact/[publicId]/edit-actions";
 import { serverCaptureApi } from "@/components/artifact-view/canvas/capture/capture-api";
+import { DocumentMentionsLoader } from "@/components/editor/document-mentions-context";
 import { ServerCatchUp } from "@/components/app/artifact-editor/use-catch-up";
 import { useQuietRefresh } from "@/components/app/artifact-editor/use-quiet-refresh";
 import { FrameCaptureHost } from "@/components/artifact-view/canvas/capture/frame-capture-host";
@@ -75,7 +76,10 @@ export function EditSurface({ publicId, title, updatedAt, reviewed, fullWidth, f
     <>
       {/* A canvas or interface takes a newer save when the tab comes back. This page is rendered only for someone who may edit. */}
       <ServerCatchUp>
-        <PageEditFrame editor={editor} reviewed={reviewed} pageFullWidth={fullWidth}>{children}</PageEditFrame>
+        {/* The document's text takes @mentions: who can be named is this editor's to ask for. */}
+        <DocumentMentionsLoader load={loadDocumentMentionablesAction}>
+          <PageEditFrame editor={editor} reviewed={reviewed} pageFullWidth={fullWidth}>{children}</PageEditFrame>
+        </DocumentMentionsLoader>
       </ServerCatchUp>
       {/* Draws the frames of a canvas for agents, out of sight, once the editable copy has loaded. This page is rendered only for someone who may edit. */}
       <FrameCaptureHost artifactId={loaded?.id ?? null} kind={loaded?.kind ?? ""} savedAt={loaded?.updatedAt ?? null} api={serverCaptureApi} />

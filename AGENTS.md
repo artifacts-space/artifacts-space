@@ -1866,7 +1866,8 @@ Markdown an agent reads agrees with the page. Every save of content
   that shares an artifact or moves its approved version calls it too.
 - At most `MAX_MENTIONS_PER_SAVE` a save; the rest are told by a later save.
   A save looks up at most `MAX_DOCUMENT_HANDLES` handles that have nobody
-  told yet, so only handles that reach nobody stay in that window.
+  told yet, so only handles that reach nobody, or whose owner is not served
+  the text yet, stay in that window.
 - The stored row is a `mention` with no `comment_id` (one per artifact and
   recipient, `actor_id` the writer) and, for people, a `notification` of type
   `mention` with no comment. A deployment from before 0051 hides both: it
@@ -1877,6 +1878,28 @@ Markdown an agent reads agrees with the page. Every save of content
   (`document-mention-view.ts`), so a mention waiting in a version they are
   not served stays hidden, and one taken out of the text drops out.
 - `document-mentions.db.test.ts` covers the rules against Postgres.
+- The document editor offers the same `@` list as the comment box: the
+  `CommentMentions` extension (`comment-mentions.tsx`), added to
+  `rich-markdown-editor.tsx` only where `DocumentMentionsLoader`
+  (`src/components/editor/document-mentions-context.tsx`) is above it: the
+  artifact page's editor (`edit-surface.tsx`) and the workspace
+  (`app/page.tsx`), for a saved Markdown artifact (`DocumentContent` in
+  `inline-content.tsx`). Fixtures, a new artifact, and a Markdown block in
+  an interface have no loader, so nothing is fetched and `@` is plain text.
+  A pick writes plain `@handle` text, so the save path above is the only
+  thing that notifies. The list is `documentMentionDirectory`
+  (`mentionables.ts`): the save's own rule without "can read it", since a
+  mention in a draft lands once it is shared; only someone who may edit the
+  artifact gets it (`loadDocumentMentionablesAction`), once per open editor.
+- A list that arrives while an `@` is already being typed redraws the open
+  menu (`refreshList` in the extension's storage): the suggestion plugin
+  redraws only when the query changes.
+- The artifact page's read view highlights the handles the text delivered
+  (`readViewMentions`, one query, only when the latest Markdown has an `@`),
+  drawn as the editor draws them (`DocumentMention` in `markdown-view.tsx`,
+  no padding, no icon) so no word moves when the editor replaces the read
+  view. An approved version's cached render stays plain: every reader
+  outside the team shares it.
 
 The comment box (`src/components/comments/comment-editor.tsx`, used for new
 comments, replies, edits, and the cards at the text) is the rich Markdown
