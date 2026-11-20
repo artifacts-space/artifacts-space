@@ -321,10 +321,10 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
     pages reach no database, or the local test database with
     `E2E_LOCAL_DB=1`. Playwright starts its own server, never reusing one.
     Never run `next dev` for e2e against `.env.local`'s database yourself.
-    With `PLAYWRIGHT_PORT` set, set `BETTER_AUTH_URL` to that same origin
-    for the database-backed specs (`BETTER_AUTH_URL=http://localhost:<port>`):
-    dev sign-in follows a link built from it, and the default sends the
-    browser to port 3000, where another project's server may answer.
+    It also gets `BETTER_AUTH_URL` from there: the server's own origin
+    (`PLAYWRIGHT_PORT`), so dev sign-in in the database-backed specs follows
+    a link to the server under test and never to port 3000, where another
+    project's server may answer. Nothing to set by hand.
 
 ### Tripwire: no correlated subqueries in single-table selects
 
@@ -1995,9 +1995,21 @@ scroll the board's box; the board turns that scroll into a pan
 (`onScroll` in `use-pan-zoom.ts`). While a glide runs (a button's move of
 the view, a 200 ms transition), the browser measures against the board as
 it is drawn at that moment, so the board brings the focused control into
-view again once it is drawn at rest (`revealFocusedAtRest`). A test that
+view again once it is drawn at rest (`revealFocusedAtRest`). Two rules keep
+that true on a busy page (#257: this was the board's test that failed in
+CI, about once in thirty runs). Whether a glide ran is noted when the focus
+moves (`onFocus`), not only when the scroll event arrives: that event comes
+a frame later, and when the frame is slow the glide is already over, with
+the scroll still measured in the middle of it. The note lasts that one
+frame, so a later scroll from another cause never reads it. And the pan is drawn before
+the handler returns (`flushSync`): the reveal runs in the same frame as the
+scroll event, before React would otherwise draw, and a second scroll
+measured on the old drawing carries the control too far. A test that
 acts on where things are after a glide must not read a rounded position as
-"at rest": the last frames of an ease-out move less than a pixel.
+"at rest": the last frames of an ease-out move less than a pixel. To test
+what a slow frame does, do not wait for a slow runner: focus inside the
+page and keep the page busy in that same task (`e2e/canvas-focus.spec.ts`,
+"the page is busy until the glide has ended").
 
 ### Frame captures
 

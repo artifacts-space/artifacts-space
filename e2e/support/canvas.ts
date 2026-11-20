@@ -30,6 +30,22 @@ export async function boxOf(locator: Locator) {
   return box;
 }
 
+/** Waits until the board's world has stopped gliding and that has been drawn (two frames on). */
+export const boardAtRest = (page: Page) => board(page).locator("[data-canvas-world]").evaluate(async (element) => {
+  await Promise.allSettled(element.getAnimations({ subtree: false }).map((animation) => animation.finished));
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+});
+
+/**
+ * The end state of a focus scroll, read together: the board turned the scroll into a pan (its box is back at 0), and
+ * `control` is inside the board, whose box on the page is `pane`. Right after the focus the box is still scrolled,
+ * which alone would put the control in view, so neither half says enough without the other.
+ */
+export async function pannedIntoView(page: Page, control: Locator, pane: { x: number; width: number }): Promise<boolean> {
+  const [scroll, box] = await Promise.all([board(page).evaluate((element) => [element.scrollLeft, element.scrollTop]), boxOf(control)]);
+  return scroll[0] === 0 && scroll[1] === 0 && box.x >= pane.x && box.x + box.width <= pane.x + pane.width;
+}
+
 /** How many columns the first Grid in a frame lays out. */
 export const gridColumns = (page: Page, id: string) => frame(page, id).locator("[data-slot=ui-grid]").first().evaluate((element) => {
   const tracks = getComputedStyle(element).gridTemplateColumns;
