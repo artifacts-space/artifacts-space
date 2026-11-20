@@ -33,6 +33,12 @@ function textOf(sent: unknown): string {
   return typeof text === "string" ? text : "";
 }
 
+/** Resolves after `ms` milliseconds; at once for zero or less. */
+function wait(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
 /** How many round trips deep the statements go: one that starts after another finished waits for it. */
 function depthOf(statements: readonly Statement[]): number {
   let depth = 0;
@@ -55,8 +61,23 @@ describe.runIf(Boolean(databaseUrl))("the database work of one autosave", async 
   const tag = randomUUID().slice(0, 8);
   const owner = `savebudget-${tag}-owner`;
 
-  /** Runs `work` and returns every statement it sent, with a counter for order (the clock is too coarse for a local database). */
-  async function statementsOf(work: () => Promise<unknown>): Promise<Statement[]> {
+  /**
+   * How long every statement takes here, at the least. On production each
+   * statement is one HTTPS round trip of about the same length, so how deep
+   * a save goes is how many of them wait for another. A local database
+   * answers in a millisecond or two, unevenly: when one of two chains that
+   * run side by side answered faster (the rate limit's read and write beside
+   * the artifact's read), its second statement started before the other
+   * chain's first had finished, and `depthOf` counted one round trip more
+   * than the save has (CI, 20 Nov 2026: 7 for 6). Holding each answer until
+   * this long after its statement started makes every round trip the same
+   * length, so the count follows what waits for what, not which answer came
+   * first. It is far above a local query's time.
+   */
+  const roundTripMs = 100;
+
+  /** Runs `work` and returns every statement it sent, with a counter for order (the clock is too coarse for a local database). `slower` delays the statements it matches by `ms` before they are sent, as a slow answer would. */
+  async function statementsOf(work: () => Promise<unknown>, slower?: { matches: (text: string) => boolean; ms: number }): Promise<Statement[]> {
     const statements: Statement[] = [];
     let tick = 0;
     const real = Pool.prototype.query.bind(getDb().$client) as (...args: unknown[]) => Promise<unknown>;
@@ -65,14 +86,34 @@ describe.runIf(Boolean(databaseUrl))("the database work of one autosave", async 
       const text = textOf(sent);
       const entry: Statement = { text: text.replace(/\s+/g, " "), started: (tick += 1), finished: Number.POSITIVE_INFINITY };
       statements.push(entry);
-      return real(...args).finally(() => { entry.finished = tick += 1; });
+      const answersAt = performance.now() + roundTripMs;
+      const delay = slower?.matches(entry.text) ? slower.ms : 0;
+      return wait(delay)
+        .then(() => real(...args))
+        .then(async (answer) => {
+          await wait(answersAt - performance.now());
+          return answer;
+        })
+        .finally(() => { entry.finished = tick += 1; });
     }) as never);
+    // One rate limit hit in 50 also sweeps old buckets (CLEANUP_CHANCE in rate-limit.ts): one more statement, and one more
+    // round trip, on that save only. The budget is the save's own path, so the sweep never runs here.
+    const sweep = vi.spyOn(Math, "random").mockReturnValue(0.5);
     try {
       await work();
     } finally {
       spy.mockRestore();
+      sweep.mockRestore();
     }
     return statements;
+  }
+
+  /** A page with one save already made, and the next autosave of its session. */
+  async function continuedSession(title: string) {
+    const page = await createArtifact(owner, { title, content: "# Plan\n\nFirst." });
+    const first = await saveArtifactUpdate(owner, page.id, { content: "# Plan\n\nFirst, and more." }, "person", { session: "start", expectedUpdatedAt: page.updatedAt });
+    if (!first) throw new Error("The first save did not land.");
+    return { page, next: () => saveArtifactUpdate(owner, page.id, { content: "# Plan\n\nFirst, and more, and more again." }, "person", { session: "continue", expectedUpdatedAt: first.artifact.updatedAt }) };
   }
 
   beforeAll(async () => {
@@ -101,11 +142,9 @@ describe.runIf(Boolean(databaseUrl))("the database work of one autosave", async 
   });
 
   it("should take at most 13 statements, 6 round trips deep, and never read a version's text back when an autosave continues a session on a private document", async () => {
-    const page = await createArtifact(owner, { title: "Plan", content: "# Plan\n\nFirst." });
-    const first = await saveArtifactUpdate(owner, page.id, { content: "# Plan\n\nFirst, and more." }, "person", { session: "start", expectedUpdatedAt: page.updatedAt });
-    if (!first) throw new Error("The first save did not land.");
+    const { page, next } = await continuedSession("Plan");
 
-    const statements = await statementsOf(() => saveArtifactUpdate(owner, page.id, { content: "# Plan\n\nFirst, and more, and more again." }, "person", { session: "continue", expectedUpdatedAt: first.artifact.updatedAt }));
+    const statements = await statementsOf(next);
 
     expect(statements.length).toBeLessThanOrEqual(13);
     expect(depthOf(statements)).toBeLessThanOrEqual(6);
@@ -114,5 +153,17 @@ describe.runIf(Boolean(databaseUrl))("the database work of one autosave", async 
     // The save still did its work: one version for the session, holding the latest text.
     const versions = await getDb().select({ content: artifactVersion.content }).from(artifactVersion).where(eq(artifactVersion.artifactId, page.id));
     expect(versions.map((version) => version.content).sort()).toEqual(["# Plan\n\nFirst, and more, and more again.", "# Plan\n\nFirst."].sort());
+  });
+
+  it("should count the same round trips when the artifact's read answers slower than the rate limit beside it", async () => {
+    const even = await continuedSession("Even");
+    const skewed = await continuedSession("Skewed");
+    const artifactRead = (text: string) => text.startsWith('select "id", "user_id", "title"');
+
+    const evenStatements = await statementsOf(even.next);
+    const skewedStatements = await statementsOf(skewed.next, { matches: artifactRead, ms: 40 });
+
+    expect(skewedStatements.some((statement) => artifactRead(statement.text)), "the artifact's read was slowed").toBe(true);
+    expect(depthOf(skewedStatements)).toBe(depthOf(evenStatements));
   });
 });
