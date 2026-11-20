@@ -181,6 +181,8 @@ async function saveChoice(artifact: ShareableArtifactDto, choice: SaveChoice, ac
   const shared = await saveSharing(artifact, choice, actions);
   if (!shared.success) return shared;
   // Who can read it or comment was saved: what the page loaded for the audience before loads again (sharing-events.ts).
+  // Also when `status` is "pending": a move can have applied while only opening its comments waits (applySharing).
+  // A reload after a save that changed nothing costs one request; a missed one leaves the old list until a reload.
   if (shared.data.artifact) announceSharingChanged(artifact.publicId);
   const saved = shared.data.artifact ?? artifact;
   if (!searchChangeAfterSave({ state: choice.searchState, savedVisibility: saved.visibility, saved: saved.showInSearch, chosen: choice.showInSearch })) return shared;

@@ -15,8 +15,9 @@ export function announceSharingChanged(publicId: string): void {
   window.dispatchEvent(new CustomEvent(eventName, { detail: publicId }));
 }
 
-/** Calls `listener` whenever this artifact's sharing was saved in this tab. Returns the cleanup. */
+/** Calls `listener` whenever this artifact's sharing was saved in this tab. Returns the cleanup; without a window there is nothing to hear, and the cleanup does nothing. */
 export function onSharingChanged(publicId: string, listener: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
   const onEvent = (event: Event) => {
     if (event instanceof CustomEvent && event.detail === publicId) listener();
   };

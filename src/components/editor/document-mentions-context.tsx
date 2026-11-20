@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, use, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, use, useEffect, useMemo, useState } from "react";
 
 import type { MentionSource } from "@/components/comments/comment-mentions";
 import type { MentionListState } from "@/components/comments/mention-suggestions";
+import { useRetryOnFocus } from "@/components/comments/use-retry-on-focus";
 import type { ActionResult } from "@/lib/artifact-types";
 import { composerMentionMap, type MentionDirectory } from "@/lib/comments/mention-autocomplete";
 
@@ -38,24 +39,6 @@ function listState(answer: Loaded | null): MentionListState {
 }
 
 /**
- * Asks again, once, the next time the window gets focus after a load that
- * failed: a dropped request does not leave the editor without its list until
- * a reload. Each failed answer waits for another focus, so a refusal costs
- * one request per return to the window and nothing in between.
- */
-function useRetryOnFocus(answer: Loaded | null, retry: () => void) {
-  const failed = answer !== null && answer.directory === null;
-  const retryRef = useRef(retry);
-  useEffect(() => { retryRef.current = retry; }, [retry]);
-  useEffect(() => {
-    if (!failed) return;
-    const onFocus = () => { retryRef.current(); };
-    window.addEventListener("focus", onFocus, { once: true });
-    return () => { window.removeEventListener("focus", onFocus); };
-  }, [failed, answer]);
-}
-
-/**
  * Gives the document editor inside it @mentions for one saved artifact: who
  * the editor can name, loaded once after the editor is on screen. Until the
  * list arrives, typing @ says it is loading, and a handle typed in full still
@@ -85,7 +68,7 @@ export function DocumentMentionsProvider({ publicId, children }: { publicId: str
 
   // Another artifact's list is never offered: what was loaded counts only for the id it was loaded for.
   const mine = loaded?.publicId === publicId ? loaded : null;
-  useRetryOnFocus(mine, () => { setAttempt((count) => count + 1); });
+  useRetryOnFocus(mine?.directory === null ? mine : null, () => { setAttempt((count) => count + 1); });
   const value = useMemo<MentionSource | null>(() => {
     if (!load || !publicId) return null;
     const directory = mine?.directory ?? emptyDirectory;
