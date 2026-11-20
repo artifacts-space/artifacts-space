@@ -85,6 +85,18 @@ async function storeInApp(drafts: readonly NotificationDraft[], target: Target) 
     requestId: target.requestId ?? null,
     actorId: target.actorId,
   }));
+  if (drafts.some((draft) => draft.inDocument)) {
+    // One row per person per artifact for mentions in its text (notification_recipient_document_mention_idx): a new one refreshes it.
+    await getDb()
+      .insert(notification)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: [notification.recipientId, notification.artifactId],
+        targetWhere: sql`${notification.type} = 'mention' and ${notification.commentId} is null and ${notification.requestId} is null`,
+        set: { readAt: null, createdAt: sql`now()`, actorId: sql`excluded.actor_id` },
+      });
+    return;
+  }
   if (target.commentId) {
     // An edit that adds a mention turns an earlier comment or reply notification into an unread mention.
     await getDb()
@@ -172,6 +184,26 @@ async function commentNotifications(event: CommentEvent) {
 /** Notifies people about a new or edited comment, after the response. */
 export function notifyComment(event: CommentEvent): void {
   afterResponse("Comment notifications", () => commentNotifications(event));
+}
+
+/** People newly mentioned in an artifact's own text (src/lib/comments/document-mentions.ts decided who). */
+export interface DocumentMentionEvent {
+  artifact: Pick<ArtifactMetaRecord, "id" | "publicId" | "title">;
+  writerId: string;
+  /** People, never agents: agents read their MCP inbox. */
+  people: readonly string[];
+}
+
+/**
+ * The bell and the browser for people mentioned in a document's text. It is
+ * awaited by the caller, which already runs after the response. No excerpt
+ * goes to the browser: readers outside the team may be served other text
+ * than the latest.
+ */
+export async function documentMentionNotifications(event: DocumentMentionEvent): Promise<void> {
+  const drafts: NotificationDraft[] = event.people.filter((id) => id !== event.writerId).map((recipientId) => ({ recipientId, type: "mention", inDocument: true }));
+  const { id: artifactId, publicId, title: latestTitle } = event.artifact;
+  await deliver(drafts, { artifactId, publicId, latestTitle, actorId: event.writerId, commentBody: null, requestKind: null, teamSlug: null });
 }
 
 async function loadRequest(requestId: string) {

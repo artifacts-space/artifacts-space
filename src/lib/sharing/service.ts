@@ -7,6 +7,7 @@ import { enforceRateLimit } from "@/lib/abuse/rate-limit";
 import { agent, artifact, sharingRequest, type ArtifactRecord } from "@/db/schema";
 import { isTeamMember } from "@/lib/access";
 import { actsForAuthor } from "@/lib/agents/owner-access";
+import { notifyDocumentMentionsAfterSharing } from "@/lib/comments/document-mentions";
 import type { ArtifactDto, ArtifactVisibility, CommentSetting, SharingLevel } from "@/lib/artifact-types";
 import { commentsAfterSharing, decideCommentSetting, defaultCommentSetting } from "@/lib/comments/setting-rules";
 import { isUniqueViolation } from "@/lib/db-errors";
@@ -99,6 +100,8 @@ async function setVisibility(artifactId: string, visibility: ArtifactVisibility,
       .where(and(eq(sharingRequest.artifactId, artifactId), eq(sharingRequest.kind, "edit"), eq(sharingRequest.status, "pending")));
   }
   await syncApprovedVersion(artifactId, byUserId);
+  // People and agents the text already @mentions hear of it once they can read it.
+  notifyDocumentMentionsAfterSharing(artifactId);
 }
 
 /** The team the change goes through: the one asked for, else the artifact's current team, else a default (team-choice-rules.ts). */
@@ -244,6 +247,8 @@ async function approve(request: typeof sharingRequest.$inferSelect, deciderId: s
   await rehomeProjectQuietly(request.artifactId);
   await cancelPendingComments(request.artifactId, deciderId);
   await syncApprovedVersion(request.artifactId, deciderId);
+  // As in setVisibility: the people the text names who can read it from now on are told.
+  notifyDocumentMentionsAfterSharing(request.artifactId);
 }
 
 /**
@@ -264,6 +269,8 @@ export async function decideSharingRequest(input: { deciderId: string; requestId
 async function applyDecision(request: typeof sharingRequest.$inferSelect, input: { deciderId: string; approve: boolean }) {
   if (request.kind === "edit") {
     await decideEditRequest(request, input.deciderId, input.approve);
+    // An approved edit is the text readers outside the team are served from now on: a mention in it reaches them here.
+    if (input.approve) notifyDocumentMentionsAfterSharing(request.artifactId);
     return;
   }
   if (request.kind === "comments" && input.approve) {

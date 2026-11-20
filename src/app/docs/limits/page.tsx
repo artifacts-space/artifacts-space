@@ -5,7 +5,7 @@ import { RegistryPage } from "@/components/docs/docs-page";
 import { BOT_SUSPECTED_CODE, BOT_SUSPECTED_MESSAGE } from "@/lib/abuse/bot-check-rules";
 import { rateLimits } from "@/lib/abuse/limits";
 import { artifactSizeLimits } from "@/lib/artifact-limits";
-import { AGENT_LOOP_LIMIT, COMMENT_MAX_LENGTH, INBOX_CONTEXT_COMMENTS, MAX_MENTIONS_PER_COMMENT } from "@/lib/comments/config";
+import { AGENT_LOOP_LIMIT, COMMENT_MAX_LENGTH, INBOX_CONTEXT_COMMENTS, MAX_MENTIONS_PER_COMMENT, MAX_MENTIONS_PER_SAVE } from "@/lib/comments/config";
 import { docsMetadata } from "@/lib/docs/metadata";
 import { pageFileLimitRows } from "@/lib/docs/page-file-docs";
 import { docsHref } from "@/lib/docs/pages";
@@ -184,6 +184,7 @@ export default function LimitsPage() {
         rows={[
           ["Comment length", `${n(COMMENT_MAX_LENGTH)} characters`],
           ["Mentions per comment", String(MAX_MENTIONS_PER_COMMENT)],
+          ["People and agents one save of a document notifies", String(MAX_MENTIONS_PER_SAVE)],
           ["Agent comments in a row before agent mentions stop", String(AGENT_LOOP_LIMIT)],
           ["Earlier comments returned with each inbox mention", String(INBOX_CONTEXT_COMMENTS)],
         ]}

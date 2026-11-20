@@ -281,8 +281,8 @@ foreground) plus a wide, soft shadow that is felt, never seen as an outline.
 - The schema is in `src/db/schema.ts`, `src/db/oauth-schema.ts`,
   `src/db/views-schema.ts`, `src/db/notification-schema.ts`,
   `src/db/connection-schema.ts`, `src/db/file-copy-schema.ts`,
-  `src/db/team-welcome-schema.ts`, `src/db/edit-lease-schema.ts`, and
-  `src/db/frame-capture-schema.ts`. Change it, then run `pnpm db:generate`
+  `src/db/team-welcome-schema.ts`, `src/db/edit-lease-schema.ts`,
+  `src/db/frame-capture-schema.ts`, and `src/db/confirmation-schema.ts`. Change it, then run `pnpm db:generate`
   and commit the migration in `drizzle/`. A new schema file is also listed
   in `drizzle.config.ts` and spread into the schema in `src/db/index.ts`.
 - Migrations apply automatically when a production deploy builds:
@@ -1845,6 +1845,38 @@ The UI takes its data through
 a `ThreadApi` (`use-comment-thread.ts`), so `/dev/inline-comments`
 (`?seed=1`, `?as=reader`) and `e2e/inline-comments.spec.ts` run without a
 database; `inline-comments.db.test.ts` covers the server rules.
+
+A mention also works in a document's own text (#254, the owner 2026-11-20:
+"mentioning fellow team mates or agents (like \"@claude\")"): `@handle` in a
+Markdown artifact is the same plain text a comment's mention is, so the
+Markdown an agent reads agrees with the page. Every save of content
+(`saveChanges` in `src/lib/artifacts.ts`, web and MCP; never a restore) runs
+`notifyDocumentMentions` after its response
+(`src/lib/comments/document-mentions.ts`, rules in
+`document-mention-rules.ts`):
+
+- Who can be reached is the comment rule (`mentionRefusal`) with the
+  comments setting left out, and an agent's save notifies people only.
+- A recipient is told once per artifact, by the first save that finds their
+  handle in the text they are served, and again only when the handle is
+  added anew after they read the earlier one. Anything else that changes
+  who is served the text calls `notifyDocumentMentionsAfterSharing`:
+  `setVisibility`, an approved sharing request (`approve`) and an approved
+  edit (`applyDecision`), all in `src/lib/sharing/service.ts`. A new path
+  that shares an artifact or moves its approved version calls it too.
+- At most `MAX_MENTIONS_PER_SAVE` a save; the rest are told by a later save.
+  A save looks up at most `MAX_DOCUMENT_HANDLES` handles that have nobody
+  told yet, so only handles that reach nobody stay in that window.
+- The stored row is a `mention` with no `comment_id` (one per artifact and
+  recipient, `actor_id` the writer) and, for people, a `notification` of type
+  `mention` with no comment. A deployment from before 0051 hides both: it
+  reads mentions through the comment. Never give these rows a new type
+  without checking what the previous deployment does with it.
+- Rows hold ids only. The Inbox, the bell, and `inbox_list` read the block
+  that names the reader from the text that reader is served
+  (`document-mention-view.ts`), so a mention waiting in a version they are
+  not served stays hidden, and one taken out of the text drops out.
+- `document-mentions.db.test.ts` covers the rules against Postgres.
 
 The comment box (`src/components/comments/comment-editor.tsx`, used for new
 comments, replies, edits, and the cards at the text) is the rich Markdown

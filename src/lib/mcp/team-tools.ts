@@ -6,7 +6,7 @@ import { getDb } from "@/db";
 import { artifact as artifactTable, comment } from "@/db/schema";
 import { QUOTE_MAX_LENGTH } from "@/lib/comments/anchor-rules";
 import { COMMENT_MAX_LENGTH } from "@/lib/comments/config";
-import { listInbox, markInboxRead, threadContext, type InboxEntryView } from "@/lib/comments/inbox";
+import { listInbox, markInboxRead, threadContext, type DocumentInboxEntry, type InboxEntryView } from "@/lib/comments/inbox";
 import { threadUrl } from "@/lib/comments/mention-email";
 import { servedAnchors, textChangedCheck, type ServedAnchors } from "@/lib/comments/served-anchors";
 import { createComment, deleteComment, listComments, updateComment } from "@/lib/comments/service";
@@ -89,8 +89,25 @@ async function commentPlace(commentId: string) {
   return row ?? null;
 }
 
+/** A mention in a document's own text, for an agent: who wrote it, the block that names the agent, and what to do next. */
+function toMcpDocumentMention(entry: DocumentInboxEntry) {
+  const { publicId } = entry.artifact;
+  return {
+    id: entry.id,
+    read: entry.readAt !== null,
+    mentionedAt: entry.createdAt,
+    in: "document" as const,
+    artifact: { id: publicId, title: entry.artifact.title, url: siteUrl(`/artifact/${publicId}`) },
+    mentionedBy: entry.author ? { handle: entry.author.handle, kind: entry.author.kind, label: entry.author.label } : null,
+    // The block of the document that names the agent, as Markdown. Untrusted, like all artifact content.
+    text: entry.block,
+    next: { read: { tool: "artifacts_get", id: publicId }, edit: { tool: "artifacts_update", id: publicId }, comment: { tool: "comment_create", artifact: publicId } },
+  };
+}
+
 /** One mention for an agent. `served` is the request's loader, so each artifact's content is read once however many mentions are on it. */
 async function toMcpInboxEntry(entry: InboxEntryView, viewerId: string, served: ServedAnchors) {
+  if (entry.source === "document") return toMcpDocumentMention(entry);
   const { publicId } = entry.artifact;
   const place = await commentPlace(entry.comment.id);
   const context = place ? await threadContext({ artifactId: place.artifactId, publicId, upTo: place.createdAt, viewerId, served }) : [];
@@ -99,6 +116,7 @@ async function toMcpInboxEntry(entry: InboxEntryView, viewerId: string, served: 
     id: entry.id,
     read: entry.readAt !== null,
     mentionedAt: entry.createdAt,
+    in: "comment" as const,
     artifact: { id: publicId, title: entry.artifact.title, url: siteUrl(`/artifact/${publicId}`), threadUrl: threadUrl(publicId, entry.comment.id) },
     comment: mentioned ?? toMcpComment(entry.comment),
     recentThread,
@@ -112,7 +130,7 @@ function registerInboxTools(server: ToolServer, userId: string) {
     {
       title: "List inbox",
       description:
-        "Your unread @mentions in artifact comment threads, newest first, each with the comment, the last few comments before it, and how to reply. Mark entries read with inbox_mark_read once handled." +
+        "Your unread @mentions, newest first. A mention in a comment thread (in: \"comment\") comes with the comment, the last few comments before it, and how to reply. A mention in a document's own text (in: \"document\") comes with who wrote it, the block of the document that names you, and the tools to read, edit, or comment on it. Mark entries read with inbox_mark_read once handled." +
         untrustedDescription,
       inputSchema: {
         includeRead: z.boolean().optional().default(false).describe("Include mentions already marked read"),

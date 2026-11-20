@@ -70,7 +70,7 @@ export async function resolvedMentions(commentIds: string[]): Promise<Map<string
     .leftJoin(agent, eq(agent.userId, user.id))
     .where(inArray(mention.commentId, commentIds));
   for (const row of rows) {
-    if (!row.handle) continue;
+    if (!row.handle || !row.commentId) continue;
     const list = byComment.get(row.commentId) ?? [];
     list.push({ handle: row.handle, kind: row.agentId ? "agent" : "person" });
     byComment.set(row.commentId, list);

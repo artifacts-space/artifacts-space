@@ -18,7 +18,7 @@ export const notification = pgTable(
     recipientId: text("recipient_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     type: text("type", { enum: notificationTypes }).notNull(),
     artifactId: text("artifact_id").notNull().references(() => artifact.id, { onDelete: "cascade" }),
-    // The comment for comment, reply, and mention.
+    // The comment for comment, reply, and mention. A mention with no comment is one in the document's own text.
     commentId: text("comment_id").references(() => comment.id, { onDelete: "cascade" }),
     // The sharing request for share_request, share_approved, and share_declined.
     requestId: text("request_id").references(() => sharingRequest.id, { onDelete: "cascade" }),
@@ -30,6 +30,10 @@ export const notification = pgTable(
   (table) => [
     // One notification per person per comment: the most direct kind wins (mention, reply, comment).
     uniqueIndex("notification_recipient_comment_idx").on(table.recipientId, table.commentId).where(sql`${table.commentId} is not null`),
+    // One notification per person per artifact for mentions in its text: a new mention refreshes it.
+    uniqueIndex("notification_recipient_document_mention_idx")
+      .on(table.recipientId, table.artifactId)
+      .where(sql`${table.type} = 'mention' and ${table.commentId} is null and ${table.requestId} is null`),
     uniqueIndex("notification_recipient_request_type_idx").on(table.recipientId, table.requestId, table.type).where(sql`${table.requestId} is not null`),
     index("notification_recipient_created_idx").on(table.recipientId, table.createdAt),
     index("notification_recipient_artifact_idx").on(table.recipientId, table.artifactId),

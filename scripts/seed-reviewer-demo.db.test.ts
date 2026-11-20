@@ -122,7 +122,7 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
       .orderBy(artifact.title);
     const threads = await getDb().select({ body: comment.body, title: artifact.title }).from(comment).innerJoin(artifact, eq(artifact.id, comment.artifactId)).where(eq(artifact.userId, userId)).orderBy(comment.createdAt);
     const projects = (await listScopeProjects({ kind: "user", userId })).map(({ name, count }) => ({ name, count }));
-    const inbox = (await listInbox(userId)).map((entry) => ({ title: entry.artifact.title, body: entry.comment.body, read: entry.readAt !== null }));
+    const inbox = (await listInbox(userId)).map((entry) => ({ title: entry.artifact.title, body: entry.source === "comment" ? entry.comment.body : entry.block, read: entry.readAt !== null }));
     return { artifacts: rows, threads, projects, inbox };
   }
 

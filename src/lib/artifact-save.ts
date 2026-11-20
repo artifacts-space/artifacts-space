@@ -46,9 +46,11 @@ export interface SaveContext {
   restoredFromId?: string | null;
 }
 
-/** What a save wrote: the row, and whether it went over agents' newer saves (a person's save only). */
+/** What a save wrote: the row, the row it changed, and whether it went over agents' newer saves (a person's save only). */
 export interface SavedRow {
   record: ArtifactRecord;
+  /** The row the save changed: the one the editor started from, or a newer one when only agents saved since. */
+  before: ArtifactRecord;
   savedOverAgents: boolean;
 }
 
@@ -207,10 +209,8 @@ export async function writeArtifactSave(changes: ArtifactChanges, context: SaveC
   if (imageChanged(changed, record)) await pruneUnusedIconFilesQuietly(record.id, [changed.icon, changed.cover]);
   // So does media the content stopped embedding, once no version names it (a merged save can drop the only one).
   await pruneUnusedContentFilesQuietly(record.id, droppedContentRefs(changed, record));
-  return { record, savedOverAgents: saved.savedOverAgents };
+  return { record, before: changed, savedOverAgents: saved.savedOverAgents };
 }
 
-/** A landed save inside this module: also the row it changed. */
-interface LandedSave extends SavedRow {
-  before: ArtifactRecord;
-}
+/** A landed save inside this module. */
+type LandedSave = SavedRow;

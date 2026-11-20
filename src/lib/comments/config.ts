@@ -31,3 +31,17 @@ export const RESOLVE_RATE_LIMITS = ["commentResolveMinute", "commentResolveHour"
 
 /** How many earlier comments inbox_list returns with each mention, for context. */
 export const INBOX_CONTEXT_COMMENTS = 5;
+
+/**
+ * A mention in a document's own text (document-mentions.ts). A save looks up
+ * at most MAX_DOCUMENT_HANDLES of the handles that have nobody told yet, and
+ * notifies at most MAX_MENTIONS_PER_SAVE people or agents: the rest are
+ * notified by a later save, never dropped. Only a handle that reaches nobody
+ * stays in that window, so a real handle waits for good only behind
+ * MAX_DOCUMENT_HANDLES such handles.
+ */
+export const MAX_DOCUMENT_HANDLES = 50;
+export const MAX_MENTIONS_PER_SAVE = 5;
+
+/** The most of a document's text inbox_list returns around a mention, in characters. */
+export const MENTION_BLOCK_MAX = 2_000;

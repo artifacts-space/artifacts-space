@@ -3,6 +3,7 @@ import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import { drizzle as drizzlePostgres } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
+import * as confirmationSchema from "./confirmation-schema";
 import * as connectionSchema from "./connection-schema";
 import * as editLeaseSchema from "./edit-lease-schema";
 import * as fileCopySchema from "./file-copy-schema";
@@ -14,7 +15,7 @@ import * as appSchema from "./schema";
 import * as teamWelcomeSchema from "./team-welcome-schema";
 import * as viewsSchema from "./views-schema";
 
-const schema = { ...appSchema, ...oauthSchema, ...viewsSchema, ...notificationSchema, ...rolesSchema, ...connectionSchema, ...fileCopySchema, ...teamWelcomeSchema, ...editLeaseSchema, ...frameCaptureSchema };
+const schema = { ...appSchema, ...confirmationSchema, ...oauthSchema, ...viewsSchema, ...notificationSchema, ...rolesSchema, ...connectionSchema, ...fileCopySchema, ...teamWelcomeSchema, ...editLeaseSchema, ...frameCaptureSchema };
 
 let database: ReturnType<typeof createDatabase> | undefined;
 

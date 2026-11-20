@@ -138,6 +138,14 @@ describe("mayNotify", () => {
     expect(mayNotify("mention", { ...full, seesComments: false })).toBe(false);
   });
 
+  it("should allow a mention in the document's own text when the comments are hidden but the person can read the artifact", () => {
+    expect(mayNotify("mention", { ...full, seesComments: false }, true)).toBe(true);
+  });
+
+  it("should refuse a mention in the document's own text when the person cannot read the artifact", () => {
+    expect(mayNotify("mention", { ...none, seesComments: true }, true)).toBe(false);
+  });
+
   it("should refuse a waiting request when the person no longer manages the team, even if they can read the artifact", () => {
     expect(mayNotify("share_request", { ...full, managesRequestTeam: false })).toBe(false);
   });

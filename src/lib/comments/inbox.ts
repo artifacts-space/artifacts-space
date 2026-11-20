@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, comment, mention } from "@/db/schema";
@@ -6,31 +6,51 @@ import type { ArtifactMetaRecord } from "@/lib/artifact-columns";
 import { getArtifactAccess, type ArtifactAccess } from "@/lib/access";
 import { canViewArtifact } from "@/lib/access-rules";
 import { loadActors } from "@/lib/agents/queries";
-import { markMentionNotificationsRead } from "@/lib/notifications/feed";
+import { markDocumentMentionNotificationsRead, markMentionNotificationsRead } from "@/lib/notifications/feed";
 import { listTeamIdsForUser } from "@/lib/teams/queries";
 
 import type { AnchorGate } from "./anchor-privacy-rules";
 import { INBOX_CONTEXT_COMMENTS } from "./config";
+import { servedMentions } from "./document-mention-view";
 import { anchorGateFor, type ServedAnchors } from "./served-anchors";
 import { canSeeComments } from "./setting-rules";
-import { actorIdsOf, toCommentView, type CommentView } from "./views";
+import { actorIdsOf, toAuthorView, toCommentView, type CommentAuthorView, type CommentView } from "./views";
 
 /**
- * The inbox: mentions that landed for a person or an agent. Entries are
- * re-checked against the read rule and the comments setting when listed, so
- * a mention on an artifact that is no longer visible, or whose comments are
- * hidden from the recipient, quietly drops out. Hidden entries stay stored and
- * come back unchanged if the comments come back; they never send anything.
+ * The inbox: mentions that landed for a person or an agent, in a comment or
+ * in a document's own text. Entries are re-checked against the read rule when
+ * listed (a comment's also against the comments setting), so a mention on an
+ * artifact that is no longer visible, or whose comments are hidden from the
+ * recipient, quietly drops out, and so does a mention in a document once the
+ * text the recipient is served no longer names them. Hidden entries stay
+ * stored and come back unchanged if what hid them is undone; they never send
+ * anything.
  */
 
-/** One inbox entry. */
-export interface InboxEntryView {
+interface InboxEntryBase {
   id: string;
   createdAt: string;
   readAt: string | null;
   artifact: { publicId: string; title: string; icon: string | null };
+}
+
+/** A mention in a comment. */
+export interface CommentInboxEntry extends InboxEntryBase {
+  source: "comment";
   comment: CommentView;
 }
+
+/** A mention in the document's own text. */
+export interface DocumentInboxEntry extends InboxEntryBase {
+  source: "document";
+  /** Who wrote the mention. Null when the account is gone. */
+  author: CommentAuthorView | null;
+  /** The block of the text the recipient is served that names them, as Markdown. Untrusted. */
+  block: string;
+}
+
+/** One inbox entry. */
+export type InboxEntryView = CommentInboxEntry | DocumentInboxEntry;
 
 const INBOX_MAX = 50;
 
@@ -60,8 +80,52 @@ export function unreadMentionSubjects(db: Pick<ReturnType<typeof getDb>, "select
     .limit(INBOX_MAX);
 }
 
+/** The fields the unread count checks, for a user's unread mentions in documents' own text. Joins only, as above. */
+export function unreadDocumentMentionSubjects(db: Pick<ReturnType<typeof getDb>, "select">, userId: string) {
+  return db
+    .select({ userId: artifact.userId, visibility: artifact.visibility, teamId: artifact.teamId })
+    .from(mention)
+    .innerJoin(artifact, eq(artifact.id, mention.artifactId))
+    .where(and(eq(mention.recipientId, userId), isNull(mention.commentId), isNull(mention.readAt)))
+    .limit(INBOX_MAX);
+}
+
+/** A user's mentions in documents' own text, newest first. */
+function documentRows(userId: string, unreadOnly: boolean, limit: number) {
+  const conditions = [eq(mention.recipientId, userId), isNull(mention.commentId)];
+  if (unreadOnly) conditions.push(isNull(mention.readAt));
+  return getDb()
+    .select({ entry: mention, publicId: artifact.publicId })
+    .from(mention)
+    .innerJoin(artifact, eq(artifact.id, mention.artifactId))
+    .where(and(...conditions))
+    .orderBy(desc(mention.createdAt))
+    .limit(limit);
+}
+
+/** The document mentions the user can still see: the artifact is readable and the text they are served still names them. */
+async function listDocumentMentions(userId: string, unreadOnly: boolean, limit: number): Promise<DocumentInboxEntry[]> {
+  const rows = await documentRows(userId, unreadOnly, limit);
+  if (rows.length === 0) return [];
+  const [served, actors] = await Promise.all([servedMentions(userId, rows.map((row) => row.publicId)), loadActors(rows.flatMap((row) => (row.entry.actorId ? [row.entry.actorId] : [])))]);
+  return rows.flatMap((row) => {
+    const shown = served.get(row.publicId);
+    if (!shown) return [];
+    const actor = row.entry.actorId ? actors.get(row.entry.actorId) : undefined;
+    return [{
+      source: "document" as const,
+      id: row.entry.id,
+      createdAt: row.entry.createdAt.toISOString(),
+      readAt: row.entry.readAt?.toISOString() ?? null,
+      artifact: { publicId: row.publicId, title: shown.title, icon: shown.icon },
+      author: actor ? toAuthorView(actor) : null,
+      block: shown.block,
+    }];
+  });
+}
+
 function inboxRows(userId: string, unreadOnly: boolean, limit: number) {
-  const conditions = [eq(mention.recipientId, userId), isNull(comment.deletedAt)];
+  const conditions = [eq(mention.recipientId, userId), isNotNull(mention.commentId), isNull(comment.deletedAt)];
   if (unreadOnly) conditions.push(isNull(mention.readAt));
   return getDb()
     .select({ entry: mention, record: comment, artifact })
@@ -86,15 +150,23 @@ async function visibleArtifacts(userId: string, publicIds: readonly string[]) {
   return visible;
 }
 
-/** Inbox entries for a user, newest first. Unread only unless `unreadOnly` is false. */
+/** Inbox entries for a user, newest first: mentions in comments and in documents' own text together. Unread only unless `unreadOnly` is false. */
 export async function listInbox(userId: string, options: { unreadOnly?: boolean; limit?: number; served?: ServedAnchors } = {}): Promise<InboxEntryView[]> {
   const limit = Math.min(Math.max(options.limit ?? INBOX_MAX, 1), INBOX_MAX);
-  const rows = await inboxRows(userId, options.unreadOnly ?? true, limit);
+  const unreadOnly = options.unreadOnly ?? true;
+  const [inComments, inDocuments] = await Promise.all([listCommentMentions(userId, unreadOnly, limit, options.served), listDocumentMentions(userId, unreadOnly, limit)]);
+  // ISO times sort as text.
+  return [...inComments, ...inDocuments].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
+}
+
+/** The comment mentions the user can still see. */
+async function listCommentMentions(userId: string, unreadOnly: boolean, limit: number, servedLoader: ServedAnchors | undefined): Promise<CommentInboxEntry[]> {
+  const rows = await inboxRows(userId, unreadOnly, limit);
   const artifacts = await visibleArtifacts(userId, [...new Set(rows.map((row) => row.artifact.publicId))]);
   const visible = rows.filter((row) => artifacts.has(row.artifact.publicId));
   // One anchor gate per artifact, each through the version this user is served there.
   const gated = [...artifacts].map(([publicId, served]) =>
-    anchorGateFor({ publicId, viewerId: userId, records: visible.filter((row) => row.artifact.publicId === publicId).map((row) => row.record), source: served.source, served: options.served }).then((gate) => [publicId, gate] as const),
+    anchorGateFor({ publicId, viewerId: userId, records: visible.filter((row) => row.artifact.publicId === publicId).map((row) => row.record), source: served.source, served: servedLoader }).then((gate) => [publicId, gate] as const),
   );
   const [actors, gates] = await Promise.all([loadActors([userId, ...actorIdsOf(visible.map((row) => row.record))]), Promise.all(gated)]);
   const anchorGates = new Map<string, AnchorGate>(gates);
@@ -104,6 +176,7 @@ export async function listInbox(userId: string, options: { unreadOnly?: boolean;
     const anchorFor = anchorGates.get(row.artifact.publicId);
     if (!served || !anchorFor) return [];
     return [{
+      source: "comment" as const,
       id: row.entry.id,
       createdAt: row.entry.createdAt.toISOString(),
       readAt: row.entry.readAt?.toISOString() ?? null,
@@ -113,10 +186,15 @@ export async function listInbox(userId: string, options: { unreadOnly?: boolean;
   });
 }
 
-/** How many unread mentions a user can still see, up to the inbox limit. */
+/**
+ * How many unread mentions a user can still see, up to the inbox limit. A
+ * mention in a document's text counts while the user can read the artifact;
+ * the text is not loaded for a count.
+ */
 export async function countUnreadMentions(userId: string): Promise<number> {
-  const [rows, teams] = await Promise.all([unreadMentionSubjects(getDb(), userId), listTeamIdsForUser(userId)]);
-  return rows.filter(visibleTo(userId, teams)).length;
+  const [rows, inDocuments, teams] = await Promise.all([unreadMentionSubjects(getDb(), userId), unreadDocumentMentionSubjects(getDb(), userId), listTeamIdsForUser(userId)]);
+  const readable = inDocuments.filter((subject) => canViewArtifact(subject, { userId, isTeamMember: subject.teamId !== null && teams.has(subject.teamId) }));
+  return Math.min(rows.filter(visibleTo(userId, teams)).length + readable.length, INBOX_MAX);
 }
 
 /** Marks some (or all) of the user's inbox entries read. Returns how many changed. */
@@ -127,8 +205,11 @@ export async function markInboxRead(userId: string, ids: string[] | "all"): Prom
     conditions.push(inArray(mention.id, ids));
   }
   const changed = await getDb().update(mention).set({ readAt: new Date() }).where(and(...conditions)).returning();
-  // The bell's mention notifications for the same comments follow.
-  await markMentionNotificationsRead(userId, changed.map((row) => row.commentId));
+  // The bell's mention notifications for the same comments, and for the same documents' text, follow.
+  await Promise.all([
+    markMentionNotificationsRead(userId, changed.flatMap((row) => (row.commentId ? [row.commentId] : []))),
+    markDocumentMentionNotificationsRead(userId, changed.flatMap((row) => (row.commentId ? [] : [row.artifactId]))),
+  ]);
   return changed.length;
 }
 

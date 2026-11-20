@@ -51,6 +51,7 @@ import { assertContentFits } from "@/lib/quota/usage";
 import type { SharingActor } from "@/lib/sharing/rules";
 import type { SaveOptions } from "@/lib/save-guard";
 import { writeArtifactSave, type SaveContext } from "@/lib/artifact-save";
+import { notifyDocumentMentions } from "@/lib/comments/document-mentions";
 import { showsInSearch } from "@/lib/search/search-rules";
 import { readSheetFormat } from "@/lib/sheet-format/rules";
 import { UserFacingError } from "@/lib/user-facing-error";
@@ -416,6 +417,8 @@ export interface SavedArtifact {
 async function saveChanges(changes: ArtifactChanges, context: SaveContext): Promise<SavedArtifact | null> {
   const saved = await writeArtifactSave(changes, context);
   if (!saved) return null;
+  // New @mentions in a document's text notify after the response. A restore brings back old text, so it tells nobody.
+  if (changes.content !== undefined && !context.restoredFromId) notifyDocumentMentions({ before: saved.before, after: saved.record, editorId: context.editorId });
   const [dto] = await toArtifactDtos([saved.record], context.editorId);
   return dto ? { artifact: dto, savedOverAgents: saved.savedOverAgents } : null;
 }

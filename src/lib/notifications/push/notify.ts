@@ -31,8 +31,9 @@ export async function sendBrowserNotifications(drafts: readonly NotificationDraf
   const excerpt = context.commentBody === null ? null : commentExcerpt(context.commentBody);
   const messages = new Map<string, PushMessage>();
   for (const draft of drafts) {
-    const href = notificationHref({ type: draft.type, publicId: context.publicId, teamSlug: context.teamSlug });
-    messages.set(draft.recipientId, pushMessage({ type: draft.type, requestKind: context.requestKind, actorLabel, artifactTitle: titleFor(draft.recipientId), publicId: context.publicId, excerpt, href }));
+    const { inDocument } = draft;
+    const href = notificationHref({ type: draft.type, publicId: context.publicId, teamSlug: context.teamSlug, inDocument });
+    messages.set(draft.recipientId, pushMessage({ type: draft.type, requestKind: context.requestKind, actorLabel, artifactTitle: titleFor(draft.recipientId), publicId: context.publicId, excerpt, href, inDocument }));
   }
   await sendPushMessages(messages);
 }

@@ -450,14 +450,19 @@ export const mention = pgTable(
   "mention",
   {
     id: text("id").primaryKey(),
-    commentId: text("comment_id").notNull().references(() => comment.id, { onDelete: "cascade" }),
+    // The comment that mentions the recipient. Null for a mention in the document's own text
+    // (src/lib/comments/document-mentions.ts): one row per artifact and recipient, refreshed when they are mentioned again.
+    commentId: text("comment_id").references(() => comment.id, { onDelete: "cascade" }),
     artifactId: text("artifact_id").notNull().references(() => artifact.id, { onDelete: "cascade" }),
     recipientId: text("recipient_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    // Who wrote a document mention. A comment's mention has its comment's author instead.
+    actorId: text("actor_id").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     readAt: timestamp("read_at", { withTimezone: true }),
   },
   (table) => [
     uniqueIndex("mention_comment_recipient_idx").on(table.commentId, table.recipientId),
+    uniqueIndex("mention_document_recipient_idx").on(table.artifactId, table.recipientId).where(sql`${table.commentId} is null`),
     index("mention_recipient_created_idx").on(table.recipientId, table.createdAt),
   ],
 );
@@ -472,18 +477,6 @@ export const threadMute = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.artifactId, table.agentId] })],
-);
-
-// A person chose "Don't ask again" for one kind of destructive confirmation.
-// Only the dialog changes; server checks stay the same.
-export const confirmationSkip = pgTable(
-  "confirmation_skip",
-  {
-    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    action: text("action").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [primaryKey({ columns: [table.userId, table.action] })],
 );
 
 export type ArtifactRecord = typeof artifact.$inferSelect;

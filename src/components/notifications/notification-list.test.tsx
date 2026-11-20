@@ -9,7 +9,7 @@ import { NotificationList } from "./notification-list";
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
 
 function mention(excerpt: string): NotificationView {
-  return { id: "n1", type: "mention", createdAt: new Date().toISOString(), readAt: null, actor: { userId: "u1", kind: "person", label: "@ada" }, artifact: { publicId: "p1", title: "Plan", icon: null }, excerpt, requestKind: null, href: "/app?artifact=p1&comments=1" };
+  return { id: "n1", type: "mention", createdAt: new Date().toISOString(), readAt: null, actor: { userId: "u1", kind: "person", label: "@ada" }, artifact: { publicId: "p1", title: "Plan", icon: null }, excerpt, inDocument: false, requestKind: null, href: "/app?artifact=p1&comments=1" };
 }
 
 describe("the bell's excerpt", () => {
