@@ -12,6 +12,7 @@ import {
   decideMentions,
   isAgentMuted,
   isLoopLimited,
+  mentionRefusal,
   resolveRefusal,
   type MentionCandidate,
 } from "./rules";
@@ -68,16 +69,27 @@ describe("mention visibility", () => {
     expect(result.refused).toEqual([]);
   });
 
-  it("should refuse a mention when the member cannot view the artifact", () => {
+  it("should refuse a mention and say to share the artifact first when a teammate cannot view it", () => {
     const result = decideMentions({ writerId: "me", candidates: [{ ...teammate, canView: false }], loopLimited: false });
     expect(result.deliver).toEqual([]);
-    expect(result.refused[0]?.reason).toBe("not_visible");
+    expect(result.refused[0]?.reason).toBe("cannot_see");
+    expect(result.refused[0]?.message).toMatch(/cannot see this artifact's comments yet\. Share the artifact with them/);
   });
 
-  it("should refuse unknown handles with the same notice as hidden ones", () => {
-    const unknown = decideMentions({ writerId: "me", candidates: [{ ...teammate, userId: null }], loopLimited: false });
-    const hidden = decideMentions({ writerId: "me", candidates: [{ ...teammate, canView: false }], loopLimited: false });
-    expect(unknown.refused[0]?.message).toBe(hidden.refused[0]?.message);
+  it("should refuse unknown handles with the same notice as people outside the writer's teams, whether or not they can view it", () => {
+    const unknown = decideMentions({ writerId: "me", candidates: [{ ...teammate, userId: null, canView: false, sharesTeamWithWriter: false }], loopLimited: false });
+    const strangerWhoCanView = decideMentions({ writerId: "me", candidates: [{ ...teammate, sharesTeamWithWriter: false }], loopLimited: false });
+    const strangerWhoCannot = decideMentions({ writerId: "me", candidates: [{ ...teammate, sharesTeamWithWriter: false, canView: false }], loopLimited: false });
+    expect([unknown, strangerWhoCanView, strangerWhoCannot].map((result) => result.refused[0]?.reason)).toEqual(["not_visible", "not_visible", "not_visible"]);
+    expect(strangerWhoCanView.refused[0]?.message).toBe(unknown.refused[0]?.message);
+    expect(strangerWhoCannot.refused[0]?.message).toBe(unknown.refused[0]?.message);
+    expect(unknown.refused[0]?.message).toMatch(/exact @handle, not their name/);
+  });
+
+  it("should never deliver to a teammate who cannot view the artifact, nor to a handle without a user", () => {
+    const candidates = [{ ...teammate, canView: false }, { ...teammate, handle: "ghost", userId: null }, { ...reviewer, canView: false }];
+    expect(decideMentions({ writerId: "me", candidates, loopLimited: false }).deliver).toEqual([]);
+    expect(candidates.map((candidate) => mentionRefusal(candidate, false))).toEqual(["cannot_see", "not_visible", "cannot_see"]);
   });
 
   it("should refuse strangers who can view a public artifact but share no team with the writer", () => {

@@ -1,7 +1,54 @@
 import { describe, expect, it } from "vitest";
 
 import { MENTION_BLOCK_MAX } from "./config";
-import { addedMentions, documentMentionStep, mentionBlock } from "./document-mention-rules";
+import { addedMentions, documentMentionMissMessage, documentMentionReach, documentMentionReportOf, documentMentionStep, mentionBlock } from "./document-mention-rules";
+import type { MentionCandidate } from "./rules";
+
+const ada: MentionCandidate = { handle: "ada", userId: "u-ada", kind: "person", canView: true, isArtifactAuthor: false, sharesTeamWithWriter: true, muted: false };
+const helper: MentionCandidate = { ...ada, handle: "helper", userId: "u-helper", kind: "agent" };
+const person = { userId: "u-me", kind: "person" as const, muted: false };
+const agentWriter = { userId: "u-bot", kind: "agent" as const, muted: false };
+
+describe("documentMentionReach", () => {
+  it("should reach a teammate who can read the artifact", () => {
+    expect(documentMentionReach(ada, person)).toEqual({ reach: "reaches", miss: null });
+  });
+
+  it("should reach a teammate who cannot read it yet only later, once it is shared with them", () => {
+    expect(documentMentionReach({ ...ada, canView: false }, person)).toEqual({ reach: "later", miss: null });
+  });
+
+  it("should reach nobody for an unknown handle or someone outside the writer's teams, with the same words for both", () => {
+    const unknown = documentMentionReach({ ...ada, userId: null }, person);
+    const stranger = documentMentionReach({ ...ada, sharesTeamWithWriter: false }, person);
+    expect(unknown).toEqual({ reach: "none", miss: "unknown" });
+    expect(stranger).toEqual(unknown);
+    expect(documentMentionReach({ ...ada, sharesTeamWithWriter: false, canView: false }, person)).toEqual(unknown);
+  });
+
+  it("should never let an agent's save reach an agent, nor anyone reach a muted agent", () => {
+    expect(documentMentionReach(helper, agentWriter)).toEqual({ reach: "none", miss: "agent_save" });
+    expect(documentMentionReach({ ...helper, muted: true }, person)).toEqual({ reach: "none", miss: "muted" });
+    expect(documentMentionReach(ada, agentWriter)).toEqual({ reach: "reaches", miss: null });
+  });
+
+  it("should reach nobody when the writer is a muted agent", () => {
+    expect(documentMentionReach(ada, { ...agentWriter, muted: true })).toEqual({ reach: "none", miss: "writer_muted" });
+  });
+
+  it("should skip the writer's own handle", () => {
+    expect(documentMentionReach({ ...ada, userId: "u-me" }, person)).toBeNull();
+  });
+
+  it("should sort a save's handles into who hears now, who hears once they can read it, and who never will", () => {
+    const report = documentMentionReportOf([ada, { ...ada, handle: "bo", userId: "u-bo", canView: false }, { ...ada, handle: "nobody", userId: null }, { ...ada, userId: "u-me", handle: "me" }], person);
+    expect(report).toEqual({ reaches: ["ada"], onceTheyCanRead: ["bo"], notNotified: [{ handle: "nobody", message: documentMentionMissMessage("nobody", "unknown") }] });
+  });
+
+  it("should tell the writer to use the exact handle when a handle reaches nobody", () => {
+    expect(documentMentionMissMessage("ada", "unknown")).toMatch(/^@ada will not be notified\. .*exact @handle, not their name\.$/);
+  });
+});
 
 describe("addedMentions", () => {
   it("should list the handles a save added when the text before had others", () => {

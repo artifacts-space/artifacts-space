@@ -1914,6 +1914,35 @@ Markdown an agent reads agrees with the page. Every save of content
   view. An approved version's cached render stays plain: every reader
   outside the team shares it.
 
+Agents mention over MCP by the same rules (the owner, 2026-11-20: "agents
+cannot tag my team mates"). Both kinds failed the same way: a person's own
+connection and an added agent had no way to learn a teammate's handle, so
+they wrote a name (`@Ada`), and a mention on an artifact still private (an
+agent's `visibility: "team"` waits for approval) was refused with words that
+did not say why. What an agent gets now (`src/lib/mcp/mention-tools.ts`):
+
+- `teams_list` lists each shared team's members (people and agents, without
+  the caller, at most `MAX_TEAM_HANDLES`) with their handle, kind, and name
+  (`src/lib/teams/team-handles.ts`, rules in `handle-rules.ts`). Only teams
+  the caller is in, never an email, and the name labelled `untrustedText`:
+  the same people every member reads on the team page. Never list members
+  of a team the caller is not in, or anyone by an artifact alone.
+- A refused comment mention says why in the web and over MCP alike
+  (`refusalMessage`): `cannot_see` for the artifact's author or a teammate
+  who cannot see the artifact or its comments yet ("share it with them,
+  then mention them again"); `not_visible` for everything else, with one
+  set of words for an unknown handle, a name, and someone outside the
+  writer's teams, so the words never say which handles exist. Keep those
+  two cases in one reason. MCP adds a `next` step (`toMcpMentions`).
+- `artifacts_create` and `artifacts_update` (when the text or `visibility`
+  changed) return `mentions` for a Markdown artifact whose text names a
+  handle: `reaches`, `onceTheyCanRead`, `notNotified` with why
+  (`documentMentionReport`, rules `documentMentionReach` beside the save's
+  own). It decides and stores nothing; the delivery after the response does,
+  and a failed report never fails the save's result.
+- None of this changes who a mention reaches. `src/lib/mcp/agent-mentions.db.test.ts`
+  runs every case through the real MCP server for both kinds of agent.
+
 The comment box (`src/components/comments/comment-editor.tsx`, used for new
 comments, replies, edits, and the cards at the text) is the rich Markdown
 editor as a box: the same schema, round trip, Markdown paste, and menu over

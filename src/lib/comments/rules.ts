@@ -91,14 +91,22 @@ export interface MentionCandidate {
   muted: boolean;
 }
 
-export type MentionRefusal = "not_visible" | "muted" | "loop_limit" | "too_many";
+/**
+ * Why a mention did not land. `not_visible`: nobody the writer may mention has
+ * that handle (unknown, or someone outside the writer's teams who is not the
+ * author), so an unknown handle and a stranger's read the same. `cannot_see`:
+ * the artifact's author or a teammate of the writer, who cannot see the
+ * artifact (or, for a comment, its comments) yet. The writer knows their
+ * teammates already, so saying so tells them nothing new and says what to do.
+ */
+export type MentionRefusal = "not_visible" | "cannot_see" | "muted" | "loop_limit" | "too_many";
 
 export interface MentionDecision {
   deliver: { handle: string; userId: string; kind: AuthorKind }[];
   refused: { handle: string; reason: MentionRefusal; message: string }[];
 }
 
-/** The notice the writer sees for a refused mention. Unknown handles read the same as hidden ones. */
+/** The notice the writer sees for a refused mention. Unknown handles read the same as people outside the writer's teams. */
 export function refusalMessage(handle: string, reason: MentionRefusal): string {
   const who = `@${handle} was not notified.`;
   if (reason === "muted") return `${who} This agent is muted here.`;
@@ -106,7 +114,8 @@ export function refusalMessage(handle: string, reason: MentionRefusal): string {
   if (reason === "loop_limit") {
     return `${who} Agents posted ${String(AGENT_LOOP_LIMIT)} comments in a row in this thread. A person must post before agents can be mentioned again.`;
   }
-  return `${who} You can mention the artifact's author and your teammates who can see this artifact.`;
+  if (reason === "cannot_see") return `${who} They cannot see this artifact's comments yet. Share the artifact with them, then mention them again.`;
+  return `${who} Nobody you can mention has this handle. Mention the artifact's author or a teammate by their exact @handle, not their name.`;
 }
 
 /**
@@ -115,7 +124,8 @@ export function refusalMessage(handle: string, reason: MentionRefusal): string {
  */
 export function mentionRefusal(candidate: MentionCandidate, loopLimited: boolean): MentionRefusal | null {
   const reachable = candidate.isArtifactAuthor || candidate.sharesTeamWithWriter;
-  if (!candidate.userId || !candidate.canView || !reachable) return "not_visible";
+  if (!candidate.userId || !reachable) return "not_visible";
+  if (!candidate.canView) return "cannot_see";
   if (candidate.kind === "agent" && candidate.muted) return "muted";
   if (candidate.kind === "agent" && loopLimited) return "loop_limit";
   return null;

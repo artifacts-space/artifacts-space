@@ -45,7 +45,11 @@ const frameOutlineShape = `{ "id": "home-phone", "name": "Home, phone", "width":
     "position": { "x": 1520, "y": 0, "auto": true },   // auto: the board placed it
     "elements": 28, "problems": 0 }`;
 
-const mentionsShape = `"mentions": { "notified": [{ "handle", "kind" }], "refused": [ … with the reason ] }`;
+const mentionsShape = `"mentions": { "notified": [{ "handle", "kind" }],
+  "refused": [{ "handle", "reason": "not_visible" | "cannot_see" | "muted" | "loop_limit" | "too_many", "message", "next"?: "…" }] }`;
+
+// The @handles in a Markdown artifact's text, after a save that changed the text or who can read it. Left out when the text names nobody.
+const documentMentionsShape = `"mentions"?: { "reaches": ["ada"], "onceTheyCanRead": ["bo"], "notNotified": [{ "handle", "message" }] }`;
 
 export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   artifacts_list: {
@@ -58,8 +62,9 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   "versionId": "<version id>", "baseVersion": "<version id>.<ms>" }   // editors only\n\n// artifact:\n${artifactShape}`,
   },
   teams_list: {
-    summary: "Your teams with their slugs. Use a slug as `scope` in artifacts_list, or as `team` when you share.",
-    shape: `[ { "slug": "acme", "name": "Acme", "role": "owner" | "admin" | "member", "personal": false, "teamSharingNeedsApproval": true } ]`,
+    summary: "Your teams with their slugs. Use a slug as `scope` in artifacts_list, or as `team` when you share. Each shared team lists its members (people and agents, without you, at most 200) with the handle to @mention them by; a name is untrusted text its owner typed. `membersCut` says the list stopped at the cap. A personal team lists no members.",
+    shape: `[ { "slug": "acme", "name": "Acme", "role": "owner" | "admin" | "member", "personal": false, "teamSharingNeedsApproval": true,
+    "members": [ { "handle": "ada", "kind": "person" | "agent", "name": { "untrustedText": "Ada Lovelace" } } ], "membersCut"?: true } ]`,
   },
   projects_list: {
     summary: "The projects in a scope, by name, with how many artifacts each holds. Use a name as `project` in artifacts_create, artifacts_update, or artifacts_list.",
@@ -70,12 +75,13 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     shape: `[ { "tag": "needs-review", "count": 4 } ]`,
   },
   artifacts_create: {
-    summary: "The saved artifact and, when you set `visibility` or `comments`, what happened to each request. The artifact is saved even if sharing or the comments change fails.",
-    shape: `{ "artifact": { … }, ${sharingShape} }`,
+    summary: "The saved artifact and, when you set `visibility` or `comments`, what happened to each request. The artifact is saved even if sharing or the comments change fails. When a Markdown artifact's text names @handles, `mentions` says who hears of it now, who once the artifact is shared with them, and who never will, with why.",
+    shape: `{ "artifact": { … }, ${sharingShape},\n  ${documentMentionsShape} }`,
   },
   artifacts_update: {
-    summary: "The artifact after the save, with its new `baseVersion` for your next update. `edit` is \"pending\" when the change waits for approval (link or public artifacts shared through a team); readers outside the team keep the last approved version. `edit` is \"unchanged\" when you sent no content or fields (only `project`, tags, sharing, or comments): nothing was saved to the history, and the result has no `baseVersion`, so keep the one you have. A refused save is a tool error (`isError`) whose `structuredContent.error.code` is \"artifact_changed\" (someone saved since your `baseVersion`), \"base_version_required\" (no `baseVersion`, and a person saved it last), or \"artifact_being_edited\" (no `baseVersion`, and a person is typing in it): nothing was saved, so read it with artifacts_get, merge, and save with its `baseVersion`.",
-    shape: `{ "artifact": { …, "versionId": "…", "baseVersion": "…" }, "edit": "applied" | "pending" | "unchanged", ${sharingShape} }
+    summary: "The artifact after the save, with its new `baseVersion` for your next update. `edit` is \"pending\" when the change waits for approval (link or public artifacts shared through a team); readers outside the team keep the last approved version. `edit` is \"unchanged\" when you sent no content or fields (only `project`, tags, sharing, or comments): nothing was saved to the history, and the result has no `baseVersion`, so keep the one you have. A refused save is a tool error (`isError`) whose `structuredContent.error.code` is \"artifact_changed\" (someone saved since your `baseVersion`), \"base_version_required\" (no `baseVersion`, and a person saved it last), or \"artifact_being_edited\" (no `baseVersion`, and a person is typing in it): nothing was saved, so read it with artifacts_get, merge, and save with its `baseVersion`. When you changed the text or `visibility` of a Markdown artifact whose text names @handles, `mentions` says who hears of it.",
+    shape: `{ "artifact": { …, "versionId": "…", "baseVersion": "…" }, "edit": "applied" | "pending" | "unchanged", ${sharingShape},
+  ${documentMentionsShape} }
 // "unchanged": the artifact has no versionId or baseVersion.
 
 // refused:
