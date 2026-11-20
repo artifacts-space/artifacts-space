@@ -60,7 +60,7 @@ describe("toCommentView anchors", () => {
 describe("toCommentView resolved state", () => {
   it("should credit the resolver by label when the thread is resolved", () => {
     const view = toCommentView({ ...record, resolvedAt: at, resolvedBy: "u-dana" }, actors, "u-dana", [], person);
-    expect(view.resolved).toEqual({ at: at.toISOString(), by: "@dana" });
+    expect(view.resolved).toEqual({ at: at.toISOString(), by: "@dana", resolver: expect.objectContaining({ userId: "u-dana", handle: "dana" }) as unknown });
   });
 
   it("should leave the resolver null when their account is gone", () => {

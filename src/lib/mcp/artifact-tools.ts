@@ -24,7 +24,6 @@ import { setArtifactProject } from "@/lib/projects/store";
 import type { TagChange } from "@/lib/tags/rules";
 import { setArtifactComments } from "@/lib/sharing/comments";
 import { requestArtifactSharing } from "@/lib/sharing/service";
-import { siteUrl } from "@/lib/site-origin";
 import { listTeamsForUser, type TeamMembership } from "@/lib/teams/queries";
 import { COVER_FIELD_DESCRIPTION, COVER_POSITION_DESCRIPTION, COVER_RULE_MESSAGE, resolveCoverChange } from "@/lib/covers/cover";
 import { artifactCoverLimits } from "@/lib/covers/limits";
@@ -35,13 +34,15 @@ import { UserFacingError } from "@/lib/user-facing-error";
 
 import { artifactRefField } from "./artifact-ref-field";
 import { SEARCH_QUERY_MAX_CHARS, SEARCH_TEXT_MAX_CHARS, searchWithReferenced } from "./artifact-ref-search";
-import { toMcpArtifact, toMcpListItem, type McpViewContext } from "./artifact-view";
+import { toMcpArtifact, toMcpListItem } from "./artifact-view";
 import { asSaved, baseVersionField, baseVersionOf, editConflictResult } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
-import { savedMentions, teamsListResult } from "./mention-tools";
+import { savedMentions } from "./mention-tools";
 import { applyTagChangeFor, tagChangeFields, tagChangeFor, tagFilterField, tagFilterFor, tagsField } from "./tag-tools";
 import { artifactToolCopy } from "./routing-copy";
+import { teamsListResult } from "./teams-list";
 import { gateTools, type ToolServer } from "./tool-access";
+import { baseViewContext, withActors, withActorsAfterSave } from "./view-context";
 
 const visibilityField = z
   .enum(artifactVisibilities)
@@ -141,12 +142,7 @@ async function respond(run: () => Promise<unknown>) {
 /** Per-call context: the caller's teams, for slugs in and out. */
 async function loadContext(userId: string) {
   const teams = await listTeamsForUser(userId);
-  const view: McpViewContext = {
-    viewerId: userId,
-    teamSlugs: new Map(teams.map((team) => [team.id, team.slug])),
-    urlFor: (publicId) => siteUrl(`/artifact/${publicId}`),
-  };
-  return { teams, view };
+  return { teams, view: baseViewContext(userId, teams) };
 }
 
 function teamBySlug(teams: TeamMembership[], slug: string) {
@@ -276,7 +272,10 @@ function registerReadTools(server: ToolServer, userId: string) {
       // A query that is an artifact's id or link names that artifact, wherever it lives: it comes first when no filter narrows the list.
       const filtered = project !== undefined || (tags?.length ?? 0) > 0;
       const search = (text: string | undefined) => listArtifacts(userId, { scope: scopeFor(teams, scope), query: text, project: projectFilterFor(project), tags: tagFilterFor(tags), limit });
-      return (await searchWithReferenced({ userId, query, filtered, limit, search })).map((item) => toMcpListItem(item, view));
+      const items = await searchWithReferenced({ userId, query, filtered, limit, search });
+      // Every author and saver in the list, looked up together: one round trip, never one per item.
+      const named = await withActors(view, items);
+      return items.map((item) => toMcpListItem(item, named));
     }),
   );
 
@@ -287,13 +286,14 @@ function registerReadTools(server: ToolServer, userId: string) {
       inputSchema: { id: artifactRefField(userId) },
     },
     ({ id }) => respond(async () => {
-      const [loaded, { view }] = await Promise.all([loadArtifactForViewer(id, userId), loadContext(userId)]);
+      const [loaded, { view }] = await Promise.all([loadArtifactForViewer(id, userId, { editingFlags: true }), loadContext(userId)]);
       if (!loaded) throw new UserFacingError("Artifact not found.");
-      // A connection that cannot edit a CSV whose owner turned downloads off gets it without its content.
-      const read = { ...toMcpArtifact(loaded.dto, view, { canEdit: loaded.viewable.canEdit }), version: loaded.viewable.version.source, editPending: loaded.viewable.editPending };
       // Editors read the latest version: they get its id and the baseVersion to send back with an update.
-      if (!loaded.viewable.canEdit || loaded.viewable.version.source !== "latest") return read;
-      return { ...read, ...(await baseVersionOf(loaded.dto.id, loaded.dto.updatedAt)) };
+      const editsLatest = loaded.viewable.canEdit && loaded.viewable.version.source === "latest";
+      const [named, base] = await Promise.all([withActors(view, [loaded.dto]), editsLatest ? baseVersionOf(loaded.dto.id, loaded.dto.updatedAt) : null]);
+      // A connection that cannot edit a CSV whose owner turned downloads off gets it without its content.
+      const read = { ...toMcpArtifact(loaded.dto, named, { canEdit: loaded.viewable.canEdit }), version: loaded.viewable.version.source, editPending: loaded.viewable.editPending };
+      return base ? { ...read, ...base } : read;
     }),
   );
 
@@ -321,8 +321,9 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
       const created = await createArtifact(userId, { ...input, cover: coverFor(cover, coverPosition, null) }, { harness: await harness(), actor: "agent" });
       const result = await shareAfterSave(userId, created, teams, { visibility, team, comments });
       // What the agent created, with the token of that save, even if someone saved since (asSaved).
-      const artifact = { ...toMcpArtifact(asSaved(result.artifact, created), view, { canEdit: true }), ...(await baseVersionOf(created.id, created.updatedAt)) };
-      const mentions = await savedMentions(created.id, userId);
+      const shown = asSaved(result.artifact, created);
+      const [named, base, mentions] = await Promise.all([withActorsAfterSave(view, [shown]), baseVersionOf(created.id, created.updatedAt), savedMentions(created.id, userId)]);
+      const artifact = { ...toMcpArtifact(shown, named, { canEdit: true }), ...base };
       return { artifact, sharing: result.sharing, comments: result.comments, ...(mentions ? { mentions } : {}) };
     }),
   );
@@ -357,10 +358,15 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
       const result = await shareAfterSave(userId, artifact, teams, { visibility, team, comments });
       // The agent's own save and its baseVersion, for its next update: never a later read that names a save it never saw (asSaved).
       // With no save ("unchanged") there is no base of its own to hand back, so none is: the agent keeps the one it has.
-      const ownBase = saved.edit === "unchanged" ? {} : await baseVersionOf(record.id, saved.artifact.updatedAt);
-      const current = { ...toMcpArtifact(asSaved(result.artifact, saved.artifact), view, { canEdit: true }), ...ownBase };
+      const shown = asSaved(result.artifact, saved.artifact);
       // What the text's @handles do, when this call changed the text or who can read it.
-      const mentions = input.content !== undefined || visibility !== undefined ? await savedMentions(record.id, userId) : null;
+      const reportsMentions = input.content !== undefined || visibility !== undefined;
+      const [named, ownBase, mentions] = await Promise.all([
+        withActorsAfterSave(view, [shown]),
+        saved.edit === "unchanged" ? {} : baseVersionOf(record.id, saved.artifact.updatedAt),
+        reportsMentions ? savedMentions(record.id, userId) : null,
+      ]);
+      const current = { ...toMcpArtifact(shown, named, { canEdit: true }), ...ownBase };
       return { artifact: current, edit: saved.edit, sharing: result.sharing, comments: result.comments, ...(mentions ? { mentions } : {}) };
     }),
   );

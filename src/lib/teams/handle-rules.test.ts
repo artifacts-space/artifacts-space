@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { fakeDatabaseUrl } from "@/test/fake-database-url";
 
-import { groupTeamHandles, type TeamHandleRow } from "./handle-rules";
+import { groupTeamHandles, memberRole, type TeamHandleRow } from "./handle-rules";
 import { teamHandlesQuery } from "./team-handles";
 
 const row = (teamId: string, userId: string, handle: string | null, isAgent = false): TeamHandleRow => ({ teamId, userId, handle, name: userId.toUpperCase(), isAgent });
@@ -38,6 +38,18 @@ describe("groupTeamHandles", () => {
   });
 });
 
+describe("memberRole", () => {
+  it("should give the role that applies, as effectiveRoleKey decides it, with a custom role's name", () => {
+    expect(memberRole({ role: "admin", customKey: null, customName: null, isAgent: false })).toEqual({ roleKey: "admin" });
+    expect(memberRole({ role: "member", customKey: "reviewer", customName: "Reviewer", isAgent: false })).toEqual({ roleKey: "reviewer", customRoleName: "Reviewer" });
+    expect(memberRole({ role: "member", customKey: "reviewer", customName: "Reviewer", isAgent: true })).toEqual({ roleKey: "agent" });
+  });
+
+  it("should never let a custom assignment named like a built-in role stand in for it", () => {
+    expect(memberRole({ role: "member", customKey: "owner", customName: "Owner", isAgent: false })).toEqual({ roleKey: "member" });
+  });
+});
+
 describe("teamHandlesQuery", () => {
   const db = drizzle({ client: neon(fakeDatabaseUrl()) });
 
@@ -48,6 +60,9 @@ describe("teamHandlesQuery", () => {
     expect(sql).toMatch(/where "team_member"\."team_id" = \$1/);
     expect(sql).not.toMatch(/"(\w+)" = "\1"(?!\.)/);
     expect(sql).not.toContain('"email"');
+    // The custom role is the member's own, in this team; the owner is the agent's.
+    expect(sql).toContain('"assigned_role"."team_id" = "team_member"."team_id"');
+    expect(sql).toContain('left join "user" "agent_owner" on "agent_owner"."id" = "agent"."owner_id"');
     expect(params).toContain("crew");
   });
 });

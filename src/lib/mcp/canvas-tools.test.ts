@@ -21,6 +21,7 @@ const data = vi.hoisted(() => ({
   frameImageStatesFor: vi.fn(),
   readFrameImage: vi.fn(),
 }));
+vi.mock("@/lib/mcp/actors", async (importOriginal) => ({ ...(await importOriginal<object>()), loadMcpActors: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/canvas/capture-read", () => ({ frameImageStatesFor: data.frameImageStatesFor, readFrameImage: data.readFrameImage }));
 vi.mock("@/lib/artifacts", () => ({ updateArtifact: data.updateArtifact }));
 vi.mock("@/lib/access", () => ({ getEditableArtifact: data.getEditableArtifact }));
@@ -96,7 +97,7 @@ describe("canvas_frames_list", () => {
     const result = await call("canvas_frames_list", { id: publicId });
     expect(data.loadArtifactForViewer).toHaveBeenCalledWith(publicId, "agent-1");
     expect(result.json()).toEqual({
-      id: publicId, title: "Checkout flow", url: `https://artifacts.space/artifact/${publicId}`, version: "latest", editPending: false,
+      id: publicId, title: "Checkout flow", url: `https://artifacts.space/artifact/${publicId}`, version: "latest", editPending: false, updatedAt: "2026-11-11T13:08:00.123Z", updatedBy: null,
       frames: [
         { id: "home", name: "Screen home", width: 390, height: null, padding: "md", position: { x: 0, y: 0, auto: true }, elements: 1, problems: 0 },
         { id: "pricing", name: "Screen pricing", width: 390, height: null, padding: "md", position: { x: 470, y: 0, auto: true }, elements: 1, problems: 0 },

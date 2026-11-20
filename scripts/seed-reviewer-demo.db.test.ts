@@ -189,12 +189,13 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
     const versions = await call<McpVersion[]>("artifacts_versions", { id: roadmap.id });
 
     expect(versions).toHaveLength(3);
-    expect(versions.map((version) => version.savedBy)).toEqual(Array(3).fill({ handle: reviewer.handle, kind: "person" }));
+    // The reviewer reads their own name too: a caller counts as their own teammate.
+    expect(versions.map((version) => version.savedBy)).toEqual(Array(3).fill(expect.objectContaining({ handle: reviewer.handle, kind: "person" })));
     expect(roadmap.content).toBe(rules.roadmapVersions[2]);
   });
 
   it("should show no acme-finance team and nothing to approve when the reviewer checks teams and requests", async () => {
-    const teams = await call<{ slug: string; personal: boolean }[]>("teams_list");
+    const { teams } = await call<{ teams: { slug: string; personal: boolean }[] }>("teams_list");
     const memberOf = getDb().select({ teamId: teamMember.teamId }).from(teamMember).where(eq(teamMember.userId, reviewer.id));
     const pending = await getDb().select({ id: sharingRequest.id }).from(sharingRequest).where(and(eq(sharingRequest.status, "pending"), inArray(sharingRequest.teamId, memberOf)));
 

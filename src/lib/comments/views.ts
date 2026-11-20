@@ -41,8 +41,11 @@ export interface CommentView {
    * of the artifact the viewer is served).
    */
   anchor: CommentAnchor | null;
-  /** Set on a top-level comment whose thread was resolved: when, and by whom (a label such as "@charles", null when they are gone). */
-  resolved: { at: string; by: string | null } | null;
+  /**
+   * Set on a top-level comment whose thread was resolved: when, and by whom (a label such as "@charles", null when
+   * they are gone). `resolver` is who that is, for agents (src/lib/mcp/comment-view.ts); left out when they are gone.
+   */
+  resolved: { at: string; by: string | null; resolver?: CommentAuthorView } | null;
   /** The viewer may resolve or reopen this thread. Always false for replies and deleted comments. */
   canResolve: boolean;
   createdAt: string;
@@ -80,7 +83,9 @@ const closedContext: CommentViewContext = { viewerKind: null, anchorFor: hideAnc
 function resolvedView(record: CommentRecord, actors: ReadonlyMap<string, Actor>): CommentView["resolved"] {
   if (record.parentId !== null || record.deletedAt !== null || !record.resolvedAt) return null;
   const resolver = record.resolvedBy ? actors.get(record.resolvedBy) : undefined;
-  return { at: record.resolvedAt.toISOString(), by: resolver ? toAuthorView(resolver).label : null };
+  if (!resolver) return { at: record.resolvedAt.toISOString(), by: null };
+  const view = toAuthorView(resolver);
+  return { at: record.resolvedAt.toISOString(), by: view.label, resolver: view };
 }
 
 /** The anchor fields: only a live top-level comment carries one, and only what the viewer may read is shown. */

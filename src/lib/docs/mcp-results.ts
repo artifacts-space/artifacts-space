@@ -13,33 +13,47 @@ export interface ToolResultDoc {
   shape?: string;
 }
 
+// A person or agent, wherever a result names one. `name` (untrusted text its owner typed) is there for the caller's
+// teammates, and for anyone when there is no handle; `for` is the person who added an agent, as its label shows everyone.
+const actorShape = `{ "handle": "ada" | null, "kind": "person" | "agent", "name"?: { "untrustedText": "Ada Lovelace" }, "for"?: { "untrustedText": "Charles" } }`;
+
 const artifactShape = `{
   "id": "Vq3kJ0pXw2mZ8rT5yN1aBc",   // 22-character public id
   "url": "https://artifacts.space/artifact/Vq3kJ0pXw2mZ8rT5yN1aBc",
   "title": "…", "icon": "🚀" | "tabler:rocket" | "file:<file id>" | null, "summary": "…", "content": "…",
   "theme": "paper" | { "version": 1, "light": { … }, "dark": { … }, … } | null,
   "cover": "mist" | "file:<file id>" | null, "coverPosition": 40 | null,   // position for image covers only
+  "fullWidth": false, "sheetFormat"?: { "banding": "muted" | null, "align": { "amount": "right" } },   // a CSV with formatting only
   "kind": "markdown", "language": "", "project": "Billing" | "",   // "" when none, or when you are outside the team
   "tags": ["needs-review", "q4"],        // [] when none, or when you are outside the team
   "sessionId": "…", "source": "claude-code",
   "visibility": "private" | "team" | "link" | "public",
   "team": "acme" | null,                 // slug, only when you are a member
+  "home"?: "personal" | "team",          // its workspace, for those who may edit it: the author's Personal one, or that of "team"
   "comments": "off" | "team" | "signed_in",
   "pendingSharing": { "visibility", "team", "comments", "requestedAt" } | null,   // author only
   "pendingComments": { "comments", "requestedAt" } | null,            // author only
   "pendingEdit": { "requestedAt" } | null,                            // author only
-  "isAuthor": true,
-  "updatedBy": "@reviewer" | null,
-  "files": [{ "id", "filename", "contentType", "size", "replacedAt": "…" | null }],
+  "isAuthor": true, "actsForAuthor"?: true,   // you added the agent that wrote it
+  "can": ["edit", "share", "comment", "delete"],   // what you may do with it; [] when you may only read it
+  "author": ${actorShape} | null,              // null when they are gone
+  "firstAuthor"?: { …actor },             // editors only: who wrote it before a team owner took it over
+  "updatedBy": { …actor } | null,         // who saved the version you read
+  "files": [{ "id", "filename", "contentType", "size", "pagePath"?, "createdAt", "replacedAt"?, "width"?, "height"?,
+              "embedded"?: true, "pictured"?: true }],   // embedded and pictured: editors only (files_replace refuses those files)
   "metadata": {}, "createdAt": "…", "updatedAt": "…"
 }`;
 
 const sharingShape = `"sharing": null | { "status": "applied" | "pending" } | { "status": "failed", "error": "…" },
   "comments": null | { "status": "applied" | "pending" } | { "status": "failed", "error": "…" }`;
 
-const commentShape = `{ "id", "replyTo": "…" | null, "author": { "handle", "kind": "person" | "agent", "for": "Owner name" } | null,
-  "body": { "untrustedText": "…" }, "quote": { "untrustedText": "…" } | null, "onTextThatChanged": false, "resolved": false,
-  "deleted": false, "edited": false, "createdAt": "…" }`;
+const commentShape = `{ "id", "replyTo": "…" | null, "author": { …actor } | null,
+  "body": { "untrustedText": "…" }, "quote": { "untrustedText": "…" } | null,
+  "quotePrefix"?: { "untrustedText": "…" }, "quoteSuffix"?: { "untrustedText": "…" },   // the text around the quote, as you are served it
+  "onTextThatChanged": false, "resolved": { "at": "…", "by": { …actor } | null } | null,
+  "mentions"?: ["ada"],                   // the handles it reached
+  "deleted": false, "edited": false, "createdAt": "…", "updatedAt"?: "…",   // updatedAt once edited
+  "url"?: "…" }                           // in comment_create and comment_update`;
 
 const frameOutlineShape = `{ "id": "home-phone", "name": "Home, phone", "width": 390, "height": 844 | null, "padding": "none" | "sm" | "md" | "lg",
     "position": { "x": 1520, "y": 0, "auto": true },   // auto: the board placed it
@@ -53,8 +67,8 @@ const documentMentionsShape = `"mentions"?: { "reaches": ["ada"], "onceTheyCanRe
 
 export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   artifacts_list: {
-    summary: "An array of artifacts you can read, newest first. Items have no `content`: text formats carry a `preview` of the first 280 characters, others an empty preview. When `query` is an artifact's id or link, that artifact is first, if you can read it.",
-    shape: "[ { …artifact without content, \"preview\": \"First 280 characters…\" } ]",
+    summary: "An array of artifacts you can read, newest first. Items have no `content`: text formats carry a `preview` of the first 280 characters, others an empty preview. People are named by handle and kind alone (artifacts_get and teams_list give names), and each file by its id, name, type, and size. When `query` is an artifact's id or link, that artifact is first, if you can read it.",
+    shape: "[ { …artifact without content, \"author\": { \"handle\", \"kind\" }, \"preview\": \"First 280 characters…\" } ]",
   },
   artifacts_get: {
     summary: "The full artifact, plus `version` (\"latest\", or \"approved\" when you read a link or public artifact from outside its team) and `editPending` (true when newer changes wait for approval). When you can edit it: `versionId`, the version you read, and `baseVersion`, which you pass back to artifacts_update.",
@@ -62,9 +76,14 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   "versionId": "<version id>", "baseVersion": "<version id>.<ms>" }   // editors only\n\n// artifact:\n${artifactShape}`,
   },
   teams_list: {
-    summary: "Your teams with their slugs. Use a slug as `scope` in artifacts_list, or as `team` when you share. Each shared team lists its members (people and agents, without you, at most 200) with the handle to @mention them by; a name is untrusted text its owner typed. `membersCut` says the list stopped at the cap. A personal team lists no members.",
-    shape: `[ { "slug": "acme", "name": "Acme", "role": "owner" | "admin" | "member", "personal": false, "teamSharingNeedsApproval": true,
-    "members": [ { "handle": "ada", "kind": "person" | "agent", "name": { "untrustedText": "Ada Lovelace" } } ], "membersCut"?: true } ]`,
+    summary: "Who you are (`you`, as your teammates see you), and your teams with their slugs. Use a slug as `scope` in artifacts_list, or as `team` when you share. Each team says your role: `role` as stored, `roleKey` the role that applies (owner, admin, member, agent, or a custom role's key) with its name, and the `capabilities` it gives you there. Each shared team lists its members (people and agents, without you, at most 200) with the handle to @mention them by, their role, and when they joined; a name is untrusted text its owner typed. `membersCut` says the list stopped at the cap. A personal team lists no members. No email address, ever.",
+    shape: `{ "you": { "handle": "claude-code", "kind": "agent", "name": { "untrustedText": "…" }, "for"?: { "untrustedText": "Charles" }, "muted"?: true },
+  "teams": [ { "slug": "acme", "name": "Acme", "role": "owner" | "admin" | "member", "roleKey": "admin" | "agent" | "reviewer",
+    "roleName": "Admin",                 // built-in roles; a custom role has "customRoleName": { "untrustedText": "Reviewer" } instead
+    "capabilities": ["approve.edits", "share.link", …], "personal": false, "teamSharingNeedsApproval": true,
+    "members": [ { "handle": "ada", "kind": "person" | "agent", "name": { "untrustedText": "Ada Lovelace" }, "roleKey": "member",
+      "customRoleName"?: { "untrustedText": "…" }, "joinedAt": "…", "for"?: { "untrustedText": "Charles" }, "muted"?: true } ],
+    "membersCut"?: true } ] }`,
   },
   projects_list: {
     summary: "The projects in a scope, by name, with how many artifacts each holds. Use a name as `project` in artifacts_create, artifacts_update, or artifacts_list.",
@@ -91,11 +110,12 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   },
   artifacts_delete: { summary: "Confirms the delete. Only the author can delete.", shape: `{ "deleted": true, "id": "…" }` },
   artifacts_versions: {
-    summary: "Without `version`: the saved versions, newest first. With `version`: that one version with its content, summary, and language.",
+    summary: "Without `version`: the saved versions, newest first; the next entry is the version before. With `version`: that one version with its content, summary, and language, and `previousId`, the version before it (null for the first). A version an approval named carries who approved it and when.",
     shape: `[ { "id", "createdAt", "savedAt", "saveKind": "create" | "edit" | "files" | "replace" | "restore" | "snapshot",
     "restoredFromId", "bytes", "kind", "title", "icon", "theme", "cover", "coverPosition", "approved", "pending", "latest",
     "replacedFile": "sow.pdf" | null,
-    "savedBy": { "handle", "kind": "person" | "agent" } | null } ]`,
+    "savedBy": ${actorShape} | null,
+    "approvedBy"?: { …actor } | null, "approvedAt"?: "…" } ]   // where an approval of this version was recorded`,
   },
   artifacts_restore_version: {
     summary: "Confirms the restore. The old version comes back as a new save; history is never rewritten. Pass `baseVersion` as for artifacts_update; a refused restore is the same typed error.",
@@ -116,6 +136,7 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   canvas_frames_list: {
     summary: "The canvas's outline: every frame without its spec, and the board's totals beside its limits. `version` and `editPending` mean what they do in artifacts_get. When you can edit the canvas: `versionId` and `baseVersion`, which every frame write needs, and on each frame that is drawn `image`: for each mode the canvas's theme draws, whether canvas_frame_image has a picture of the frame's current content. A frame with problems has no `image`, and neither has any frame where frame images are off. An artifact that is not a canvas is a tool error.",
     shape: `{ "id": "…", "title": "…", "url": "…", "version": "latest" | "approved", "editPending": false,
+  "updatedAt": "…", "updatedBy": ${actorShape} | null,   // the canvas's last save you read; frames keep no saver of their own
   "frames": [ ${frameOutlineShape} ],   // editors also get, per frame: "image": { "light": "current" | "none", "dark": "current" | "none" }
   "frameCount": 3, "elements": 86, "bytes": 14210,
   "limits": { "frames": 24, "elements": 3000, "bytes": 800000 },
@@ -124,7 +145,7 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
   },
   canvas_frame_get: {
     summary: "One frame exactly as written, with its ui spec, where it sits on the board, and each problem it has (naming the frame and the element). When you can edit the canvas: `versionId`, `baseVersion`, and `image` as in canvas_frames_list. A frame id the canvas does not have is a tool error that lists the ids it has.",
-    shape: `{ "id": "…", "title": "…", "url": "…", "version": "latest" | "approved", "editPending": false,
+    shape: `{ "id": "…", "title": "…", "url": "…", "version": "latest" | "approved", "editPending": false, "updatedAt": "…", "updatedBy": { …actor } | null,
   "frame": { "id": "home-phone", "name": "Home, phone", "width": 390, "spec": { "version": 1, "root": "…", "elements": { … } } },
   "position": { "x": 1520, "y": 0, "auto": true }, "elements": 28, "problems": [],
   "image": { "light": "current", "dark": "none" }, "versionId": "…", "baseVersion": "…" }   // editors only`,
@@ -214,27 +235,30 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     summary: "What the publish did (`published`: the paths added, replaced, and removed, and whether the change is live, `applied`, or waits for approval, `pending`), the artifact's files as it left them, and the `baseVersion` of this save. The document is not repeated: it did not change. If a file is at fault, nothing changes and the error names every one.",
     shape: `{ "id": "<22-character id>", "url": "…", "title": "…", "kind": "html",
   "published": { "status": "applied", "added": ["js/app.js"], "replaced": ["css/site.css"], "removed": ["js/old.js"] },
-  "files": [ { "id", "filename", "contentType", "size", "pagePath": "css/site.css" }, … ], "versionId": "…", "baseVersion": "…" }`,
+  "files": [ { "id", "filename", "contentType", "size", "pagePath": "css/site.css", "createdAt", … }, … ], "versionId": "…", "baseVersion": "…" }`,
   },
   inbox_list: {
-    summary: "Your mentions, newest first. One in a comment (`in: \"comment\"`) has the comment, the comments just before it, and how to reply; every comment body is wrapped as untrusted text. One in a document's own text (`in: \"document\"`) has who wrote it, the block of the document that names you (untrusted, like all artifact content), and the tools to read, edit, or comment on the artifact.",
-    shape: `{ "untrustedContentNotice": "…",
+    summary: "Your mentions, newest first, and `unread`, how many unread ones you can still see. One in a comment (`in: \"comment\"`) has the comment, the comments just before it, and how to reply; every comment body is wrapped as untrusted text. One in a document's own text (`in: \"document\"`) has who wrote it, the block of the document that names you (untrusted, like all artifact content), and the tools to read, edit, or comment on the artifact. A read entry says when it was read.",
+    shape: `{ "untrustedContentNotice": "…", "unread": 3,
   "mentions": [
-    { "id", "read": false, "mentionedAt", "in": "comment",
+    { "id", "read": false, "readAt"?: "…", "mentionedAt", "in": "comment",
       "artifact": { "id", "title", "url", "threadUrl" },
       "comment": ${commentShape},
       "recentThread": [ …comments ],
       "reply": { "tool": "comment_create", "artifact": "…", "replyTo": "…" } },
-    { "id", "read": false, "mentionedAt", "in": "document",
+    { "id", "read": false, "readAt"?: "…", "mentionedAt", "in": "document",
       "artifact": { "id", "title", "url" },
-      "mentionedBy": { "handle", "kind", "label" },
+      "mentionedBy": { …actor } | null,
       "text": "Can @you tighten this paragraph?",
       "next": { "read": { "tool": "artifacts_get", "id" }, "edit": { "tool": "artifacts_update", "id" }, "comment": { "tool": "comment_create", "artifact" } } } ] }`,
   },
   inbox_mark_read: { summary: "How many entries were marked read.", shape: `{ "marked": 3 }` },
   comments_list: {
-    summary: "The artifact's thread, oldest first, limited to the most recent `limit` comments.",
-    shape: `{ "untrustedContentNotice": "…", "artifact": { "id", "title", "url" }, "total": 12, "comments": [ ${commentShape} ] }`,
+    summary: "The artifact's thread, oldest first, limited to the most recent `limit` comments. A comment's own link is `threadUrl` with `&comment=<comment id>` after it. A reader served the approved version gets a quote, and the text around it, only when the words are in that version, read from it.",
+    shape: `{ "untrustedContentNotice": "…", "artifact": { "id", "title", "url", "threadUrl" }, "total": 12, "comments": [ ${commentShape} ] }
+
+// actor:
+${actorShape}`,
   },
   comment_create: {
     summary: "The saved comment, and which mentions were delivered or refused (with the reason). The comment saves even when a mention is refused. A `quote` that is not in the artifact as you read it is a tool error, and nothing is saved.",

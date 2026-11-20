@@ -379,6 +379,32 @@ catch this, so test the generated SQL with `.toSQL()`, as
   `artifacts_create` and `artifacts_update`; a test fails when a tool takes
   either input without it. ChatGPT
   asks before every tool without `readOnlyHint`, and Pro offers only those.
+- Agents get the full data model (the owner, 2026-11-20: "agents need the
+  full data model - no exceptions. who what when where why"). For the same
+  caller, an MCP result gives an agent everything the web app shows that
+  person about the same thing: who wrote, saved, resolved, or approved it,
+  in one actor shape (`McpActor` in `src/lib/mcp/actors.ts`); what the
+  caller may do (`can`, decided by the server's own rules in
+  `src/lib/mcp/caller-rules.ts`, never a copy of them); when; and where it
+  lives (`home`). The rule lifts nothing that depends on who the caller is:
+  - A reader served the approved version never gets the latest, nor who
+    saved it.
+  - Comment quotes, and the text around them, come only through the anchor
+    gate (`served-anchors.ts`), read from the text that reader is served.
+  - Team theme names stay "Custom" outside the team (`theme-privacy.ts`).
+  - Projects, tags, `home`, `firstAuthor`, and files' `embedded` and
+    `pictured` go to editors only; `pending*` to the author or to whoever
+    `actsForAuthor`.
+  - A person's or agent's name goes only to their teammates
+    (`teammatesAmong` in `src/lib/teams/teammates.ts`), and to everyone
+    only where the web's label shows it: someone without a handle, and an
+    agent's owner (`for`). Never an email address, a token, or a key.
+  A list names people in their short form (`shortActor`) and looks them up
+  in one batch, never a query per row; `src/lib/mcp/full-data-model.db.test.ts`
+  counts the statements of `artifacts_list` and checks each field from the
+  side of a caller who may not see it. A new result field is documented in
+  `src/lib/docs/mcp-results.ts`, left out while it is null or false where
+  those docs say so, and a field only some callers may see gets such a test.
 - Agents can request sharing but never approve it.
 - GitHub and Google sign-in (`src/lib/auth/social-auth-options.ts`, rules in
   `google-sign-in-rules.ts` and `social-request-rules.ts`):
