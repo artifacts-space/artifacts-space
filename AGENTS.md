@@ -2319,7 +2319,8 @@ short:
   files, which the rule that keeps a dropped file restorable reads
   (`dropsShownImage`; `content-file-lifecycle.db.test.ts` fails without it).
   Never read `latestVersion` (the whole row) on the private or team save
-  path. A link or public save still reads it (`planSave` in
+  path, apart from `ensureHistoryStart`, which runs once, when the artifact
+  has no version yet. A link or public save still reads it (`planSave` in
   `src/lib/versions/save-write.ts`): it decides whether the write reuses
   the latest version, inside the one statement that writes both.
 - History is pruned only when a save added a version row (`fileSave`'s
