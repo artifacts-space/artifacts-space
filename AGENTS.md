@@ -1857,11 +1857,16 @@ Markdown an agent reads agrees with the page. Every save of content
 
 - Who can be reached is the comment rule (`mentionRefusal`) with the
   comments setting left out, and an agent's save notifies people only.
-- A recipient is told once per artifact (the first save, or sharing change
-  through `setVisibility`, that finds their handle while they can read it),
-  and again only when the handle is added
-  anew after they read the earlier one. At most `MAX_MENTIONS_PER_SAVE` a
-  save; the rest are told by a later save.
+- A recipient is told once per artifact, by the first save that finds their
+  handle in the text they are served, and again only when the handle is
+  added anew after they read the earlier one. Anything else that changes
+  who is served the text calls `notifyDocumentMentionsAfterSharing`:
+  `setVisibility`, an approved sharing request (`approve`) and an approved
+  edit (`applyDecision`), all in `src/lib/sharing/service.ts`. A new path
+  that shares an artifact or moves its approved version calls it too.
+- At most `MAX_MENTIONS_PER_SAVE` a save; the rest are told by a later save.
+  A save looks up at most `MAX_DOCUMENT_HANDLES` handles that have nobody
+  told yet, so only handles that reach nobody stay in that window.
 - The stored row is a `mention` with no `comment_id` (one per artifact and
   recipient, `actor_id` the writer) and, for people, a `notification` of type
   `mention` with no comment. A deployment from before 0051 hides both: it

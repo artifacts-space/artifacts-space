@@ -247,6 +247,8 @@ async function approve(request: typeof sharingRequest.$inferSelect, deciderId: s
   await rehomeProjectQuietly(request.artifactId);
   await cancelPendingComments(request.artifactId, deciderId);
   await syncApprovedVersion(request.artifactId, deciderId);
+  // As in setVisibility: the people the text names who can read it from now on are told.
+  notifyDocumentMentionsAfterSharing(request.artifactId);
 }
 
 /**
@@ -267,6 +269,8 @@ export async function decideSharingRequest(input: { deciderId: string; requestId
 async function applyDecision(request: typeof sharingRequest.$inferSelect, input: { deciderId: string; approve: boolean }) {
   if (request.kind === "edit") {
     await decideEditRequest(request, input.deciderId, input.approve);
+    // An approved edit is the text readers outside the team are served from now on: a mention in it reaches them here.
+    if (input.approve) notifyDocumentMentionsAfterSharing(request.artifactId);
     return;
   }
   if (request.kind === "comments" && input.approve) {

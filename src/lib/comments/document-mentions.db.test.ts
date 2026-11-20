@@ -21,8 +21,10 @@ describe.runIf(Boolean(databaseUrl))("mentions in a document's own text", async 
   const { and, eq, inArray, isNull, like } = await import("drizzle-orm");
   const { getDb } = await import("@/db");
   const { notification } = await import("@/db/notification-schema");
-  const { agent, artifact, artifactVersion, mention, rateLimitBucket, team, teamMember, user } = await import("@/db/schema");
-  const { updateArtifact } = await import("@/lib/artifacts");
+  const { agent, artifact, artifactVersion, mention, rateLimitBucket, sharingRequest, team, teamMember, user } = await import("@/db/schema");
+  const { createArtifact, updateArtifact } = await import("@/lib/artifacts");
+  const { encodeBaseVersion } = await import("@/lib/edits/edit-conflict-rules");
+  const { decideSharingRequest } = await import("@/lib/sharing/service");
   const { listNotifications, markNotificationsRead } = await import("@/lib/notifications/feed");
   const { generatePublicId } = await import("@/lib/public-id");
   const { deliverDocumentMentions, deliverDocumentMentionsAfterSharing } = await import("./document-mentions");
@@ -31,7 +33,7 @@ describe.runIf(Boolean(databaseUrl))("mentions in a document's own text", async 
   const tag = randomUUID().slice(0, 8);
   const id = (name: string) => `docmention-${tag}-${name}`;
   const handle = (name: string) => `${name}-${tag}`;
-  const ids = { writer: id("writer"), ada: id("ada"), outsider: id("outsider"), claude: id("claude"), helper: id("helper"), crew: id("crew") };
+  const ids = { writer: id("writer"), ada: id("ada"), outsider: id("outsider"), claude: id("claude"), helper: id("helper"), crew: id("crew"), press: id("press") };
   const docs: string[] = [];
 
   type Row = typeof artifact.$inferSelect;
@@ -72,8 +74,10 @@ describe.runIf(Boolean(databaseUrl))("mentions in a document's own text", async 
       { id: ids.claude, name: "Claude", email: `${ids.claude}@example.com`, username: handle("claude") },
       { id: ids.helper, name: "Helper", email: `${ids.helper}@example.com`, username: handle("helper") },
     ]);
-    await db.insert(team).values({ id: ids.crew, name: "Crew", slug: ids.crew, personal: false });
+    // The press team is the writer's alone: Ada, their teammate in the crew, reads its public artifacts as an outside reader.
+    await db.insert(team).values([{ id: ids.crew, name: "Crew", slug: ids.crew, personal: false }, { id: ids.press, name: "Press", slug: ids.press, personal: false }]);
     await db.insert(teamMember).values([
+      { id: id("m-press"), teamId: ids.press, userId: ids.writer, role: "owner" },
       { id: id("m-writer"), teamId: ids.crew, userId: ids.writer, role: "owner" },
       { id: id("m-ada"), teamId: ids.crew, userId: ids.ada, role: "member" },
       { id: id("m-claude"), teamId: ids.crew, userId: ids.claude, role: "member" },
@@ -100,7 +104,7 @@ describe.runIf(Boolean(databaseUrl))("mentions in a document's own text", async 
     }
     await db.delete(agent).where(inArray(agent.userId, people));
     // The team goes whole: its members cannot be removed one by one down to none (team_keeps_an_owner).
-    await db.delete(team).where(eq(team.id, ids.crew));
+    await db.delete(team).where(inArray(team.id, [ids.crew, ids.press]));
     await db.delete(rateLimitBucket).where(like(rateLimitBucket.key, `%docmention-${tag}-%`));
     await db.delete(user).where(inArray(user.id, people));
   });
@@ -179,6 +183,51 @@ describe.runIf(Boolean(databaseUrl))("mentions in a document's own text", async 
     // Another sharing change tells nobody again.
     await deliverDocumentMentionsAfterSharing(doc.id);
     expect(sendMentionEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("should tell the people the text names when an owner approves the request that shares it with their team", async () => {
+    const doc = await makeDoc("# Draft\n", { visibility: "private", teamId: null, comments: "off" });
+    await save(doc, `For @${handle("ada")}.\n`);
+    expect(await mentionsOf(doc.id)).toEqual([]);
+    const requestId = id(`request-${doc.id}`);
+    await getDb().insert(sharingRequest).values({ id: requestId, artifactId: doc.id, teamId: ids.crew, requestedBy: ids.writer, kind: "sharing", visibility: "team", comments: "team" });
+
+    await decideSharingRequest({ deciderId: ids.writer, requestId, approve: true });
+
+    // The delivery runs after the response; outside a request it starts at once and is not awaited.
+    await vi.waitFor(async () => { expect(await mentionsOf(doc.id)).toEqual([{ recipientId: ids.ada, actorId: ids.writer, readAt: null }]); }, { timeout: 5000 });
+    expect(sendMentionEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("should tell a reader outside the team only once the edit that names them is approved", async () => {
+    const created = await createArtifact(ids.writer, { title: "Notes", content: "# Notes\n\nNothing yet.\n" });
+    docs.push(created.id);
+    const [shared] = await getDb().update(artifact).set({ teamId: ids.press, visibility: "public" }).where(eq(artifact.id, created.id)).returning();
+    if (!shared) throw new Error("The test artifact is gone.");
+
+    // An agent's edit to a public artifact waits for approval: outside readers keep the approved text.
+    const edited = await updateArtifact(ids.writer, created.id, { content: `# Notes\n\nOver to @${handle("ada")}.\n` }, "agent", { harness: { harness: "claude-code", label: null }, baseVersion: encodeBaseVersion({ versionId: null, updatedAt: shared.updatedAt }) });
+    expect(edited?.pendingEdit).not.toBeNull();
+    const [request] = await getDb().select().from(sharingRequest).where(and(eq(sharingRequest.artifactId, created.id), eq(sharingRequest.kind, "edit"), eq(sharingRequest.status, "pending")));
+    if (!request) throw new Error("The edit was not filed for approval.");
+    await deliverDocumentMentions({ before: shared, after: { ...shared, content: `# Notes\n\nOver to @${handle("ada")}.\n` }, editorId: ids.writer });
+    expect(await mentionsOf(created.id)).toEqual([]);
+
+    await decideSharingRequest({ deciderId: ids.writer, requestId: request.id, approve: true });
+
+    await vi.waitFor(async () => { expect(await mentionsOf(created.id)).toEqual([{ recipientId: ids.ada, actorId: ids.writer, readAt: null }]); }, { timeout: 5000 });
+  });
+
+  it("should reach a handle past the look-up window once the handles before it have been told or reach nobody", async () => {
+    // Fifty handles that reach nobody fill one save's window; Ada is the fifty-first.
+    const unknown = Array.from({ length: 49 }, (_, index) => `@nobody${String(index)}-${tag}`).join(" ");
+    const doc = await makeDoc("# Plan\n");
+    const first = await save(doc, `${unknown} @${handle("claude")} @${handle("ada")}\n`);
+    expect((await mentionsOf(doc.id)).map((row) => row.recipientId)).toEqual([ids.claude]);
+
+    // Claude has been told, so the window now reaches Ada.
+    await save(first, `${first.content}\nMore.\n`);
+    expect((await mentionsOf(doc.id)).map((row) => row.recipientId)).toEqual([ids.ada, ids.claude]);
   });
 
   it("should tell nobody when the artifact is not Markdown", async () => {

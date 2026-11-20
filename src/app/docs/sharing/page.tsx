@@ -138,7 +138,7 @@ export default function SharingPage() {
         <blockquote>{refusalMessage("reviewer", "loop_limit")}</blockquote>
         <p>
           A mention also works in a Markdown artifact&apos;s own text: write <code>@handle</code> in the document, and saving it notifies that teammate or agent, whether a person or an agent saved it. The same people and agents can be reached as from a comment, and
-          the artifact&apos;s comments setting does not matter. Someone named in a private draft is told when it is shared with them. They are told once per artifact, and again only when their handle is added anew after they read the earlier mention. A save notifies up to {MAX_MENTIONS_PER_SAVE}; the rest hear on a later save. An
+          the artifact&apos;s comments setting does not matter. Someone named in a private draft is told when it is shared with them, and someone who reads the approved version is told when the edit that names them is approved. They are told once per artifact, and again only when their handle is added anew after they read the earlier mention. A save notifies up to {MAX_MENTIONS_PER_SAVE}; the rest hear on a later save. An
           agent&apos;s save notifies people only, never other agents. The inbox shows the paragraph that names them, from the version they may read: someone who reads an approved version hears of a mention once that version includes it and the artifact is saved
           again, and a mention taken out of the text leaves the inbox.
         </p>

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, mention, user, type ArtifactRecord } from "@/db/schema";
@@ -47,24 +47,15 @@ function isReachable(candidate: MentionCandidate, writer: Actor): candidate is R
   return candidate.userId !== null && candidate.userId !== writer.userId && mentionRefusal(candidate, writer.kind === "agent") === null;
 }
 
-/** Whether each stored document mention of these recipients on this artifact was read. */
-async function storedMentions(artifactId: string, recipientIds: string[]): Promise<Map<string, { read: boolean }>> {
-  const rows = await getDb()
-    .select({ recipientId: mention.recipientId, readAt: mention.readAt })
-    .from(mention)
-    .where(and(eq(mention.artifactId, artifactId), isNull(mention.commentId), inArray(mention.recipientId, recipientIds)));
-  return new Map(rows.map((row) => [row.recipientId, { read: row.readAt !== null }]));
-}
-
 /**
- * Whether this save has nobody to tell, from one query: every handle the
- * text names already has a stored mention, and none was added anew after its
- * earlier one was read. The common case for an autosave of a document that
- * mentions people, so it stops here before any other lookup. A handle that
- * reaches nobody (unknown, the writer's own) never has a row, so such a
- * document takes the full path each time.
+ * The handles this save still has to look up, at most MAX_DOCUMENT_HANDLES,
+ * from one query. A handle whose
+ * mention is stored and was not added anew after being read needs nothing,
+ * so an autosave of a document that mentions people stops here, and the
+ * window moves on past everyone already told. A handle that reaches nobody
+ * (unknown, the writer's own) never has a row and is looked up by each save.
  */
-async function nothingDue(save: DocumentSave, handles: readonly string[]): Promise<boolean> {
+async function handlesToLookUp(save: DocumentSave): Promise<string[]> {
   const rows = await getDb()
     .select({ handle: user.username, readAt: mention.readAt })
     .from(mention)
@@ -72,10 +63,9 @@ async function nothingDue(save: DocumentSave, handles: readonly string[]): Promi
     .where(and(eq(mention.artifactId, save.after.id), isNull(mention.commentId)));
   const stored = new Map(rows.flatMap((row) => (row.handle ? [[row.handle, { read: row.readAt !== null }] as const] : [])));
   const added = addedOf(save);
-  return handles.every((handle) => {
-    const known = stored.get(handle);
-    return known !== undefined && documentMentionStep({ stored: known, added: added.has(handle) }) === "keep";
-  });
+  return parseMentions(save.after.content)
+    .filter((handle) => documentMentionStep({ stored: stored.get(handle) ?? null, added: added.has(handle) }) !== "keep")
+    .slice(0, MAX_DOCUMENT_HANDLES);
 }
 
 /** The handles this save added. Text that was not Markdown before counts as none. */
@@ -89,16 +79,11 @@ async function servedTheMention(publicId: string, candidate: Reachable): Promise
   return viewable?.view.kind === "markdown" && parseMentions(viewable.view.content).includes(candidate.handle);
 }
 
-/** The reachable people and agents this save should tell, at most MAX_MENTIONS_PER_SAVE. */
-async function dueMentions(save: DocumentSave, writer: Actor, threadMutes: ReadonlySet<string>): Promise<Reachable[]> {
+/** The reachable people and agents among these handles, at most MAX_MENTIONS_PER_SAVE, whose served text names them. */
+async function dueMentions(save: DocumentSave, handles: string[], writer: Actor, threadMutes: ReadonlySet<string>): Promise<Reachable[]> {
   const { after } = save;
-  const handles = parseMentions(after.content).slice(0, MAX_DOCUMENT_HANDLES);
   const candidates = await mentionCandidates(handles, after, writer.userId, threadMutes, "document");
-  const reachable = candidates.filter((candidate) => isReachable(candidate, writer));
-  if (reachable.length === 0) return [];
-  const stored = await storedMentions(after.id, reachable.map((candidate) => candidate.userId));
-  const added = addedOf(save);
-  const due = reachable.filter((candidate) => documentMentionStep({ stored: stored.get(candidate.userId) ?? null, added: added.has(candidate.handle) }) !== "keep").slice(0, MAX_MENTIONS_PER_SAVE);
+  const due = candidates.filter((candidate) => isReachable(candidate, writer)).slice(0, MAX_MENTIONS_PER_SAVE);
   const served = await Promise.all(due.map((candidate) => servedTheMention(after.publicId, candidate)));
   return due.filter((_, index) => served[index]);
 }
@@ -126,14 +111,14 @@ async function storeMentions(artifactId: string, writerId: string, recipients: r
 export async function deliverDocumentMentions(save: DocumentSave): Promise<void> {
   const { after } = save;
   if (after.kind !== "markdown" || !after.content.includes("@")) return;
-  const handles = parseMentions(after.content).slice(0, MAX_DOCUMENT_HANDLES);
-  if (handles.length === 0 || (await nothingDue(save, handles))) return;
+  const handles = await handlesToLookUp(save);
+  if (handles.length === 0) return;
   const [actors, threadMutes] = await Promise.all([loadActors([save.editorId]), threadMutedAgentIds(after.id)]);
   const writer = actors.get(save.editorId);
   if (!writer) return;
   // A muted agent notifies nobody, as in a thread.
   if (writer.kind === "agent" && (writer.teamMuted || threadMutes.has(writer.userId))) return;
-  const due = await dueMentions(save, writer, threadMutes);
+  const due = await dueMentions(save, handles, writer, threadMutes);
   if (due.length === 0) return;
   const people = due.filter((candidate) => candidate.kind === "person").map((candidate) => candidate.userId);
   // Someone with an unread mention on this artifact already had its email.
@@ -154,9 +139,11 @@ export function notifyDocumentMentions(save: DocumentSave): void {
 }
 
 /**
- * After a sharing change: the people and agents the text already names who
- * can read it now are told, as if whoever saved it last had just saved it.
- * Nothing in the text is new, so nobody already told hears again.
+ * After a change to who is served the text (sharing applied or approved, or
+ * an edit approved for readers outside the team): the people and agents the
+ * text already names who can read it now are told, as if whoever saved it
+ * last had just saved it. Nothing in the text is new, so nobody already told
+ * hears again.
  */
 export async function deliverDocumentMentionsAfterSharing(artifactId: string): Promise<void> {
   const [row] = await getDb().select().from(artifact).where(eq(artifact.id, artifactId)).limit(1);
