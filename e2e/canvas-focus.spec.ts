@@ -49,6 +49,38 @@ test.describe("on a desktop", () => {
     expect(await atRestInView()).toBe(true);
   });
 
+  test("should bring a control into view when focus moves to it during a glide and the board's box cannot scroll as far as the control", async ({ page }) => {
+    await open(page, "flow", "board");
+    await page.getByRole("button", { name: /Show at 100%/ }).click();
+    await expect(board(page)).toHaveAttribute("data-canvas-zoom", "100%");
+    await boardAtRest(page);
+    const pane = await boxOf(board(page));
+    const alerts = frame(page, "settings").getByRole("switch", { name: "Push alerts" });
+    // A scroll of the board's box stops where its scrollable content ends. On a page that has just loaded on a fresh
+    // dev server that was 80 pixels, far short of the control (CI, 20 Nov 2026). Made certain here: any scroll asked of
+    // an element moves the box 80 pixels at most. The browser's own focus scroll is not touched.
+    await page.evaluate(() => {
+      HTMLElement.prototype.scrollIntoView = function scrollShort(this: HTMLElement) {
+        const box = this.closest("[data-canvas-board]");
+        if (box) box.scrollLeft += 80;
+      };
+    });
+    const glide = await alerts.evaluate(async (control: HTMLElement) => {
+      const pane = control.closest("[data-canvas-board]");
+      const moving = pane?.querySelector("[data-canvas-world]");
+      if (!pane || !moving) return "missing";
+      pane.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", shiftKey: true, bubbles: true, cancelable: true }));
+      await new Promise<void>((resolve) => { queueMicrotask(resolve); });
+      const running = moving.getAnimations({ subtree: false }).length > 0;
+      control.focus();
+      return running ? "gliding" : "at rest";
+    });
+    expect(glide).toBe("gliding");
+    await expect.poll(() => pannedIntoView(page, alerts, pane)).toBe(true);
+    await boardAtRest(page);
+    expect(await pannedIntoView(page, alerts, pane)).toBe(true);
+  });
+
   test("should bring a control into view when focus moves to it during a glide and the page is busy until the glide has ended", async ({ page }) => {
     await open(page, "flow", "board");
     await page.getByRole("button", { name: /Show at 100%/ }).click();
