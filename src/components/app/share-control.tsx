@@ -30,6 +30,7 @@ import { searchChangeAfterSave, searchSwitchState, type SearchSwitchState } from
 import { useShareActions, type ShareActions } from "./share-actions";
 import { choiceOutcome, outcomeText, ruleTeamFor, selectedTeamLabel, teamLabel, teamsFor, visibilityLabel, visibilityOptions } from "./share-options";
 import { useShareTeams, type ShareTeam } from "./share-teams-context";
+import { announceSharingChanged } from "./sharing-events";
 import { useShareChoice } from "./use-share-choice";
 
 const icons: Record<ArtifactVisibility, typeof IconLock> = { private: IconLock, team: IconUsersGroup, link: IconLink, public: IconWorld };
@@ -179,6 +180,8 @@ function saveSharing(artifact: ShareableArtifactDto, choice: SaveChoice, actions
 async function saveChoice(artifact: ShareableArtifactDto, choice: SaveChoice, actions: ShareActions, onShared: (artifact: ArtifactDto) => void): Promise<SaveResult> {
   const shared = await saveSharing(artifact, choice, actions);
   if (!shared.success) return shared;
+  // Who can read it or comment was saved: what the page loaded for the audience before loads again (sharing-events.ts).
+  if (shared.data.artifact) announceSharingChanged(artifact.publicId);
   const saved = shared.data.artifact ?? artifact;
   if (!searchChangeAfterSave({ state: choice.searchState, savedVisibility: saved.visibility, saved: saved.showInSearch, chosen: choice.showInSearch })) return shared;
   const search = await actions.search(artifact.id, choice.showInSearch);

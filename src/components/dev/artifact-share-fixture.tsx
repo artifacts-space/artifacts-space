@@ -10,7 +10,10 @@ import { ArtifactPageShare } from "@/components/artifact-page/page-share";
 import { ArtifactPageTheme } from "@/components/artifact-page/artifact-page-theme";
 import { PageEditorChromeProvider } from "@/components/artifact-page/page-editor-chrome";
 import { StickyChrome } from "@/components/artifact-page/sticky-chrome";
+import { CommentComposer } from "@/components/comments/comment-composer";
+import { MentionablesLoader, MentionablesProvider, type LoadMentionables } from "@/components/comments/mentionables-context";
 import { commentSettings, type ArtifactDto } from "@/lib/artifact-types";
+import type { MentionDirectory } from "@/lib/comments/mention-autocomplete";
 import { pageColumnClass } from "@/lib/page-width/rules";
 import { presetTheme } from "@/lib/themes/resolve";
 import type { Theme } from "@/lib/themes/schema";
@@ -60,10 +63,49 @@ function memoryShareActions(read: () => ArtifactDto, write: (artifact: ArtifactD
   };
 }
 
-/** The in-memory actions over their own copy of the artifact, starting from `initial`. */
-function memoryShareStore(initial: ArtifactDto): ShareActions {
+const fixtureSelf = { userId: "fixture-dev", handle: "dev", name: "Dev", kind: "person" as const };
+
+/**
+ * Who a comment can mention on the fixture artifact, as the server answers
+ * it: nobody while it is private (nobody else can read it), and the team's
+ * people once it is shared through a team.
+ */
+function mentionablesFor(artifact: ArtifactDto): MentionDirectory {
+  if (artifact.visibility === "private") return { candidates: [], self: fixtureSelf };
+  return {
+    candidates: [
+      { userId: "fixture-dana", handle: "dana", name: "Dana Reyes", kind: "person" },
+      { userId: "fixture-leah", handle: "leah", name: "Leah Park", kind: "person" },
+    ],
+    self: fixtureSelf,
+  };
+}
+
+/**
+ * The in-memory actions over their own copy of the artifact, starting from
+ * `initial`, and the list of people to mention read from that copy. The
+ * loader is one function for the page's life, as the server action is: the
+ * comment box gets a new list only when it asks again.
+ */
+function memoryShareStore(initial: ArtifactDto): { actions: ShareActions; mentionables: LoadMentionables } {
   let current = initial;
-  return memoryShareActions(() => current, (next) => { current = next; });
+  return {
+    actions: memoryShareActions(() => current, (next) => { current = next; }),
+    mentionables: () => Promise.resolve({ success: true, data: mentionablesFor(current) }),
+  };
+}
+
+/** A comment box under the fixture's title, with the mention list the real thread has. Posting keeps nothing. */
+function FixtureCommentBox({ publicId, load }: { publicId: string; load: LoadMentionables }) {
+  return (
+    <MentionablesLoader load={load}>
+      <MentionablesProvider publicId={publicId}>
+        <section aria-label="Comments" className="mt-12 border-t pt-8">
+          <CommentComposer label="Write a comment" placeholder="Write a comment" submitLabel="Comment" onSubmit={() => Promise.resolve({ ok: true, mentions: null })} />
+        </section>
+      </MentionablesProvider>
+    </MentionablesLoader>
+  );
 }
 
 /** The sentence the header shows for the fixture artifact's level now. */
@@ -76,7 +118,7 @@ function sentenceFor(artifact: ArtifactDto) {
 const widestDownload = { href: "#download", filename: "launch-checklist.csv" };
 
 /** The page header around the artifact's title, as the artifact page lays it out. */
-function FixturePage({ artifact, share, theme = null }: { artifact: ArtifactDto; share: React.ReactNode; theme?: Theme | null }) {
+function FixturePage({ artifact, share, theme = null, comments = null }: { artifact: ArtifactDto; share: React.ReactNode; theme?: Theme | null; comments?: React.ReactNode }) {
   const column = pageColumnClass(false);
   return (
     <ArtifactPageTheme theme={theme} overlays className="min-h-screen" data-page-theme={theme ? "set" : "site"}>
@@ -91,6 +133,7 @@ function FixturePage({ artifact, share, theme = null }: { artifact: ArtifactDto;
         <p className="mt-4 text-md text-muted-foreground" data-fixture-sharing="">
           {artifact.visibility}:{artifact.teamId ?? "none"}
         </p>
+        {comments}
       </main>
     </ArtifactPageTheme>
   );
@@ -100,15 +143,17 @@ function FixturePage({ artifact, share, theme = null }: { artifact: ArtifactDto;
  * Development only: the artifact page's header for its owner (Share in place
  * of the visibility status, saving in memory) or for a reader (the
  * read-only status), with no database. The artifact page share e2e test
- * uses it.
+ * uses it. `mentions` adds a comment box whose list of people to mention
+ * follows the fixture's sharing, as the page's thread does.
  */
-export function ArtifactShareFixture({ as, themeId = null }: { as: "owner" | "reader"; themeId?: string | null }) {
+export function ArtifactShareFixture({ as, themeId = null, mentions = false }: { as: "owner" | "reader"; themeId?: string | null; mentions?: boolean }) {
   // `?theme=<preset id>`: the page wears that theme, as a themed artifact's page does (overlays included).
   const theme = themeId ? (presetTheme(themeId) ?? null) : null;
   const initial = useMemo(() => fixtureArtifact({ id: "fixture-share", kind: "markdown", title: "Launch checklist", content: "# Launch checklist" }), []);
   const [artifact, setArtifact] = useState(initial);
-  const [actions] = useState(() => memoryShareStore(initial));
+  const [store] = useState(() => memoryShareStore(initial));
   if (as === "reader") return <FixturePage artifact={{ ...artifact, visibility: "team", teamId: "fixture-platform" }} share={null} theme={theme} />;
-  const share = <ArtifactPageShare artifact={artifact} teams={fixtureTeams} sentence={sentenceFor(artifact)} shareUrl={`https://artifacts.space/artifact/${artifact.publicId}`} actions={actions} onSaved={setArtifact} />;
-  return <FixturePage artifact={artifact} share={share} theme={theme} />;
+  const share = <ArtifactPageShare artifact={artifact} teams={fixtureTeams} sentence={sentenceFor(artifact)} shareUrl={`https://artifacts.space/artifact/${artifact.publicId}`} actions={store.actions} onSaved={setArtifact} />;
+  const comments = mentions ? <FixtureCommentBox publicId={artifact.publicId} load={store.mentionables} /> : null;
+  return <FixturePage artifact={artifact} share={share} theme={theme} comments={comments} />;
 }

@@ -10,6 +10,7 @@ import { elsewhereName, listedInWorkspace, movedMessage, moveHref, openLabel, re
 import { useShareActions } from "./share-actions";
 import { undoApplies } from "./share-options";
 import { useShareTeams, type ShareTeam } from "./share-teams-context";
+import { announceSharingChanged } from "./sharing-events";
 
 /**
  * A workspace lists only the artifacts whose home it is
@@ -106,6 +107,7 @@ export function useHomeMoves({ teams, scopeTeam, viewerId, listPath, onReturned,
         return;
       }
       const { artifact, status } = result.data;
+      announceSharingChanged(before.publicId);
       const outcome = undoResult(after, artifact, teams, scopeTeamId);
       if (outcome.kind === "returned") {
         setReturned((current) => new Map(current).set(artifact.id, artifact));
