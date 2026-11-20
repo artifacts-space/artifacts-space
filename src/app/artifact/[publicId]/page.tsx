@@ -442,7 +442,7 @@ export default async function ArtifactPage({ params }: PageProps<"/artifact/[pub
         <ThemeBackdrop theme={theme} className={cn("text-foreground", lockedMode(theme))}>
           {view.cover ? (
             <ThemeScope theme={theme}>
-              <ArtifactCover publicId={record.publicId} cover={view.cover} editable={viewable.canEdit} fullWidth={fullWidth} />
+              <ArtifactCover publicId={record.publicId} cover={view.cover} editable={viewable.canEdit} fullWidth={fullWidth} hasIcon={Boolean(view.icon)} />
             </ThemeScope>
           ) : null}
           <main className={cn("mx-auto w-full py-12 sm:py-16", column, mainTopClass(view))} data-full-width={fullWidth}>

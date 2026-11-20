@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { allowPageError, expect, test } from "./support/test";
 
 import { approveVersionWithCover, attachTestImage, cleanUp, createTestArtifact, devUserId, localDatabaseEnabled, localDatabaseSkipReason, storedCovers } from "./support/local-db";
@@ -144,3 +144,92 @@ test("should move an image cover's focal point with the keyboard and save it whe
   await page.keyboard.press("Enter");
   await expect.poll(async () => (await storedCovers(publicId)).artifact).toBe(`file:${fileId}@1`);
 });
+
+/** The opacity of a computed CSS color: 1 when it names none. A form this does not know fails the test, never passes it. */
+function alphaOf(color: string): number {
+  const modern = /^[a-z0-9-]+\([^/]*(?:\/\s*([\d.]+%?)\s*)?\)$/i.exec(color);
+  const legacy = /^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+%?)\s*\)$/i.exec(color);
+  const match = legacy ?? modern;
+  if (!match) throw new Error(`Unreadable color: ${color}`);
+  const alpha = match[1];
+  if (alpha === undefined) return 1;
+  return alpha.endsWith("%") ? Number.parseFloat(alpha) / 100 : Number.parseFloat(alpha);
+}
+
+/** Where a visible element is. An element with no box fails the test here, so a comparison never passes on two missing readings. */
+async function measured(locator: Locator) {
+  await expect(locator).toBeVisible();
+  const box = await locator.boundingBox();
+  if (!box) throw new Error("The element has no box to measure.");
+  return box;
+}
+
+/** The surfaces drawn over the cover right now: every button in it, and the reposition hint when shown. */
+async function surfacesOver(cover: Locator): Promise<{ name: string; color: string }[]> {
+  return cover.locator("button, [role=slider] p").evaluateAll((nodes) => nodes.map((node) => ({ name: node.getAttribute("aria-label") ?? node.textContent.trim(), color: getComputedStyle(node).backgroundColor })));
+}
+
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`should give everything drawn over the cover a solid surface in ${colorScheme} mode, so the words read over any image`, async ({ page }, testInfo) => {
+    await page.emulateMedia({ colorScheme });
+    await signIn(page);
+    const userId = await devUserId();
+    const fileId = randomUUID();
+    const publicId = await createTestArtifact({ userId, title: `Cover controls ${colorScheme} ${testInfo.project.name}`, content: "# Notes", visibility: "private", theme: null, cover: `file:${fileId}@30` });
+    created.push(publicId);
+    await attachTestImage(publicId, userId, fileId);
+    allowPageError(`/api/files/${fileId}`, "The seeded file has no stored object in the e2e environment, so the file route cannot serve it.");
+
+    await page.goto(`/artifact/${publicId}`);
+    const cover = page.locator("[data-artifact-cover]");
+    await cover.hover();
+    const resting = await surfacesOver(cover);
+    expect(resting.map((surface) => surface.name)).toEqual(expect.arrayContaining(["Remove cover"]));
+    expect(resting.length, "Change cover, Reposition, and Remove").toBe(3);
+    await page.getByRole("button", { name: "Reposition" }).click();
+    await expect(page.getByRole("slider", { name: "Cover position" })).toBeFocused();
+    const repositioning = await surfacesOver(cover);
+    expect(repositioning.length, "the hint, Cancel, and Save position").toBe(3);
+    for (const { name, color } of [...resting, ...repositioning]) expect(alphaOf(color), `${name}: ${color}`).toBe(1);
+  });
+}
+
+for (const icon of ["🚀", null]) {
+  test(`should take a removed cover away at once and leave the page ${icon ? "with an icon" : "without an icon"} as the server then draws it, while the save is still on its way`, async ({ page }, testInfo) => {
+    await signIn(page);
+    const title = `Cover removal ${icon ? "icon" : "plain"} ${testInfo.project.name}`;
+    const publicId = await createTestArtifact({ userId: await devUserId(), title, content: "# Notes", visibility: "private", theme: null, cover: "dusk", icon });
+    created.push(publicId);
+    await page.goto(`/artifact/${publicId}`);
+    const cover = page.locator("[data-artifact-cover]");
+    const iconRow = page.locator("[data-page-icon]");
+    const heading = page.getByRole("heading", { level: 1, name: title });
+    await expect(cover).toBeVisible();
+
+    // Hold the save (a server action posts to the page's own address) until the test lets it go.
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    await page.route(`**/artifact/${publicId}`, async (route) => {
+      if (route.request().method() === "POST") await held;
+      await route.continue();
+    });
+    await cover.hover();
+    await cover.getByRole("button", { name: "Remove cover" }).click();
+
+    await expect(cover).toHaveCount(0);
+    await expect(page.locator("[data-cover-removed]")).toBeAttached();
+    const header = await measured(page.getByRole("banner"));
+    const waiting = { icon: await measured(iconRow), heading: await measured(heading) };
+    expect(waiting.icon.y, "the icon row is clear of the header while the save is on its way").toBeGreaterThanOrEqual(header.y + header.height);
+
+    release();
+    await expect(page.getByRole("button", { name: "Add cover" })).toBeAttached();
+    await expect(page.locator("[data-cover-removed]")).toHaveCount(0);
+    await expect(iconRow).toHaveAttribute("data-page-icon", "in-flow");
+    // The page does not move when the server's page takes over: the title, and so everything under it, keeps its place.
+    const settled = { icon: await measured(iconRow), heading: await measured(heading) };
+    expect(settled.heading.y).toBe(waiting.heading.y);
+    // The icon's box over a cover is not its row without one, so the row may settle by a few pixels, never more.
+    expect(Math.abs(settled.icon.y - waiting.icon.y)).toBeLessThanOrEqual(8);
+  });
+}
