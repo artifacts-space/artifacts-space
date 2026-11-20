@@ -1866,7 +1866,8 @@ Markdown an agent reads agrees with the page. Every save of content
   that shares an artifact or moves its approved version calls it too.
 - At most `MAX_MENTIONS_PER_SAVE` a save; the rest are told by a later save.
   A save looks up at most `MAX_DOCUMENT_HANDLES` handles that have nobody
-  told yet, so only handles that reach nobody stay in that window.
+  told yet, so only handles that reach nobody, or whose owner is not served
+  the text yet, stay in that window.
 - The stored row is a `mention` with no `comment_id` (one per artifact and
   recipient, `actor_id` the writer) and, for people, a `notification` of type
   `mention` with no comment. A deployment from before 0051 hides both: it
@@ -1877,6 +1878,41 @@ Markdown an agent reads agrees with the page. Every save of content
   (`document-mention-view.ts`), so a mention waiting in a version they are
   not served stays hidden, and one taken out of the text drops out.
 - `document-mentions.db.test.ts` covers the rules against Postgres.
+- The document editor offers the same `@` list as the comment box: the
+  `CommentMentions` extension (`comment-mentions.tsx`), always in
+  `rich-markdown-editor.tsx` and off until a `DocumentMentionsLoader`
+  (`src/components/editor/document-mentions-context.tsx`) above it offers
+  people for a saved Markdown artifact (`DocumentContent` in
+  `inline-content.tsx`): the artifact page's editor (`edit-surface.tsx`),
+  the workspace (`app/page.tsx`), and the `/dev/editor?mentions=` fixture.
+  Without a loader or an id (other fixtures, a new artifact, a Markdown block
+  in an interface) nothing is fetched and `@` is plain text.
+  A pick writes plain `@handle` text, so the save path above is the only
+  thing that notifies. The list is `documentMentionDirectory`
+  (`mentionables.ts`): the save's own rule without "can read it", since a
+  mention in a draft lands once it is shared; only someone who may edit the
+  artifact gets it (`loadDocumentMentionablesAction`), once per open editor.
+- The extension is always in the document editor and starts off
+  (`startsOff`); `setMentionSource(null)` keeps `@` plain text. Never add it
+  only when a page offers mentions, and never wrap the editor in something
+  that appears only once the artifact has an id: a new artifact gets its id
+  while it is being written, and either change remounts the editor and drops
+  the text (`e2e/new-artifact.spec.ts` fails on it). `DocumentMentionsProvider`
+  always renders, with a null id until there is one.
+- The hint under an `@` claims "no one to mention" or "no match" only of a
+  list that is here (`MentionListState`): one on its way says it is loading,
+  and one that could not be loaded says so and is asked for again when the
+  window next gets focus (never on a timer). A list loaded for one artifact
+  is never offered on another.
+- A list that arrives while an `@` is already being typed redraws the open
+  menu (`refreshList` in the extension's storage): the suggestion plugin
+  redraws only when the query changes.
+- The artifact page's read view highlights the handles the text delivered
+  (`readViewMentions`, one query, only when the latest Markdown has an `@`),
+  drawn as the editor draws them (`DocumentMention` in `markdown-view.tsx`,
+  no padding, no icon) so no word moves when the editor replaces the read
+  view. An approved version's cached render stays plain: every reader
+  outside the team shares it.
 
 The comment box (`src/components/comments/comment-editor.tsx`, used for new
 comments, replies, edits, and the cards at the text) is the rich Markdown

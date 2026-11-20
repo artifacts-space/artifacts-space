@@ -37,6 +37,7 @@ import type { ReactNode } from "react";
 
 import type { FormatKind } from "@/lib/artifact-formats";
 import type { FileDto } from "@/lib/files/types";
+import type { MentionKind } from "@/lib/comments/mentions";
 import { cn } from "@/lib/utils";
 
 import { FileArtifactView } from "./file-artifact-view";
@@ -58,11 +59,13 @@ export interface ArtifactViewProps {
   files?: readonly FileDto[] | undefined;
   pageKey?: string | undefined;
   className?: string | undefined;
+  /** Markdown only: the @handles in the text that reached someone, shown as chips (src/lib/comments/document-mention-view.ts). */
+  mentions?: ReadonlyMap<string, MentionKind> | undefined;
 }
 
 /** How each format's content is drawn. A kind missing here (one this build does not know) shows as plain text. */
 const formatBodies: Record<FormatKind, (props: ArtifactViewProps) => ReactNode> = {
-  markdown: ({ content }) => <MarkdownView content={content} media diagrams />,
+  markdown: ({ content, mentions }) => <MarkdownView content={content} mentions={mentions} media diagrams />,
   html: ({ content, title, pageKey }) => <HtmlView content={content} title={title ?? "Artifact page"} pageKey={pageKey} />,
   code: ({ content, language }) => <CodeView content={content} language={language} />,
   text: ({ content }) => <TextView content={content} />,

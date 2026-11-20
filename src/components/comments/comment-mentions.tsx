@@ -14,7 +14,7 @@ import { matchMentionables, type Mentionable } from "@/lib/comments/mention-auto
 import { splitMentions, type MentionKind } from "@/lib/comments/mentions";
 
 import { mentionEditAt, mentionMatchAt } from "./mention-match";
-import { MentionHint, mentionPopoverClass, MentionSuggestionList } from "./mention-suggestions";
+import { MentionHint, mentionPopoverClass, MentionSuggestionList, type MentionListState } from "./mention-suggestions";
 
 /** Who the writer can mention, read fresh on every keystroke (the list loads after the box). */
 export interface MentionSource {
@@ -22,6 +22,8 @@ export interface MentionSource {
   self: Mentionable | null;
   /** Handles that show as chips: the candidates and the writer. */
   resolved: ReadonlyMap<string, MentionKind>;
+  /** Whether the list is here, on its way, or could not be loaded ("ready" when left out): the hint says which. */
+  list?: MentionListState;
 }
 
 const suggestionKey = new PluginKey("commentMention");
@@ -40,6 +42,7 @@ interface MentionMenuProps {
   query: string;
   self: Mentionable | null;
   hasCandidates: boolean;
+  list: MentionListState;
   command: (item: Mentionable) => void;
   onActive: (index: number) => void;
   ref?: React.Ref<MentionMenuHandle>;
@@ -62,7 +65,7 @@ function picks(event: KeyboardEvent): boolean {
  * Escape closes (the plugin does that). Focus stays in the box. When nothing
  * matches, a short hint says why, and Enter goes on to the text.
  */
-function MentionMenu({ listId, items, query, self, hasCandidates, command, onActive, ref }: MentionMenuProps) {
+function MentionMenu({ listId, items, query, self, hasCandidates, list, command, onActive, ref }: MentionMenuProps) {
   const [active, setActive] = useState(0);
   const [itemsSeen, setItemsSeen] = useState(items);
   if (itemsSeen !== items) {
@@ -92,7 +95,7 @@ function MentionMenu({ listId, items, query, self, hasCandidates, command, onAct
     },
   }), [active, command, items]);
 
-  if (items.length === 0) return <MentionHint query={query} self={self} hasCandidates={hasCandidates} />;
+  if (items.length === 0) return <MentionHint query={query} self={self} hasCandidates={hasCandidates} list={list} />;
   return <MentionSuggestionList id={listId} options={items} activeIndex={active} optionId={(index) => `${listId}-${String(index)}`} onPick={command} onHover={setActive} />;
 }
 
@@ -128,14 +131,22 @@ function pickMention(editor: Editor, handle: string) {
 
 type MentionProps = SuggestionProps<Mentionable, Mentionable>;
 
-function renderMentionMenu(source: () => MentionSource, listId: string): ReturnType<NonNullable<SuggestionOptions<Mentionable, Mentionable>["render"]>> {
+/**
+ * `onOpen` gets a way to redraw the open list from the current source, and
+ * null when the list closes: the people to mention can arrive while an "@"
+ * is already being typed, and the list must not wait for the next key.
+ */
+function renderMentionMenu(source: () => MentionSource, listId: string, onOpen: (refresh: (() => void) | null) => void): ReturnType<NonNullable<SuggestionOptions<Mentionable, Mentionable>["render"]>> {
   let renderer: ReactRenderer<MentionMenuHandle, MentionMenuProps> | null = null;
   let unmount: (() => void) | null = null;
+  let shown: MentionProps | null = null;
   const propsFor = (props: MentionProps): MentionMenuProps => {
-    const { self, candidates } = source();
+    const { self, candidates, list = "ready" } = source();
     return {
       listId,
-      items: props.items,
+      list,
+      // Matched here, not taken from the plugin: its items are from when the query last changed.
+      items: matchMentionables(candidates, props.query),
       query: props.query,
       self,
       hasCandidates: candidates.length > 0,
@@ -145,13 +156,18 @@ function renderMentionMenu(source: () => MentionSource, listId: string): ReturnT
   };
   return {
     onStart: (props) => {
+      shown = props;
+      onOpen(() => { if (shown) renderer?.updateProps(propsFor(shown)); });
       renderer = new ReactRenderer(MentionMenu, { props: propsFor(props), editor: props.editor, className: mentionPopoverClass });
       renderer.element.setAttribute("data-slot", "mention-menu");
       // Inside the box, so the dialog or card around it counts a press on the list as its own.
       (props.editor.view.dom.parentElement ?? document.body).appendChild(renderer.element);
       unmount = props.mount(renderer.element);
     },
-    onUpdate: (props) => { renderer?.updateProps(propsFor(props)); },
+    onUpdate: (props) => {
+      shown = props;
+      renderer?.updateProps(propsFor(props));
+    },
     onKeyDown: ({ event }: SuggestionKeyDownProps) => renderer?.ref?.onKeyDown(event) ?? false,
     onExit: (props) => {
       unmount?.();
@@ -159,6 +175,8 @@ function renderMentionMenu(source: () => MentionSource, listId: string): ReturnT
       renderer?.destroy();
       renderer = null;
       unmount = null;
+      shown = null;
+      onOpen(null);
       setComboboxState(props.editor, listId, null);
     },
   };
@@ -185,8 +203,12 @@ function mentionDecorations(doc: ProseMirrorNode, resolved: ReadonlyMap<string, 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     commentMentions: {
-      /** Who can be mentioned now: the list loads after the box, and the chips are drawn again when it arrives. */
-      setMentionSource: (source: MentionSource) => ReturnType;
+      /**
+       * Who can be mentioned now: the list loads after the box, and the chips
+       * are drawn again when it arrives. Null turns mentions off: "@" is
+       * plain text, with no list and no chips.
+       */
+      setMentionSource: (source: MentionSource | null) => ReturnType;
     };
   }
 }
@@ -199,18 +221,26 @@ const noSource: MentionSource = { candidates: [], self: null, resolved: new Map(
  * Markdown and the server's mention parsing are as before), and chips on
  * handles that reach someone.
  */
-export const CommentMentions = Extension.create<Record<string, never>, { source: MentionSource }>({
+export const CommentMentions = Extension.create<{ startsOff: boolean }, { source: MentionSource; off: boolean; refreshList: (() => void) | null }>({
   name: "commentMentions",
 
+  addOptions() {
+    // The document editor starts off and is turned on where its page offers mentions; the comment box always has them.
+    return { startsOff: false };
+  },
+
   addStorage() {
-    return { source: noSource };
+    return { source: noSource, off: this.options.startsOff, refreshList: null };
   },
 
   addCommands() {
     return {
       setMentionSource: (next) => ({ tr, dispatch }) => {
-        this.storage.source = next;
+        this.storage.source = next ?? noSource;
+        this.storage.off = next === null;
         if (dispatch) tr.setMeta(highlightKey, true);
+        // An "@" already being typed shows the new list at once.
+        if (dispatch) this.storage.refreshList?.();
         return true;
       },
     };
@@ -227,6 +257,7 @@ export const CommentMentions = Extension.create<Record<string, never>, { source:
         editor: this.editor,
         char: "@",
         allowedPrefixes: null,
+        allow: () => !storage.off,
         findSuggestionMatch: ({ $position }) => {
           const match = mentionMatchAt($position);
           return match ? { range: match.range, query: match.query.query, text: `@${match.query.query}` } : null;
@@ -235,7 +266,7 @@ export const CommentMentions = Extension.create<Record<string, never>, { source:
         command: ({ editor, props }) => { pickMention(editor, props.handle); },
         offset: { mainAxis: 4 },
         floatingUi: { middleware: [shift({ padding: 8 })] },
-        render: () => renderMentionMenu(source, listId),
+        render: () => renderMentionMenu(source, listId, (refresh) => { storage.refreshList = refresh; }),
       }),
       new Plugin<DecorationSet>({
         key: highlightKey,

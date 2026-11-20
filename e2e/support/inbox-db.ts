@@ -67,3 +67,17 @@ export async function closeInboxDb(): Promise<void> {
   await pool?.end();
   pool = null;
 }
+
+/** Gives a test user a confirmed @handle, so they can be mentioned. */
+export async function giveHandle(userId: string, handle: string): Promise<void> {
+  await db().query(`update "user" set username = $2, username_confirmed = true where id = $1`, [userId, handle]);
+}
+
+/** The people and agents an artifact's own text has mentioned, by user id (document mentions carry no comment). */
+export async function documentMentionRecipients(publicId: string): Promise<string[]> {
+  const result = await db().query<{ recipient_id: string }>(
+    `select m.recipient_id from mention m join artifact a on a.id = m.artifact_id where a.public_id = $1 and m.comment_id is null order by m.recipient_id`,
+    [publicId],
+  );
+  return result.rows.map((row) => row.recipient_id);
+}

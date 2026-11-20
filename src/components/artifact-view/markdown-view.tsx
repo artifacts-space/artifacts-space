@@ -11,6 +11,7 @@ import { isFileLinkPath, isFileMediaUrl } from "@/lib/files/media-rules";
 import { parseFenceInfo, type FenceInfo } from "@/lib/markdown/fence-info";
 import { artifactLinkHref } from "@/lib/markdown/link-href";
 import { isMermaidLanguage } from "@/lib/markdown/mermaid-fence";
+import { mentionClasses } from "@/components/editor/mention-classes";
 import { cn } from "@/lib/utils";
 
 import { ExternalLink } from "./external-link";
@@ -102,6 +103,21 @@ function blockColorProps(node: ExtraProps["node"]): Record<string, string> {
   return blockColorAttributes({ color: readBlockHue(properties?.dataBlockColor), background: readBlockHue(properties?.dataBlockBackground) });
 }
 
+/** The kind of mention the mention plugin marked this span as, or null for any other span. */
+function mentionKindOf(node: ExtraProps["node"]): MentionKind | null {
+  const kind = node?.properties.dataMention;
+  return kind === "person" || kind === "agent" ? kind : null;
+}
+
+/**
+ * A resolved @mention in an artifact's own text: the look it has in the
+ * document editor (mention-classes.ts), which takes no room of its own, so
+ * no word moves when the page's editor replaces this read view.
+ */
+function DocumentMention({ kind, children }: { kind: MentionKind; children: React.ReactNode }) {
+  return <span data-mention-kind={kind} className={mentionClasses[kind]}>{children}</span>;
+}
+
 /**
  * Element overrides. Links follow the link policy. Images never load from
  * other sites: they could track readers, so an image shows as its alt text
@@ -113,9 +129,8 @@ const components: Components = {
   a: ({ href, children }) => <ExternalLink href={href}>{children}</ExternalLink>,
   img: ({ alt }) => <ImageAltText alt={alt} />,
   span: ({ node, children }) => {
-    const kind = node?.properties.dataMention;
-    if (kind !== "person" && kind !== "agent") return <span {...blockColorProps(node)}>{children}</span>;
-    return <MentionChip kind={kind}>{children}</MentionChip>;
+    const kind = mentionKindOf(node);
+    return kind ? <MentionChip kind={kind}>{children}</MentionChip> : <span {...blockColorProps(node)}>{children}</span>;
   },
 };
 
@@ -128,6 +143,10 @@ const components: Components = {
  */
 const mediaComponents: Components = {
   ...components,
+  span: ({ node, children }) => {
+    const kind = mentionKindOf(node);
+    return kind ? <DocumentMention kind={kind}>{children}</DocumentMention> : <span {...blockColorProps(node)}>{children}</span>;
+  },
   p: ({ node, children }) => {
     const media = mediaImageOf(node);
     return media ? <MarkdownMedia {...media} /> : <p {...blockColorProps(node)}>{children}</p>;
@@ -160,12 +179,13 @@ const noMentions: ReadonlyMap<string, MentionKind> = new Map();
  * GitHub-flavored Markdown rendered as prose. Raw HTML is never rendered
  * (skipHtml), and links pass through the same policy as every artifact link.
  * `mentions` lists the @handles that resolved, which show as chips. `media`
- * shows uploaded files, for an artifact's own content (not comments).
+ * shows uploaded files, for an artifact's own content (not comments), and
+ * draws a mention as the document editor does.
  * `diagrams` draws fenced ```mermaid blocks as diagrams, for an artifact's
  * own Markdown (not comments); Mermaid loads only when one is on the page.
  * Works on the server and the client.
  */
-export function MarkdownView({ content, className, mentions = noMentions, media = false, diagrams = false }: { content: string; className?: string; mentions?: ReadonlyMap<string, MentionKind>; media?: boolean; diagrams?: boolean }) {
+export function MarkdownView({ content, className, mentions = noMentions, media = false, diagrams = false }: { content: string; className?: string; mentions?: ReadonlyMap<string, MentionKind> | undefined; media?: boolean; diagrams?: boolean }) {
   return (
     <div className={cn("artifact-prose", className)}>
       <ReactMarkdown remarkPlugins={[...markdownSyntaxPlugins, remarkMentions(mentions)]} skipHtml urlTransform={urlTransform} components={componentsFor(media, diagrams)}>

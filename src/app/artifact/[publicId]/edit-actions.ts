@@ -3,10 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { getEditableArtifact } from "@/lib/access";
+import { getArtifactAccess, getEditableArtifact } from "@/lib/access";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { loadActors } from "@/lib/agents/queries";
 import type { ActionResult, ArtifactDto } from "@/lib/artifact-types";
 import { artifactIconInputSchema } from "@/lib/artifact-icons";
+import type { MentionDirectory } from "@/lib/comments/mention-autocomplete";
+import { documentMentionDirectory } from "@/lib/comments/mentionables";
 import { artifactCoverInputSchema } from "@/lib/covers/cover";
 import { toArtifactDtos, updateArtifact } from "@/lib/artifacts";
 import { isPublicId } from "@/lib/public-id";
@@ -39,6 +42,25 @@ export interface IconSaveResult extends OwnSaveTimes {
 export interface ThemeSaveResult extends OwnSaveTimes {
   theme: StoredArtifactTheme | null;
   pending: boolean;
+}
+
+/**
+ * The people and agents the signed-in editor can @mention in this artifact's
+ * own text, and their own handle, for the document editor's suggestions and
+ * chips. Only someone who may edit the artifact gets the list. Loaded once
+ * per open editor, never per keystroke.
+ */
+export async function loadDocumentMentionablesAction(publicId: string): Promise<ActionResult<MentionDirectory>> {
+  try {
+    const session = await getSession();
+    if (!session) return { success: false, error: "Sign in to continue." };
+    const [access, actors] = await Promise.all([getArtifactAccess(publicIdSchema.parse(publicId), session.user.id), loadActors([session.user.id])]);
+    const writer = actors.get(session.user.id);
+    if (!access?.canEdit || !writer) return { success: false, error: "Artifact not found." };
+    return { success: true, data: await documentMentionDirectory(access.record, writer) };
+  } catch (error) {
+    return { success: false, error: actionErrorMessage(error, "Suggestions could not be loaded.") };
+  }
 }
 
 /**

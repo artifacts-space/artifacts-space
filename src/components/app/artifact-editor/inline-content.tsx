@@ -11,6 +11,7 @@ import { ArtifactFilesProvider } from "@/components/artifact-view/files-context"
 import { ThemeScope } from "@/components/artifact-view/theme-scope";
 import { ContentStatus } from "@/components/editor/content-status";
 import { DocumentEditor, isDocumentKind, type DocumentKind } from "@/components/editor/document-editor";
+import { DocumentMentionsProvider } from "@/components/editor/document-mentions-context";
 import { useSourceFileDrop } from "@/components/editor/source-file-drop";
 import { InlineCommentSurface } from "@/components/inline-comments/inline-comment-surface";
 import { Button } from "@/components/ui/button";
@@ -281,9 +282,11 @@ export function hasInlineField(kind: ArtifactKind, sourceOpen: boolean): boolean
  * document's words take inline comments; plain text is a native field,
  * whose text cannot be highlighted.
  */
-function DocumentContent({ kind, content, revision, place, onChange, onShowSource }: Pick<InlineContentProps, "content" | "revision" | "onChange" | "onShowSource"> & { kind: DocumentKind; place: Placement }) {
+function DocumentContent({ kind, content, revision, pageKey, place, onChange, onShowSource }: Pick<InlineContentProps, "content" | "revision" | "pageKey" | "onChange" | "onShowSource"> & { kind: DocumentKind; place: Placement }) {
   const document = <DocumentEditor key={revision} kind={kind} value={content} onChange={onChange} label="Artifact content" sourceToggle={false} onEditSource={onShowSource} />;
-  return <ContentFrame place={place}>{kind === "markdown" ? <InlineCommentSurface>{document}</InlineCommentSurface> : document}</ContentFrame>;
+  if (kind !== "markdown") return <ContentFrame place={place}>{document}</ContentFrame>;
+  // A saved Markdown artifact (it has a public id) takes @mentions in its text. The same tree before and after it is stored, so the editor is never remounted.
+  return <ContentFrame place={place}><InlineCommentSurface><DocumentMentionsProvider publicId={pageKey ?? null}>{document}</DocumentMentionsProvider></InlineCommentSurface></ContentFrame>;
 }
 
 /** The content in its frame: the source, or the format's own view. */
@@ -297,7 +300,7 @@ function Content({ handoff, ...props }: InlineContentProps & { handoff: FocusHan
     // The document's blocks read their files' details here: a file's type and size on its card, and an image's shape before it loads.
     return (
       <ArtifactFilesProvider files={files}>
-        <DocumentContent kind={kind} content={content} revision={revision} place={place} onChange={onChange} onShowSource={onShowSource} />
+        <DocumentContent kind={kind} content={content} revision={revision} pageKey={props.pageKey} place={place} onChange={onChange} onShowSource={onShowSource} />
       </ArtifactFilesProvider>
     );
   }

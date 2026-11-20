@@ -52,8 +52,9 @@ function isReachable(candidate: MentionCandidate, writer: Actor): candidate is R
  * from one query. A handle whose
  * mention is stored and was not added anew after being read needs nothing,
  * so an autosave of a document that mentions people stops here, and the
- * window moves on past everyone already told. A handle that reaches nobody
- * (unknown, the writer's own) never has a row and is looked up by each save.
+ * window moves on past everyone already told. A handle with nobody told
+ * through it yet (it reaches nobody, or its owner is not served the text)
+ * has no row and is looked up by each save.
  */
 async function handlesToLookUp(save: DocumentSave): Promise<string[]> {
   const rows = await getDb()

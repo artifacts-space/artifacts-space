@@ -36,9 +36,11 @@ export const INBOX_CONTEXT_COMMENTS = 5;
  * A mention in a document's own text (document-mentions.ts). A save looks up
  * at most MAX_DOCUMENT_HANDLES of the handles that have nobody told yet, and
  * notifies at most MAX_MENTIONS_PER_SAVE people or agents: the rest are
- * notified by a later save, never dropped. Only a handle that reaches nobody
- * stays in that window, so a real handle waits for good only behind
- * MAX_DOCUMENT_HANDLES such handles.
+ * notified by a later save, never dropped. A handle stays in that window
+ * while nobody has been told through it: one that reaches nobody (unknown,
+ * the writer's own, outside the writer's teams) and one whose owner is not
+ * served the text yet (a private draft, an edit waiting for approval). A
+ * handle past the window waits behind MAX_DOCUMENT_HANDLES of those.
  */
 export const MAX_DOCUMENT_HANDLES = 50;
 export const MAX_MENTIONS_PER_SAVE = 5;
