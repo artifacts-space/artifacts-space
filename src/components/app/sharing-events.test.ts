@@ -45,4 +45,12 @@ describe("sharing events", () => {
 
     expect(() => { announceSharingChanged("artifact-one"); }).not.toThrow();
   });
+
+  it("should return a cleanup that does nothing when a listener is added with no window", () => {
+    vi.stubGlobal("window", undefined);
+
+    const stop = onSharingChanged("artifact-one", vi.fn());
+
+    expect(() => { stop(); }).not.toThrow();
+  });
 });

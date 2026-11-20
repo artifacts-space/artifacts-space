@@ -1982,12 +1982,26 @@ to a team once left "@" with nobody to offer until a reload. Every save of
 sharing in the browser says so (`announceSharingChanged` in
 `src/components/app/sharing-events.ts`: the Share dialog's save, and Undo
 on the move toast), and the provider loads the list again, keeping the one
-in hand until the new one arrives. A new path in the browser that saves an
+in hand until the new one arrives, and after a load that failed. A save
+announces whatever its `status`: a move can apply while only opening its
+comments waits, which also answers "pending", so never gate the
+announcement on "applied". A new path in the browser that saves an
 artifact's sharing or its comments setting announces it too. A change made
 elsewhere (another tab, an approval, an agent) sends no signal: that list
-is new after a reload. `e2e/artifact-page-share.spec.ts` holds this on
-`/dev/artifact-share?mentions=1`, whose list follows the fixture's sharing,
-and `e2e/comment-mentions-after-move-db.spec.ts` on the real page.
+is new after a reload. The comment box's hint under `@` says only what is
+known (`MentionListState`): that the list is loading until the newest
+request answers, that it could not be loaded when that request failed, and
+that nobody can be mentioned only of a list that answered it; suggestions
+in hand stay on screen meanwhile. The rule is one pure function,
+`mentionListView` in `src/components/comments/mention-list-load.ts` (unit
+tested), read by both `MentionablesProvider` and the document editor's
+`DocumentMentionsProvider`: never a second copy of it. A failed load is
+asked for again on the next window focus (`useRetryOnFocus`, shared the
+same way), never on a timer. `e2e/artifact-page-share.spec.ts`
+holds this on `/dev/artifact-share?mentions=1`, whose list follows the
+fixture's sharing and whose requests a test can hold or fail
+(`fixture:mentions-network`, `fixture-mentions-network.ts`), and
+`e2e/comment-mentions-after-move-db.spec.ts` on the real page.
 
 ### Replaced files
 

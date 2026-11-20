@@ -22,6 +22,7 @@ import { defaultActor, defaultRoleCapabilities } from "@/lib/teams/capability-ru
 import { visibilityCopy, visibilitySentence } from "@/lib/visibility-copy";
 
 import { fixtureArtifact } from "./fixture-content";
+import { steeredNetwork } from "./fixture-mentions-network";
 
 /** The viewer's teams: their personal team, Platform (sharing applies at once), and Design (team sharing waits for approval). */
 const fixtureTeams: ShareTeam[] = [
@@ -85,13 +86,15 @@ function mentionablesFor(artifact: ArtifactDto): MentionDirectory {
  * The in-memory actions over their own copy of the artifact, starting from
  * `initial`, and the list of people to mention read from that copy. The
  * loader is one function for the page's life, as the server action is: the
- * comment box gets a new list only when it asks again.
+ * comment box gets a new list only when it asks again. Its requests go
+ * through a network the test can hold or fail (FIXTURE_MENTIONS_NETWORK);
+ * the list is read when a request answers.
  */
 function memoryShareStore(initial: ArtifactDto): { actions: ShareActions; mentionables: LoadMentionables } {
   let current = initial;
   return {
     actions: memoryShareActions(() => current, (next) => { current = next; }),
-    mentionables: () => Promise.resolve({ success: true, data: mentionablesFor(current) }),
+    mentionables: steeredNetwork(() => mentionablesFor(current)),
   };
 }
 

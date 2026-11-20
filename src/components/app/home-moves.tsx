@@ -107,6 +107,7 @@ export function useHomeMoves({ teams, scopeTeam, viewerId, listPath, onReturned,
         return;
       }
       const { artifact, status } = result.data;
+      // Whatever the status: an undo whose move applied can still report "pending" for its comments (see saveChoice).
       announceSharingChanged(before.publicId);
       const outcome = undoResult(after, artifact, teams, scopeTeamId);
       if (outcome.kind === "returned") {

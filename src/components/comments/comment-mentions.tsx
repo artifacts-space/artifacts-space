@@ -13,8 +13,9 @@ import { mentionClasses } from "@/components/editor/mention-classes";
 import { matchMentionables, type Mentionable } from "@/lib/comments/mention-autocomplete";
 import { splitMentions, type MentionKind } from "@/lib/comments/mentions";
 
+import type { MentionListState } from "./mention-list-load";
 import { mentionEditAt, mentionMatchAt } from "./mention-match";
-import { MentionHint, mentionPopoverClass, MentionSuggestionList, type MentionListState } from "./mention-suggestions";
+import { MentionHint, mentionPopoverClass, MentionSuggestionList } from "./mention-suggestions";
 
 /** Who the writer can mention, read fresh on every keystroke (the list loads after the box). */
 export interface MentionSource {

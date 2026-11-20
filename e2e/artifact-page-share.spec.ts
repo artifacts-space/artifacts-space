@@ -111,6 +111,86 @@ test("should offer the team's people under @ in a comment after the move, withou
   await expect(suggestions).toHaveCount(0);
 });
 
+/** Sets how the fixture's requests for people to mention fare (FIXTURE_MENTIONS_NETWORK in fixture-mentions-network.ts). */
+async function mentionsNetwork(page: Page, network: "ok" | "hold" | "fail") {
+  await page.evaluate((detail) => window.dispatchEvent(new CustomEvent("fixture:mentions-network", { detail })), network);
+}
+
+/** Saves the fixture's sharing from the header: Team (Platform) or Private. */
+async function moveFromHeader(page: Page, to: "team" | "private") {
+  const from = to === "team" ? "Private" : "Team";
+  await header(page).getByRole("button", { name: `${from}. Share settings` }).click();
+  const dialog = page.getByRole("dialog", { name: "Share “Launch checklist”" });
+  await dialog.getByRole("radio", { name: to === "team" ? /^Team/ : /^Private/ }).click();
+  await dialog.getByRole("button", { name: to === "team" ? "Move to Platform" : "Move to Personal" }).click();
+  await expect(page.locator("[data-fixture-sharing]")).toHaveText(to === "team" ? "team:fixture-platform" : "private:none");
+}
+
+/** The fixture's comment box, with the rich box in place and the caret in it. */
+async function commentBox(page: Page) {
+  const box = page.getByRole("region", { name: "Comments" }).getByRole("textbox", { name: "Write a comment" });
+  await box.click();
+  await expect(box, "the rich box took over").toHaveAttribute("contenteditable", "true");
+  return box;
+}
+
+const nobodyHint = "No one to mention here yet.";
+const loadingHint = "Loading the people you can mention…";
+const unavailableHint = "The list of people to mention could not be loaded. A handle typed in full still reaches its owner once they can read this artifact.";
+
+test("should say the list is loading, not that nobody can be mentioned, while it loads again after a move, and show it under the same @ when it arrives", async ({ page }) => {
+  await page.goto("/dev/artifact-share?mentions=1");
+  const box = await commentBox(page);
+  const suggestions = page.getByRole("listbox", { name: "Mention suggestions" });
+  await page.keyboard.type("Ask @");
+  await expect(page.getByText(nobodyHint, { exact: false })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // The new list is slow to come: the private artifact's empty list is still in hand, and says nothing about the team.
+  await mentionsNetwork(page, "hold");
+  await moveFromHeader(page, "team");
+  await box.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" or @le");
+  await expect(page.getByText(loadingHint)).toBeVisible();
+  await expect(page.getByText(nobodyHint, { exact: false })).toHaveCount(0);
+
+  // No further key: the list replaces the hint as soon as it arrives.
+  await mentionsNetwork(page, "ok");
+  await expect(suggestions.getByRole("option")).toHaveText([/@leah/]);
+  await expect(page.getByText(loadingHint)).toHaveCount(0);
+});
+
+test("should keep the list in hand and say it could not be loaded when loading it again fails, and ask again when the window gets focus", async ({ page }) => {
+  await page.goto("/dev/artifact-share?mentions=1");
+  await moveFromHeader(page, "team");
+  const box = await commentBox(page);
+  const suggestions = page.getByRole("listbox", { name: "Mention suggestions" });
+  await page.keyboard.type("Ask @le");
+  await expect(suggestions.getByRole("option")).toHaveText([/@leah/]);
+  await page.keyboard.press("Escape");
+
+  await mentionsNetwork(page, "fail");
+  await moveFromHeader(page, "private");
+  await box.click();
+  await page.keyboard.press("End");
+  // The list in hand stays: suggestions never blink out because a reload failed.
+  await page.keyboard.type(" @le");
+  await expect(suggestions.getByRole("option")).toHaveText([/@leah/]);
+  await page.keyboard.press("Escape");
+  // What matches nothing is not called "no match" or "nobody": the newest list is not known.
+  await page.keyboard.type(" @zz");
+  await expect(page.getByText(unavailableHint)).toBeVisible();
+  await expect(page.getByText(nobodyHint, { exact: false })).toHaveCount(0);
+  await expect(page.getByText("No match.", { exact: false })).toHaveCount(0);
+
+  // The network is back, and coming back to the window asks again: the private artifact's list shows under the same "@".
+  await mentionsNetwork(page, "ok");
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByText(nobodyHint, { exact: false })).toBeVisible();
+  await expect(page.getByText(unavailableHint)).toHaveCount(0);
+});
+
 test("should say Pending in the header when the team's sharing waits for approval", async ({ page }) => {
   const share = await openAsOwner(page);
   await share.click();

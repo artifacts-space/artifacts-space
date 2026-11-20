@@ -82,8 +82,8 @@ export function CommentComposer({ label, placeholder, submitLabel, initialBody =
   /** The rich box, loaded and waiting for the plain box to stop being typed in. */
   const ready = useRef<CommentEditorApi | null>(null);
   const opening = useRef(initialBody);
-  const { candidates, self, resolved } = useMentionables();
-  const mentions = useMemo<MentionSource>(() => ({ candidates, self, resolved }), [candidates, self, resolved]);
+  const { candidates, self, resolved, list } = useMentionables();
+  const mentions = useMemo<MentionSource>(() => ({ candidates, self, resolved, list }), [candidates, self, resolved, list]);
   const { attach, wanted, want } = useWantsEditor(autoFocus);
 
   useEffect(() => {

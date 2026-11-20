@@ -4,6 +4,8 @@ import { PixelAvatar } from "@/components/pixel-avatar";
 import type { Mentionable } from "@/lib/comments/mention-autocomplete";
 import { cn } from "@/lib/utils";
 
+import type { MentionListState } from "./mention-list-load";
+
 /** The popover look the suggestions and the hint share, under the "@" being typed. */
 export const mentionPopoverClass = "z-50 max-w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md";
 
@@ -15,13 +17,6 @@ export function MentionHint({ query, self, hasCandidates, list = "ready" }: { qu
     </p>
   );
 }
-
-/**
- * What is known about who can be mentioned: the list is here ("ready"), on
- * its way, or could not be loaded. The hint claims that nobody can be
- * mentioned, or that nothing matches, only of a list that is here.
- */
-export type MentionListState = "ready" | "loading" | "unavailable";
 
 /** The list is on its way: the hint is replaced by the list as soon as it arrives. */
 export const MENTIONS_LOADING = "Loading the people you can mention…";
