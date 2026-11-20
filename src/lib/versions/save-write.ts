@@ -206,9 +206,12 @@ async function afterReviewedSave(spec: SaveSpec, reviewed: ReviewedPlan, record:
       console.error("[versions] Dropping a superseded session version failed", error instanceof Error ? error.name : "unknown error");
     });
   }
-  await pruneArtifactVersions(record.id).catch((error: unknown) => {
-    console.error("[versions] Pruning after a save failed", error instanceof Error ? error.name : "unknown error");
-  });
+  // History grows only when the save wrote a version row: a save that reused the latest version leaves nothing new to prune.
+  if (reviewed.newVersion) {
+    await pruneArtifactVersions(record.id).catch((error: unknown) => {
+      console.error("[versions] Pruning after a save failed", error instanceof Error ? error.name : "unknown error");
+    });
+  }
   return reviewed.approval.outcome === "pending" ? "pending" : "applied";
 }
 

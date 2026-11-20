@@ -25,7 +25,7 @@ export const rateLimitPlacements: Record<RateLimitName, LimitPlacement> = {
   artifactUpdateByToken: { per: "token", where: "artifacts_update, artifacts_restore_version, canvas_frame_save, canvas_frame_update, canvas_frame_delete, files_attach, files_replace, page_files_publish", refusal: "mcp-429", group: "MCP and artifacts" },
   artifactCreate: { per: "user", where: "artifacts_create, files_create_artifact, and the web app", refusal: "tool-error", group: "MCP and artifacts" },
   artifactUpdate: { per: "user", where: "Every artifact edit, from MCP and the web app, except web autosaves that continue an editing session", refusal: "tool-error", group: "MCP and artifacts" },
-  artifactAutosave: { per: "user", where: "Web editor autosaves that continue an editing session (the editor sends at most one every 5 seconds)", refusal: "form", group: "MCP and artifacts" },
+  artifactAutosave: { per: "user", where: "Web editor autosaves that continue an editing session (the editor sends at most one every 2 seconds)", refusal: "form", group: "MCP and artifacts" },
   organize: { per: "user", where: "Project and tag changes, from MCP and the web app", refusal: "tool-error", group: "MCP and artifacts" },
   clientInfoRecord: { per: "user", where: "Storing what an MCP client says it is on initialize (over the limit it is not stored; the request still runs)", refusal: "not-counted", group: "MCP and artifacts" },
   catchUp: { per: "user", where: "An open canvas or interface asking, when its tab comes back, whether an agent or another tab saved it (over the limit it shows the newest save on the next reload)", refusal: "not-counted", group: "MCP and artifacts" },

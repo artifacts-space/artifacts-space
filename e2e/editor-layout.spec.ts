@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./support/test";
 
-/** Autosave sends at most one save every 5 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
+/** Autosave waits a second after the last change and sends at most one save every 2 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
 const savedWithin = { timeout: 12_000 };
 
 declare global {

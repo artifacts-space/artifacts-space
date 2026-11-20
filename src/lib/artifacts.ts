@@ -50,7 +50,7 @@ import { generatePublicId } from "@/lib/public-id";
 import { assertContentFits } from "@/lib/quota/usage";
 import type { SharingActor } from "@/lib/sharing/rules";
 import type { SaveOptions } from "@/lib/save-guard";
-import { writeArtifactSave, type SaveContext } from "@/lib/artifact-save";
+import { startSaveLimit, writeArtifactSave, type SaveContext } from "@/lib/artifact-save";
 import { notifyDocumentMentions } from "@/lib/comments/document-mentions";
 import { showsInSearch } from "@/lib/search/search-rules";
 import { readSheetFormat } from "@/lib/sheet-format/rules";
@@ -430,11 +430,13 @@ async function saveChanges(changes: ArtifactChanges, context: SaveContext): Prom
  */
 export async function saveArtifactUpdate(userId: string, id: string, input: ArtifactUpdateInput, actor: SharingActor = "person", options: SaveOptions = {}): Promise<SavedArtifact | null> {
   const sent = artifactUpdateSchema.parse(input);
+  // The save's limit is counted beside the read of the artifact, not after it.
+  const limited = startSaveLimit(userId, options);
   const before = await getEditableArtifact(userId, { id });
   if (!before) return null;
   const parsed = contentForSave(sent.kind ?? before.kind, sent);
   assertArtifactSize(parsed);
-  return saveChanges(parsed, { editorId: userId, before, actor, options });
+  return saveChanges(parsed, { editorId: userId, before, actor, options, limited });
 }
 
 /**

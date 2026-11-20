@@ -15,7 +15,7 @@ import { getTeamMembershipById } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { forgetArtifactCache } from "./cache";
-import { dropSupersededSessionVersion, ensureHistoryStart, fileVersion, latestVersion, pruneArtifactVersions, versionMatching } from "./history";
+import { dropSupersededSessionVersion, ensureHistoryStart, fileSave, filesOf, pruneArtifactVersions, readHistory, versionMatching, type FiledSave, type KnownHistory, type VersionFiles } from "./history";
 import type { EditSessionStep } from "./history-rules";
 import { decideEdit, editNeedsAuditRow, isReviewedLevel, sameReviewedFields } from "./rules";
 
@@ -181,22 +181,65 @@ export interface ArtifactSave {
  * the newer save's. The returned status is what the rule decided for this save.
  */
 export async function recordArtifactSave(save: ArtifactSave): Promise<EditStatus> {
-  const { before, after, editorId } = save;
-  if (before) await ensureHistoryStart(before);
-  const approvedId = before && isReviewedLevel(after.visibility) ? await ensureApprovedBefore(before) : null;
-  // A continuing session that could not merge (its version was approved or waiting) replaces that version once approval moved on.
-  const previous = save.session === "continue" ? await latestVersion(after.id) : null;
-  const byAgent = save.actor === "agent";
-  const versionId = await fileVersion({ ...after, approvedVersionId: approvedId ?? after.approvedVersionId }, { editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, session: save.session, harness: save.harness, byAgent });
-  const status = approvedId ? await approvalFor(after, approvedId, versionId, save) : "applied";
-  await dropSupersededSessionVersion(after, previous, { editorId, saveKind: save.saveKind, session: save.session, harness: save.harness, byAgent, newVersionId: versionId }).catch((error: unknown) => {
-    // Housekeeping only: an extra version in History is the worst case.
+  const { before, after } = save;
+  return before && isReviewedLevel(after.visibility) ? recordReviewedSave(save, before) : recordPlainSave(save);
+}
+
+/** The save as fileSave files it. */
+function filedOf(save: ArtifactSave): FiledSave {
+  return { editorId: save.editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, session: save.session, harness: save.harness, byAgent: save.actor === "agent" };
+}
+
+/** The version a continuing session filed before this save: when this save could not merge into it (it was approved or waiting), it is replaced once approval moved on. */
+function sessionPrevious(save: ArtifactSave, history: KnownHistory): VersionFiles | null {
+  return save.session === "continue" && history.latest ? filesOf(history.latest) : null;
+}
+
+/** Housekeeping after a save's version is filed. Neither step may fail the save: an extra version in History is the worst case, and the cleanup job prunes again. */
+async function tidyHistory(after: ArtifactRecord, previous: VersionFiles | null, filed: FiledSave, outcome: { versionId: string; added: boolean }) {
+  await dropSupersededSessionVersion(after, previous, { ...filed, newVersionId: outcome.versionId }).catch((error: unknown) => {
     console.error("[versions] Dropping a superseded session version failed", error instanceof Error ? error.name : "unknown error");
   });
+  // History grows only when a version row is added: a save that merged into the latest version, or changed nothing it shows, leaves nothing new to prune.
+  if (!outcome.added) return;
   await pruneArtifactVersions(after.id).catch((error: unknown) => {
-    // Pruning is housekeeping; the cleanup job retries it.
     console.error("[versions] Pruning after a save failed", error instanceof Error ? error.name : "unknown error");
   });
+}
+
+/**
+ * A new artifact, or a save of a private or team artifact: no approval. The
+ * history is read once (the latest version beside the saved row, and the
+ * protected versions, together), the version is filed, and History is pruned
+ * only when a row was added. An autosave that continues a session is two
+ * round trips: the read, and the merge.
+ */
+async function recordPlainSave(save: ArtifactSave): Promise<EditStatus> {
+  const { before, after } = save;
+  let history = await readHistory(after);
+  if (!history.latest && before) {
+    // Saved before history began: its first version is what it showed before this save.
+    await ensureHistoryStart(before);
+    history = await readHistory(after);
+  }
+  const filed = filedOf(save);
+  const outcome = await fileSave(after, filed, history);
+  // A new artifact has one version: nothing to prune.
+  await tidyHistory(after, sessionPrevious(save, history), filed, { ...outcome, added: outcome.added && history.latest !== null });
+  return "applied";
+}
+
+/** A save of a link or public artifact that did not write its own version (save-write.ts does for every edit): the approval rule decides what readers outside the team see. */
+async function recordReviewedSave(save: ArtifactSave, before: ArtifactRecord): Promise<EditStatus> {
+  const { after } = save;
+  await ensureHistoryStart(before);
+  const approvedId = await ensureApprovedBefore(before);
+  const row = { ...after, approvedVersionId: approvedId };
+  const history = await readHistory(row);
+  const filed = filedOf(save);
+  const outcome = await fileSave(row, filed, history);
+  const status = await approvalFor(after, approvedId, outcome.versionId, save);
+  await tidyHistory(after, sessionPrevious(save, history), filed, outcome);
   return status;
 }
 

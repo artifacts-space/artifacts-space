@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
-import { and, desc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray, lte, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { artifact, artifactVersion, sharingRequest, type ArtifactRecord, type ArtifactVersionRecord } from "@/db/schema";
@@ -79,6 +79,58 @@ export async function latestVersion(artifactId: string): Promise<ArtifactVersion
     .orderBy(desc(artifactVersion.createdAt), desc(artifactVersion.id))
     .limit(1);
   return row ?? null;
+}
+
+/** A version without its text: what filing a save reads of the latest version. */
+export type VersionMeta = Omit<ArtifactVersionRecord, "content">;
+
+/**
+ * The newest version beside a saved row: its fields, and whether its content
+ * is the row's. The database compares the two by hash, so a save does not
+ * read the text of a large document back to see that it changed. The text
+ * comes back only when it can point at uploaded files (`fileContent`): the
+ * rule that keeps a dropped file restorable reads those (dropsShownImage).
+ */
+export interface LatestBeside {
+  version: VersionMeta;
+  sameContent: boolean;
+  /** The version's content when it can point at uploaded files (a ui spec, a canvas, Markdown with a file address in it); null otherwise. */
+  fileContent: string | null;
+}
+
+/** A version as the file rules read it: its fields, with its content only as far as it can point at uploaded files (empty otherwise). A whole version row is one too. */
+export type VersionFiles = VersionMeta & { content: string };
+
+/** The latest version as the file rules read it. */
+export function filesOf(latest: LatestBeside): VersionFiles {
+  return { ...latest.version, content: latest.fileContent ?? "" };
+}
+
+/**
+ * SQL: the version's content when it can point at uploaded files, else null.
+ * Wider than the rule that finds them (fileRefsInContent), never narrower:
+ * every ui spec and canvas, and Markdown that has the files address in it.
+ */
+const fileContentSql = sql<string | null>`case when ${artifactVersion.kind} in ('ui', 'canvas') or (${artifactVersion.kind} = 'markdown' and strpos(${artifactVersion.content}, '/api/files/') > 0) then ${artifactVersion.content} end`;
+
+/** The newest version of the artifact `record` is a row of, compared with it (LatestBeside), or null. */
+export async function latestVersionBeside(record: Pick<ArtifactRecord, "id" | "content">): Promise<LatestBeside | null> {
+  const columns = Object.fromEntries(Object.entries(getTableColumns(artifactVersion)).filter(([name]) => name !== "content")) as Omit<ReturnType<typeof getTableColumns<typeof artifactVersion>>, "content">;
+  const hash = createHash("sha256").update(record.content, "utf8").digest("hex");
+  const [row] = await getDb()
+    .select({ ...columns, sameContent: sql<boolean>`encode(sha256(convert_to(${artifactVersion.content}, 'UTF8')), 'hex') = ${hash}`, fileContent: fileContentSql })
+    .from(artifactVersion)
+    .where(eq(artifactVersion.artifactId, record.id))
+    .orderBy(desc(artifactVersion.createdAt), desc(artifactVersion.id))
+    .limit(1);
+  if (!row) return null;
+  const { sameContent, fileContent, ...version } = row;
+  return { version, sameContent, fileContent };
+}
+
+/** True when the latest version shows readers what `record` shows (sameReviewedFields, with the content compared in the database). */
+function showsSame(latest: LatestBeside, record: ArtifactRecord): boolean {
+  return latest.sameContent && sameReviewedFields({ ...latest.version, content: record.content }, record);
 }
 
 /**
@@ -170,7 +222,7 @@ export async function versionMatching(record: ArtifactRecord, createdBy: string 
  * an agent's version is relabelled, never one a person saved, and only while
  * the artifact is still at this save.
  */
-export async function restampVersion(latest: ArtifactVersionRecord, record: ArtifactRecord, save: FiledSave) {
+export async function restampVersion(latest: VersionMeta, record: ArtifactRecord, save: FiledSave) {
   // A version a person saved stays theirs: an agent never relabels it (saveSourceKey).
   if (!save.byAgent || !save.harness || latest.createdBy !== save.editorId || latest.harness === null || !versionByAgent(latest)) return;
   // Versions an approval or a decision names (the approved one too) keep what was decided.
@@ -218,16 +270,44 @@ export interface FiledSave {
  * one overtook never becomes the newest version (insertSaveVersion).
  */
 export async function fileVersion(record: ArtifactRecord, save: FiledSave): Promise<string> {
-  const latest = await latestVersion(record.id);
-  if (latest && save.saveKind === "edit" && sameReviewedFields(latest, record)) {
-    await restampVersion(latest, record, save);
-    return latest.id;
+  return (await fileSave(record, save)).versionId;
+}
+
+/** What fileSave needs to know of the artifact's history; read together when the caller has not read it already. */
+export interface KnownHistory {
+  latest: LatestBeside | null;
+  /** Versions a request ever named (protectedVersions): never merged into. */
+  referenced: ReadonlySet<string>;
+}
+
+/** The latest version and the protected ones, read together: one round trip. */
+export async function readHistory(record: ArtifactRecord): Promise<KnownHistory> {
+  const [latest, { referenced }] = await Promise.all([latestVersionBeside(record), protectedVersions(record.id, record.approvedVersionId)]);
+  return { latest, referenced };
+}
+
+/**
+ * fileVersion, also saying whether a version row was added (`added`): only
+ * then can History hold more than retention keeps, so only then is it worth
+ * pruning. `known` is the history the caller already read (readHistory).
+ */
+export async function fileSave(record: ArtifactRecord, save: FiledSave, known?: KnownHistory): Promise<{ versionId: string; added: boolean }> {
+  const { latest, referenced } = known ?? (await readHistory(record));
+  const kept = latest ? await fileIntoLatest(latest, referenced, record, save) : false;
+  if (latest && kept) return { versionId: latest.version.id, added: false };
+  const versionId = await insertSaveVersion(record, { createdBy: save.editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, harness: save.harness, byAgent: save.byAgent });
+  return { versionId, added: true };
+}
+
+/** Whether the save needs no row of its own: it changes nothing the latest version shows, or it merged into it. */
+async function fileIntoLatest(latest: LatestBeside, referenced: ReadonlySet<string>, record: ArtifactRecord, save: FiledSave): Promise<boolean> {
+  if (save.saveKind === "edit" && showsSame(latest, record)) {
+    await restampVersion(latest.version, record, save);
+    return true;
   }
-  const { referenced } = await protectedVersions(record.id, record.approvedVersionId);
   // A save that drops an uploaded icon or cover image files its own version, so the image stays restorable.
-  const merges = latest && shouldMergeInto(latest, { ...save, now: record.updatedAt }, referenced) && !dropsShownImage(latest, record);
-  if (latest && merges && (await mergeInto(latest.id, record, save))) return latest.id;
-  return insertSaveVersion(record, { createdBy: save.editorId, saveKind: save.saveKind, restoredFromId: save.restoredFromId ?? null, harness: save.harness, byAgent: save.byAgent });
+  const merges = shouldMergeInto(latest.version, { ...save, now: record.updatedAt }, referenced) && !dropsShownImage(filesOf(latest), record);
+  return merges && mergeInto(latest.version.id, record, save);
 }
 
 /**
@@ -239,7 +319,7 @@ export async function fileVersion(record: ArtifactRecord, save: FiledSave): Prom
  */
 export async function dropSupersededSessionVersion(
   record: ArtifactRecord,
-  previous: ArtifactVersionRecord | null,
+  previous: VersionFiles | null,
   save: FiledSave & { newVersionId: string },
 ): Promise<void> {
   if (!previous || previous.id === save.newVersionId || save.session !== "continue" || dropsShownImage(previous, record)) return;
