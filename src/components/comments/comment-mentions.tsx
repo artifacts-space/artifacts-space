@@ -14,7 +14,7 @@ import { matchMentionables, type Mentionable } from "@/lib/comments/mention-auto
 import { splitMentions, type MentionKind } from "@/lib/comments/mentions";
 
 import { mentionEditAt, mentionMatchAt } from "./mention-match";
-import { MentionHint, mentionPopoverClass, MentionSuggestionList } from "./mention-suggestions";
+import { MentionHint, mentionPopoverClass, MentionSuggestionList, type MentionListState } from "./mention-suggestions";
 
 /** Who the writer can mention, read fresh on every keystroke (the list loads after the box). */
 export interface MentionSource {
@@ -22,8 +22,8 @@ export interface MentionSource {
   self: Mentionable | null;
   /** Handles that show as chips: the candidates and the writer. */
   resolved: ReadonlyMap<string, MentionKind>;
-  /** The list could not be loaded: the hint says so instead of saying there is nobody to mention. */
-  unavailable?: boolean;
+  /** Whether the list is here, on its way, or could not be loaded ("ready" when left out): the hint says which. */
+  list?: MentionListState;
 }
 
 const suggestionKey = new PluginKey("commentMention");
@@ -42,7 +42,7 @@ interface MentionMenuProps {
   query: string;
   self: Mentionable | null;
   hasCandidates: boolean;
-  unavailable: boolean;
+  list: MentionListState;
   command: (item: Mentionable) => void;
   onActive: (index: number) => void;
   ref?: React.Ref<MentionMenuHandle>;
@@ -65,7 +65,7 @@ function picks(event: KeyboardEvent): boolean {
  * Escape closes (the plugin does that). Focus stays in the box. When nothing
  * matches, a short hint says why, and Enter goes on to the text.
  */
-function MentionMenu({ listId, items, query, self, hasCandidates, unavailable, command, onActive, ref }: MentionMenuProps) {
+function MentionMenu({ listId, items, query, self, hasCandidates, list, command, onActive, ref }: MentionMenuProps) {
   const [active, setActive] = useState(0);
   const [itemsSeen, setItemsSeen] = useState(items);
   if (itemsSeen !== items) {
@@ -95,7 +95,7 @@ function MentionMenu({ listId, items, query, self, hasCandidates, unavailable, c
     },
   }), [active, command, items]);
 
-  if (items.length === 0) return <MentionHint query={query} self={self} hasCandidates={hasCandidates} unavailable={unavailable} />;
+  if (items.length === 0) return <MentionHint query={query} self={self} hasCandidates={hasCandidates} list={list} />;
   return <MentionSuggestionList id={listId} options={items} activeIndex={active} optionId={(index) => `${listId}-${String(index)}`} onPick={command} onHover={setActive} />;
 }
 
@@ -141,10 +141,10 @@ function renderMentionMenu(source: () => MentionSource, listId: string, onOpen: 
   let unmount: (() => void) | null = null;
   let shown: MentionProps | null = null;
   const propsFor = (props: MentionProps): MentionMenuProps => {
-    const { self, candidates, unavailable = false } = source();
+    const { self, candidates, list = "ready" } = source();
     return {
       listId,
-      unavailable,
+      list,
       // Matched here, not taken from the plugin: its items are from when the query last changed.
       items: matchMentionables(candidates, props.query),
       query: props.query,

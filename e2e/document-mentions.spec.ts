@@ -81,7 +81,9 @@ test("should close the list on Escape and leave what was typed as plain text", a
 test("should show the list under an @ already being typed as soon as the people to mention arrive", async ({ page }) => {
   await openAtFirstParagraph(page, "&mentions=late");
   await page.keyboard.type(" @da");
-  await expect(page.getByText("No one to mention here yet. You can mention this artifact's author and your teammates.")).toBeVisible();
+  // Nothing is known yet, so the hint does not claim there is nobody to mention.
+  await expect(page.getByText("Loading the people you can mention…")).toBeVisible();
+  await expect(page.getByText("No one to mention here yet.")).toHaveCount(0);
 
   await page.evaluate(() => window.dispatchEvent(new Event("fixture:mentions-arrive")));
 

@@ -3,6 +3,7 @@
 import { createContext, use, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MentionSource } from "@/components/comments/comment-mentions";
+import type { MentionListState } from "@/components/comments/mention-suggestions";
 import type { ActionResult } from "@/lib/artifact-types";
 import { composerMentionMap, type MentionDirectory } from "@/lib/comments/mention-autocomplete";
 
@@ -30,6 +31,12 @@ interface Loaded {
   directory: MentionDirectory | null;
 }
 
+/** What is known of the list for this artifact: nothing has answered yet, the answer was a failure, or it is here. */
+function listState(answer: Loaded | null): MentionListState {
+  if (answer === null) return "loading";
+  return answer.directory === null ? "unavailable" : "ready";
+}
+
 /**
  * Asks again, once, the next time the window gets focus after a load that
  * failed: a dropped request does not leave the editor without its list until
@@ -51,7 +58,7 @@ function useRetryOnFocus(answer: Loaded | null, retry: () => void) {
 /**
  * Gives the document editor inside it @mentions for one saved artifact: who
  * the editor can name, loaded once after the editor is on screen. Until the
- * list arrives, typing @ shows a short hint, and a handle typed in full still
+ * list arrives, typing @ says it is loading, and a handle typed in full still
  * reaches its owner: by the save, or once they can read the artifact. A list
  * that could not be loaded is asked for again when the window next gets
  * focus, never on a timer. Without an id (an artifact not stored
@@ -82,7 +89,7 @@ export function DocumentMentionsProvider({ publicId, children }: { publicId: str
   const value = useMemo<MentionSource | null>(() => {
     if (!load || !publicId) return null;
     const directory = mine?.directory ?? emptyDirectory;
-    return { candidates: directory.candidates, self: directory.self, resolved: composerMentionMap(directory), unavailable: mine !== null && mine.directory === null };
+    return { candidates: directory.candidates, self: directory.self, resolved: composerMentionMap(directory), list: listState(mine) };
   }, [load, publicId, mine]);
   return <SourceContext value={value}>{children}</SourceContext>;
 }

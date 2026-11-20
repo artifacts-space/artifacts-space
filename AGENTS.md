@@ -1879,13 +1879,14 @@ Markdown an agent reads agrees with the page. Every save of content
   not served stays hidden, and one taken out of the text drops out.
 - `document-mentions.db.test.ts` covers the rules against Postgres.
 - The document editor offers the same `@` list as the comment box: the
-  `CommentMentions` extension (`comment-mentions.tsx`), added to
-  `rich-markdown-editor.tsx` only where `DocumentMentionsLoader`
-  (`src/components/editor/document-mentions-context.tsx`) is above it: the
-  artifact page's editor (`edit-surface.tsx`) and the workspace
-  (`app/page.tsx`), for a saved Markdown artifact (`DocumentContent` in
-  `inline-content.tsx`). Fixtures, a new artifact, and a Markdown block in
-  an interface have no loader, so nothing is fetched and `@` is plain text.
+  `CommentMentions` extension (`comment-mentions.tsx`), always in
+  `rich-markdown-editor.tsx` and off until a `DocumentMentionsLoader`
+  (`src/components/editor/document-mentions-context.tsx`) above it offers
+  people for a saved Markdown artifact (`DocumentContent` in
+  `inline-content.tsx`): the artifact page's editor (`edit-surface.tsx`),
+  the workspace (`app/page.tsx`), and the `/dev/editor?mentions=` fixture.
+  Without a loader or an id (other fixtures, a new artifact, a Markdown block
+  in an interface) nothing is fetched and `@` is plain text.
   A pick writes plain `@handle` text, so the save path above is the only
   thing that notifies. The list is `documentMentionDirectory`
   (`mentionables.ts`): the save's own rule without "can read it", since a
@@ -1898,9 +1899,11 @@ Markdown an agent reads agrees with the page. Every save of content
   while it is being written, and either change remounts the editor and drops
   the text (`e2e/new-artifact.spec.ts` fails on it). `DocumentMentionsProvider`
   always renders, with a null id until there is one.
-- A list that could not be loaded says so in the hint (`unavailable`) and
-  is asked for again when the window next gets focus (never on a timer); a
-  list loaded for one artifact is never offered on another.
+- The hint under an `@` claims "no one to mention" or "no match" only of a
+  list that is here (`MentionListState`): one on its way says it is loading,
+  and one that could not be loaded says so and is asked for again when the
+  window next gets focus (never on a timer). A list loaded for one artifact
+  is never offered on another.
 - A list that arrives while an `@` is already being typed redraws the open
   menu (`refreshList` in the extension's storage): the suggestion plugin
   redraws only when the query changes.
