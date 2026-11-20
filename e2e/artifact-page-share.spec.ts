@@ -70,6 +70,47 @@ test("should move a personal artifact into a team from the page's Share when the
   await expect(page.locator("[data-fixture-sharing]")).toHaveText("private:none");
 });
 
+test("should offer the team's people under @ in a comment after the move, without a reload", async ({ page }) => {
+  // `?mentions=1`: a comment box whose list follows the fixture's sharing, as the server's follows who can read the artifact.
+  await page.goto("/dev/artifact-share?mentions=1");
+  const box = page.getByRole("region", { name: "Comments" }).getByRole("textbox", { name: "Write a comment" });
+  const suggestions = page.getByRole("listbox", { name: "Mention suggestions" });
+  await box.click();
+  await expect(box, "the rich box took over").toHaveAttribute("contenteditable", "true");
+  await page.keyboard.type("Ask @");
+  // While it is private nobody else can read it, so there is nobody to mention.
+  await expect(page.getByText("No one to mention here yet.", { exact: false })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await header(page).getByRole("button", { name: "Private. Share settings" }).click();
+  const dialog = page.getByRole("dialog", { name: "Share “Launch checklist”" });
+  await dialog.getByRole("radiogroup", { name: "Who can read it" }).getByRole("radio", { name: /^Team/ }).click();
+  await dialog.getByRole("button", { name: "Move to Platform" }).click();
+  await expect(page.locator("[data-fixture-sharing]")).toHaveText("team:fixture-platform");
+
+  // The same box, still holding its draft: the list was loaded again when the sharing was saved.
+  // A new "@": Escape keeps the one it closed shut.
+  await box.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" or @le");
+  await expect(box).toHaveText("Ask @ or @le");
+  await expect(suggestions.getByRole("option")).toHaveText([/@leah/]);
+  await page.keyboard.press("Enter");
+  await expect(box.locator("[data-mention=leah]"), "a mention that reaches someone shows as a chip").toHaveText("@leah");
+
+  // Private again, and nobody can be mentioned again.
+  await header(page).getByRole("button", { name: "Team. Share settings" }).click();
+  const reopened = page.getByRole("dialog", { name: "Share “Launch checklist”" });
+  await reopened.getByRole("radio", { name: /^Private/ }).click();
+  await reopened.getByRole("button", { name: "Move to Personal" }).click();
+  await expect(page.locator("[data-fixture-sharing]")).toHaveText("private:none");
+  await box.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("and @da");
+  await expect(page.getByText("No one to mention here yet.", { exact: false })).toBeVisible();
+  await expect(suggestions).toHaveCount(0);
+});
+
 test("should say Pending in the header when the team's sharing waits for approval", async ({ page }) => {
   const share = await openAsOwner(page);
   await share.click();

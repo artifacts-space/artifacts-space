@@ -3,6 +3,7 @@
 import { createContext, use, useEffect, useMemo, useState } from "react";
 
 import { loadMentionablesAction } from "@/app/(workspace)/threads/actions";
+import { onSharingChanged } from "@/components/app/sharing-events";
 import type { ActionResult } from "@/lib/artifact-types";
 import { composerMentionMap, type MentionDirectory, type Mentionable } from "@/lib/comments/mention-autocomplete";
 import type { MentionKind } from "@/lib/comments/mentions";
@@ -32,10 +33,20 @@ export function MentionablesLoader({ load, children }: { load: LoadMentionables;
  * Loads who the viewer can mention on this artifact once, and shares the list
  * with every composer in the thread. Without the list, typing @ shows a short
  * hint instead of suggestions; mentions still work when typed in full.
+ *
+ * Who a mention reaches follows who can read the artifact, so the list is
+ * loaded again when the artifact's sharing is saved in this tab
+ * (sharing-events.ts): a thread that stays on the page across a move to a
+ * team offers the teammates at once. The list in hand stays until the new
+ * one arrives, and stays if it cannot be loaded.
  */
 export function MentionablesProvider({ publicId, children }: { publicId: string; children: React.ReactNode }) {
   const [directory, setDirectory] = useState<MentionDirectory>(emptyDirectory);
+  /** Counts the saves of this artifact's sharing since the provider mounted; each one asks for the list again. */
+  const [sharingSaves, setSharingSaves] = useState(0);
   const load = use(LoaderContext);
+
+  useEffect(() => onSharingChanged(publicId, () => { setSharingSaves((count) => count + 1); }), [publicId]);
 
   useEffect(() => {
     let active = true;
@@ -47,7 +58,7 @@ export function MentionablesProvider({ publicId, children }: { publicId: string;
     return () => {
       active = false;
     };
-  }, [load, publicId]);
+  }, [load, publicId, sharingSaves]);
 
   const value = useMemo(() => ({ candidates: directory.candidates, self: directory.self, resolved: composerMentionMap(directory) }), [directory]);
   return <MentionablesContext value={value}>{children}</MentionablesContext>;

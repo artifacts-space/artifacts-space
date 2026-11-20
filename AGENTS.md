@@ -1945,6 +1945,21 @@ Fixtures supply people to mention through `MentionablesLoader`;
 `/dev/inline-comments` keeps every body it is sent in
 `window.fixtureCommentWrites`.
 
+Who a comment can mention follows who can read the artifact
+(`listMentionables`): a private artifact's list is empty. The list
+(`MentionablesProvider`) is loaded once per thread on the page, and the
+artifact page's thread stays on the page across a sharing change, so a move
+to a team once left "@" with nobody to offer until a reload. Every save of
+sharing in the browser says so (`announceSharingChanged` in
+`src/components/app/sharing-events.ts`: the Share dialog's save, and Undo
+on the move toast), and the provider loads the list again, keeping the one
+in hand until the new one arrives. A new path in the browser that saves an
+artifact's sharing or its comments setting announces it too. A change made
+elsewhere (another tab, an approval, an agent) sends no signal: that list
+is new after a reload. `e2e/artifact-page-share.spec.ts` holds this on
+`/dev/artifact-share?mentions=1`, whose list follows the fixture's sharing,
+and `e2e/comment-mentions-after-move-db.spec.ts` on the real page.
+
 ### Replaced files
 
 Replace (a file's row in the Files section or in the list of attached files,
