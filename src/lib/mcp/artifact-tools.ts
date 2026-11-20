@@ -38,6 +38,7 @@ import { SEARCH_QUERY_MAX_CHARS, SEARCH_TEXT_MAX_CHARS, searchWithReferenced } f
 import { toMcpArtifact, toMcpListItem, type McpViewContext } from "./artifact-view";
 import { asSaved, baseVersionField, baseVersionOf, editConflictResult } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
+import { savedMentions, teamsListResult } from "./mention-tools";
 import { applyTagChangeFor, tagChangeFields, tagChangeFor, tagFilterField, tagFilterFor, tagsField } from "./tag-tools";
 import { artifactToolCopy } from "./routing-copy";
 import { gateTools, type ToolServer } from "./tool-access";
@@ -302,10 +303,7 @@ function registerReadTools(server: ToolServer, userId: string) {
       ...artifactToolCopy.teams_list,
       inputSchema: {},
     },
-    () => respond(async () => {
-      const teams = await listTeamsForUser(userId);
-      return teams.map((team) => ({ slug: team.slug, name: team.name, role: team.role, personal: team.personal, teamSharingNeedsApproval: team.teamSharingNeedsApproval }));
-    }),
+    () => respond(async () => teamsListResult(userId, await listTeamsForUser(userId))),
   );
 }
 
@@ -324,7 +322,8 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
       const result = await shareAfterSave(userId, created, teams, { visibility, team, comments });
       // What the agent created, with the token of that save, even if someone saved since (asSaved).
       const artifact = { ...toMcpArtifact(asSaved(result.artifact, created), view, { canEdit: true }), ...(await baseVersionOf(created.id, created.updatedAt)) };
-      return { artifact, sharing: result.sharing, comments: result.comments };
+      const mentions = await savedMentions(created.id, userId);
+      return { artifact, sharing: result.sharing, comments: result.comments, ...(mentions ? { mentions } : {}) };
     }),
   );
 
@@ -360,7 +359,9 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
       // With no save ("unchanged") there is no base of its own to hand back, so none is: the agent keeps the one it has.
       const ownBase = saved.edit === "unchanged" ? {} : await baseVersionOf(record.id, saved.artifact.updatedAt);
       const current = { ...toMcpArtifact(asSaved(result.artifact, saved.artifact), view, { canEdit: true }), ...ownBase };
-      return { artifact: current, edit: saved.edit, sharing: result.sharing, comments: result.comments };
+      // What the text's @handles do, when this call changed the text or who can read it.
+      const mentions = input.content !== undefined || visibility !== undefined ? await savedMentions(record.id, userId) : null;
+      return { artifact: current, edit: saved.edit, sharing: result.sharing, comments: result.comments, ...(mentions ? { mentions } : {}) };
     }),
   );
 

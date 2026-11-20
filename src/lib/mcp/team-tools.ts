@@ -16,6 +16,7 @@ import { siteUrl } from "@/lib/site-origin";
 import { UserFacingError } from "@/lib/user-facing-error";
 
 import { artifactRefField } from "./artifact-ref-field";
+import { toMcpMentions } from "./mention-tools";
 import { gateTools, type ToolServer } from "./tool-access";
 
 /**
@@ -193,7 +194,7 @@ function registerCommentTools(server: ToolServer, userId: string) {
     {
       title: "Create comment",
       description:
-        "Posts a markdown comment on an artifact you can read and whose comments setting lets you in (see `comments` in artifacts_get), or a reply with replyTo. To comment on specific words, pass quote: people then see your comment at those words. Copy the words exactly as they read in the artifact, without Markdown marks; words that are not there are refused. A reply cannot have a quote. Mention people or agents with @handle. A mention lands only for the artifact's author or your teammates who can see the artifact; others are listed under mentions.refused with the reason. Agent-to-agent mentions stop after several agent replies in a row until a person posts, and muted agents cannot post.",
+        "Posts a markdown comment on an artifact you can read and whose comments setting lets you in (see `comments` in artifacts_get), or a reply with replyTo. To comment on specific words, pass quote: people then see your comment at those words. Copy the words exactly as they read in the artifact, without Markdown marks; words that are not there are refused. A reply cannot have a quote. Mention people or agents by their exact @handle, never their name: teams_list lists your teammates' handles. A mention lands only for the artifact's author or your teammates who can see the artifact (and its comments), so on a private artifact it reaches nobody but its author; others are listed under mentions.refused with the reason and a next step. Agent-to-agent mentions stop after several agent replies in a row until a person posts, and muted agents cannot post.",
       inputSchema: {
         artifact: artifactRefField(userId),
         body: z.string().min(1).max(COMMENT_MAX_LENGTH).describe("Markdown. No raw HTML; links must be http, https, or mailto."),
@@ -210,7 +211,7 @@ function registerCommentTools(server: ToolServer, userId: string) {
       respond(async () => {
         if (replyTo && quote !== undefined) throw new UserFacingError("A reply cannot have a quote. Leave out quote to reply, or leave out replyTo to start a new comment on those words.");
         const result = await createComment({ actorId: userId, publicId: artifact, body, parentId: replyTo, quote });
-        return { comment: toMcpComment(result.comment), mentions: result.mentions };
+        return { comment: toMcpComment(result.comment), mentions: toMcpMentions(result.mentions) };
       }),
   );
 }
@@ -237,7 +238,7 @@ function registerCommentChangeTools(server: ToolServer, userId: string) {
         const result = await updateComment({ actorId: userId, commentId, body });
         const place = result.comment.anchor ? await commentPlace(result.comment.id) : null;
         const [updated] = place ? await toMcpComments(place.publicId, userId, [result.comment]) : [];
-        return { comment: updated ?? toMcpComment(result.comment), mentions: result.mentions };
+        return { comment: updated ?? toMcpComment(result.comment), mentions: toMcpMentions(result.mentions) };
       }),
   );
 
