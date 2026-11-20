@@ -85,7 +85,15 @@ export default defineConfig({
       // empty for the fixture pages, or the local test database with E2E_LOCAL_DB=1.
       // Google sign-in and the OpenAI domain-check token are pinned off too.
       // A secret of its own unless the shell has one, so the page files fixture can make a token with no .env.local (CI has none).
-      env: { ...e2eDevServerDatabaseEnv(process.env), ...googleSignInOff, ...openAiChallengeOff, BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? productionTestEnv.BETTER_AUTH_SECRET },
+      // The site's origin is this server's own, whatever the shell or .env.local says: dev sign-in follows a link built
+      // from it, and with PLAYWRIGHT_PORT set the default (port 3000) sent the browser to another project's server.
+      env: {
+        ...e2eDevServerDatabaseEnv(process.env),
+        ...googleSignInOff,
+        ...openAiChallengeOff,
+        BETTER_AUTH_URL: `http://localhost:${String(port)}`,
+        BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? productionTestEnv.BETTER_AUTH_SECRET,
+      },
     },
     {
       // `next build` writes .next/ and `next dev` writes .next/dev/, so both can run at once.

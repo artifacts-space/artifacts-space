@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type PointerEvent, type RefObject, type UIEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent, type FocusEvent, type KeyboardEvent, type PointerEvent, type RefObject, type UIEvent } from "react";
+import { flushSync } from "react-dom";
 
 import { fitView, frameView, keepInWindow, nextZoomStep, panBy, wheelZoom, zoomAbout, type BoardView, type Box, type Size } from "@/lib/canvas/view-rules";
 
@@ -48,6 +49,7 @@ export interface PanZoom {
     onPointerCancel: (event: PointerEvent<HTMLElement>) => void;
     onLostPointerCapture: (event: PointerEvent<HTMLElement>) => void;
     onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+    onFocus: (event: FocusEvent<HTMLElement>) => void;
     onScroll: (event: UIEvent<HTMLElement>) => void;
     onDragStart: (event: DragEvent<HTMLElement>) => void;
   };
@@ -106,6 +108,7 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
   const [glide, setGlide] = useState(false);
   const press = useRef<Press | null>(null);
   const reveal = useRef<{ frame: number | null }>({ frame: null });
+  const focusedMidGlide = useRef(false);
   useEffect(() => {
     const pending = reveal.current;
     return () => { if (pending.frame !== null) cancelAnimationFrame(pending.frame); };
@@ -223,15 +226,23 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
   // While a glide runs, the browser measures that scroll against the board as it is drawn at that moment, not where
   // the view comes to rest, so the pan would leave the control off by what the glide had left. The pan ends the
   // glide; once the board is drawn at rest, the focused control is brought into view again, and that scroll is exact.
+  // Whether a glide ran is asked when the focus moves, not only when the scroll arrives: the scroll event comes a
+  // frame later, and on a busy page the glide can be over by then, with the scroll still measured in the middle of it.
+  const onFocus = (event: FocusEvent<HTMLElement>) => {
+    focusedMidGlide.current = event.target !== event.currentTarget && isGliding(event.currentTarget);
+  };
+
   const onScroll = (event: UIEvent<HTMLElement>) => {
     const element = event.currentTarget;
     const { scrollLeft, scrollTop } = element;
     if (scrollLeft === 0 && scrollTop === 0) return;
-    const gliding = isGliding(element);
+    const gliding = isGliding(element) || focusedMidGlide.current;
+    focusedMidGlide.current = false;
     element.scrollLeft = 0;
     element.scrollTop = 0;
     const current = latest.current.view;
-    move({ zoom: current.zoom, x: current.x - scrollLeft, y: current.y - scrollTop }, false);
+    // Drawn before this returns: the reveal below measures the board in this same frame, and must find the pan in it.
+    flushSync(() => { move({ zoom: current.zoom, x: current.x - scrollLeft, y: current.y - scrollTop }, false); });
     if (gliding) revealFocusedAtRest(element, reveal.current);
   };
 
@@ -266,6 +277,6 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
     actualSize: () => { zoomTo(() => 1); },
     fit,
     showFrame: (box) => { move(frameView(box, latest.current.room), true); },
-    handlers: { onPointerDown, onPointerMove, onPointerUp: endPress, onPointerCancel: cancelPress, onLostPointerCapture: endPress, onKeyDown, onScroll, onDragStart },
+    handlers: { onPointerDown, onPointerMove, onPointerUp: endPress, onPointerCancel: cancelPress, onLostPointerCapture: endPress, onKeyDown, onFocus, onScroll, onDragStart },
   };
 }
