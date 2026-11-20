@@ -55,8 +55,10 @@ test("should keep the workspace pane's editor working when its editor opens anot
   await page.goto(`/app?artifact=${publicId}`);
   const body = page.getByRole("textbox", { name: "Artifact content" });
   await body.getByText("First draft.").click();
-  await page.evaluate(() => { (window as unknown as { next: { router: { push: (href: string) => void } } }).next.router.push("/docs"); });
-  await page.waitForURL(/\/docs/);
+  // A link of the app's own, so the router keeps this page for Back.
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  await page.waitForURL(/\/app\/settings/);
 
   await page.goBack();
   await page.waitForURL(/\/app/);
