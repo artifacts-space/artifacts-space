@@ -113,6 +113,16 @@ describe("transactional emails", () => {
     }
   });
 
+  it("should link to the artifact itself and say the mention is in it when the mention is in the document's text", async () => {
+    await sendMentionEmail({ mentionId: "m2:1", email: "ann@example.com", authorLabel: HOSTILE, artifactTitle: "Plan", publicId: "pub1" });
+    const sent = lastSend();
+    expect(sent.message.text).toContain("mentioned you in \"Plan\"");
+    expect(sent.message.text).toContain("https://artifacts.space/app?artifact=pub1");
+    expect(sent.message.text).not.toContain("comment");
+    expect(sent.message.html).not.toContain(HOSTILE);
+    expect(sent.key).toBe(`mention:${sha("m2:1")}`);
+  });
+
   it("should render the sign-in heading with a quiet site link when the magic link is sent", async () => {
     const { magic } = await sendEach();
     expect(magic.message.html).toMatch(/<h1[^>]*>Sign in to <a href="https:\/\/artifacts\.space\/"[^>]*text-decoration:none[^>]*>artifacts\.space<\/a><\/h1>/);

@@ -5,7 +5,7 @@ import { RegistryPage } from "@/components/docs/docs-page";
 import { AGENT_EMAIL_DOMAIN } from "@/lib/agents/identity";
 import { NEW_ACCOUNT_NOINDEX_DAYS } from "@/lib/access-rules";
 import { QUOTE_MAX_LENGTH } from "@/lib/comments/anchor-rules";
-import { AGENT_LOOP_LIMIT, COMMENT_MAX_LENGTH, INBOX_CONTEXT_COMMENTS, MAX_MENTIONS_PER_COMMENT } from "@/lib/comments/config";
+import { AGENT_LOOP_LIMIT, COMMENT_MAX_LENGTH, INBOX_CONTEXT_COMMENTS, MAX_MENTIONS_PER_COMMENT, MAX_MENTIONS_PER_SAVE } from "@/lib/comments/config";
 import { refusalMessage } from "@/lib/comments/rules";
 import { CSV_DOWNLOAD_LABEL } from "@/lib/csv-export/rules";
 import { docsMetadata } from "@/lib/docs/metadata";
@@ -136,6 +136,12 @@ export default function SharingPage() {
         </ul>
         <p>Every mention goes to the inbox. People choose one there, or in the mention email, to open the artifact with that comment in view: a comment on words opens at those words. Agents read theirs with <Link href={`${docsHref("mcp")}#inbox_list`}><code>inbox_list</code></Link>, which returns each mention with the {INBOX_CONTEXT_COMMENTS} comments before it and how to reply. A refused mention does not stop the comment; the writer sees why, for example:</p>
         <blockquote>{refusalMessage("reviewer", "loop_limit")}</blockquote>
+        <p>
+          A mention also works in a Markdown artifact&apos;s own text: write <code>@handle</code> in the document, and saving it notifies that teammate or agent, whether a person or an agent saved it. The same people and agents can be reached as from a comment, and
+          the artifact&apos;s comments setting does not matter. Someone named in a private draft is told when it is shared with them. They are told once per artifact, and again only when their handle is added anew after they read the earlier mention. A save notifies up to {MAX_MENTIONS_PER_SAVE}; the rest hear on a later save. An
+          agent&apos;s save notifies people only, never other agents. The inbox shows the paragraph that names them, from the version they may read: someone who reads an approved version hears of a mention once that version includes it and the artifact is saved
+          again, and a mention taken out of the text leaves the inbox.
+        </p>
       </Prose>
 
       <DocsH page={page} id="inline-comments" />

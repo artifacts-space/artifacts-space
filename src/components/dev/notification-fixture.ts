@@ -23,12 +23,12 @@ export function fixtureNotifications(now: number = Date.now()): NotificationView
   const open = (publicId: string) => `/dev/workspace?artifact=${publicId}`;
   const href = `${open(artifact.publicId)}&comments=1`;
   return [
-    { id: "n1", type: "mention", createdAt: at(2), readAt: null, actor: ada, artifact, excerpt: "Can you check the rollout plan before Friday?", requestKind: null, href },
-    { id: "n2", type: "comment", createdAt: at(10), readAt: null, actor: agent, artifact, excerpt: "I updated the risks section with the new numbers.", requestKind: null, href },
-    { id: "n3", type: "comment", createdAt: at(30), readAt: null, actor: ada, artifact, excerpt: "Looks good to me.", requestKind: null, href },
-    { id: "n4", type: "share_request", createdAt: at(90), readAt: null, actor: agent, artifact, excerpt: null, requestKind: "sharing", href: "/teams/fixture?tab=artifacts&view=approval" },
-    { id: "n5", type: "share_approved", createdAt: at(60 * 26), readAt: at(60 * 20), actor: ada, artifact, excerpt: null, requestKind: "edit", href: open(artifact.publicId) },
-    { id: "n6", type: "share_approved", createdAt: at(60 * 50), readAt: at(60 * 48), actor: ada, artifact: linkOnly, excerpt: null, requestKind: "sharing", href: open(linkOnly.publicId) },
-    { id: "n7", type: "share_declined", createdAt: at(60 * 74), readAt: at(60 * 72), actor: ada, artifact: gone, excerpt: null, requestKind: "sharing", href: open(gone.publicId) },
+    { id: "n1", type: "mention", createdAt: at(2), readAt: null, actor: ada, artifact, excerpt: "Can you check the rollout plan before Friday?", inDocument: false, requestKind: null, href },
+    { id: "n2", type: "comment", createdAt: at(10), readAt: null, actor: agent, artifact, excerpt: "I updated the risks section with the new numbers.", inDocument: false, requestKind: null, href },
+    { id: "n3", type: "comment", createdAt: at(30), readAt: null, actor: ada, artifact, excerpt: "Looks good to me.", inDocument: false, requestKind: null, href },
+    { id: "n4", type: "share_request", createdAt: at(90), readAt: null, actor: agent, artifact, excerpt: null, inDocument: false, requestKind: "sharing", href: "/teams/fixture?tab=artifacts&view=approval" },
+    { id: "n5", type: "share_approved", createdAt: at(60 * 26), readAt: at(60 * 20), actor: ada, artifact, excerpt: null, inDocument: false, requestKind: "edit", href: open(artifact.publicId) },
+    { id: "n6", type: "share_approved", createdAt: at(60 * 50), readAt: at(60 * 48), actor: ada, artifact: linkOnly, excerpt: null, inDocument: false, requestKind: "sharing", href: open(linkOnly.publicId) },
+    { id: "n7", type: "share_declined", createdAt: at(60 * 74), readAt: at(60 * 72), actor: ada, artifact: gone, excerpt: null, inDocument: false, requestKind: "sharing", href: open(gone.publicId) },
   ];
 }

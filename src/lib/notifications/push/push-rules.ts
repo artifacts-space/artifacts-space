@@ -89,9 +89,9 @@ function clip(text: string, max: number) {
  * plain-text excerpt for comments. Nothing more of the comment, and the
  * caller only builds it for someone who may read the artifact now.
  */
-export function pushMessage(input: { type: NotificationType; requestKind: SharingRequestKind | null; actorLabel: string | null; artifactTitle: string; publicId: string; excerpt: string | null; href: string }): PushMessage {
+export function pushMessage(input: { type: NotificationType; requestKind: SharingRequestKind | null; actorLabel: string | null; artifactTitle: string; publicId: string; excerpt: string | null; href: string; inDocument?: boolean | undefined }): PushMessage {
   const actor = input.actorLabel ?? "Someone";
-  const title = clip(`${actor} ${actionPhrase(input.type, input.requestKind)} ${input.artifactTitle || "an artifact"}`, TITLE_MAX);
+  const title = clip(`${actor} ${actionPhrase(input.type, input.requestKind, input.inDocument)} ${input.artifactTitle || "an artifact"}`, TITLE_MAX);
   return { v: 1, type: input.type, title, body: clip(input.excerpt ?? "", BODY_MAX), url: input.href, tag: `${input.type}:${input.publicId}` };
 }
 

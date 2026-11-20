@@ -45,6 +45,11 @@ describe("pushMessage", () => {
     expect(message).toEqual({ v: 1, type: "mention", title: "@ada mentioned you on Plan", body: "Can you check this?", url: "/app?artifact=p1&comments=1", tag: "mention:p1" });
   });
 
+  it("should say the person was mentioned in the artifact when the mention is in its text", () => {
+    const message = pushMessage({ type: "mention", requestKind: null, actorLabel: "@ada", artifactTitle: "Plan", publicId: "p1", excerpt: null, href: "/app?artifact=p1", inDocument: true });
+    expect(message).toEqual({ v: 1, type: "mention", title: "@ada mentioned you in Plan", body: "", url: "/app?artifact=p1", tag: "mention:p1" });
+  });
+
   it("should keep the title and body short when the input is long", () => {
     const message = pushMessage({ type: "comment", requestKind: null, actorLabel: "@ada", artifactTitle: "T".repeat(300), publicId: "p1", excerpt: "x".repeat(500), href: "/app" });
     expect(message.title.length).toBeLessThanOrEqual(120);

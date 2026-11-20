@@ -147,8 +147,10 @@ export function commentExcerpt(body: string, max: number = EXCERPT_MAX): string 
 }
 
 /** Where a notification opens: the artifact in /app with its comments, the team's approval queue for a request, or the artifact. */
-export function notificationHref(input: { type: NotificationType; publicId: string; teamSlug: string | null }): string {
+export function notificationHref(input: { type: NotificationType; publicId: string; teamSlug: string | null; inDocument?: boolean | undefined }): string {
   const artifact = `/app?artifact=${encodeURIComponent(input.publicId)}`;
+  // A mention in the document's own text opens the document, not its comments.
+  if (input.inDocument) return artifact;
   if (input.type === "share_request") return input.teamSlug ? teamTabHref(input.teamSlug, "artifacts", "approval") : artifact;
   if (input.type === "share_approved" || input.type === "share_declined") return artifact;
   return `${artifact}&comments=1`;
@@ -170,11 +172,12 @@ const decisionObjects: Record<SharingRequestKind, string> = {
  * What the actor did, between their name and the artifact's title:
  * "commented on", "asked to share", "approved your changes to".
  */
-export function actionPhrase(type: NotificationType, requestKind: SharingRequestKind | null): string {
+export function actionPhrase(type: NotificationType, requestKind: SharingRequestKind | null, inDocument = false): string {
   const kind = requestKind ?? "sharing";
   if (type === "comment") return "commented on";
   if (type === "reply") return "replied to your comment on";
-  if (type === "mention") return "mentioned you on";
+  // "on" is a comment on the artifact; "in" is the artifact's own text.
+  if (type === "mention") return inDocument ? "mentioned you in" : "mentioned you on";
   if (type === "share_request") return `asked ${requestObjects[kind]}`;
   return `${type === "share_approved" ? "approved" : "declined"} ${decisionObjects[kind]}`;
 }

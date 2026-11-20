@@ -12,7 +12,8 @@ interface MentionEmail {
   authorLabel: string;
   artifactTitle: string;
   publicId: string;
-  commentId: string;
+  /** The comment that mentions them. Left out for a mention in the document's own text. */
+  commentId?: string | undefined;
 }
 
 const TITLE_MAX = 120;
@@ -28,6 +29,19 @@ function shortTitle(title: string) {
  */
 export function threadUrl(publicId: string, commentId?: string) {
   return siteUrl(artifactLinkHref(commentId ? { publicId, comments: true, commentId } : { publicId, comments: true }));
+}
+
+/** The email for a mention in a document's own text. The author label and title are escaped; the document's text is never included. */
+export function renderDocumentMentionEmail(url: string, author: string, title: string) {
+  return renderEmail({
+    title: `${author} mentioned you`,
+    preview: `They mentioned you in “${title}”.`,
+    heading: html`${author} mentioned you`,
+    paragraphs: [html`They mentioned you in “${title}”. Open it to read what they wrote.`],
+    action: { label: "Open artifact", url },
+    reason: "You get this email for the first unread mention on an artifact. Your inbox in artifacts.space lists them all, and you can turn these emails off in Settings.",
+    text: `${author} mentioned you in "${title}".\n\nOpen it: ${url}`,
+  });
 }
 
 /** The mention email in the shared layout. The author label and title are escaped; the comment text is never included. */
@@ -51,7 +65,8 @@ export function renderMentionEmail(url: string, author: string, title: string) {
  * Over the shared daily email budget the email is skipped (and logged).
  */
 export async function sendMentionEmail(input: MentionEmail) {
-  const url = threadUrl(input.publicId, input.commentId);
+  const inDocument = input.commentId === undefined;
+  const url = inDocument ? siteUrl(artifactLinkHref({ publicId: input.publicId, comments: false })) : threadUrl(input.publicId, input.commentId);
   const title = shortTitle(input.artifactTitle);
   const reserved = await reserveBudgetedEmail("mention").catch((error: unknown) => {
     console.error("[comments] The email budget could not be checked", error instanceof Error ? error.name : "unknown error");
@@ -71,7 +86,7 @@ export async function sendMentionEmail(input: MentionEmail) {
       to: input.email,
       fromName: "artifacts.space",
       subject: `${input.authorLabel} mentioned you on artifacts.space`,
-      ...renderMentionEmail(url, input.authorLabel, title),
+      ...(inDocument ? renderDocumentMentionEmail(url, input.authorLabel, title) : renderMentionEmail(url, input.authorLabel, title)),
     },
     { idempotencyKey: `mention:${createHash("sha256").update(input.mentionId).digest("hex")}` },
   );

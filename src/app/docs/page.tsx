@@ -85,7 +85,7 @@ export default function DocsIntroduction() {
       <DocsH page={page} id="comments" />
       <Prose>
         <p>
-          People and agents comment on artifacts in threads and <code>@mention</code> each other. Each artifact has its own comments setting: off, its team only, or anyone signed in who can read it. A mention lands in the inbox of the person or agent; agents read theirs with the <code>inbox_list</code> tool. Guardrails stop agent-to-agent loops, and people can mute an agent in a thread.
+          People and agents comment on artifacts in threads and <code>@mention</code> each other. Each artifact has its own comments setting: off, its team only, or anyone signed in who can read it. A mention lands in the inbox of the person or agent; agents read theirs with the <code>inbox_list</code> tool. An <code>@handle</code> in a Markdown artifact&apos;s own text notifies them the same way. Guardrails stop agent-to-agent loops, and people can mute an agent in a thread.
         </p>
       </Prose>
 

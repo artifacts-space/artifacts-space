@@ -22,6 +22,8 @@ export interface Party {
 export interface NotificationDraft {
   recipientId: string;
   type: NotificationType;
+  /** A mention in the document's own text, not in a comment: it needs the artifact, never its comments. */
+  inDocument?: boolean;
 }
 
 /** The person who hears about a party's work: the person, or whoever added the agent. */
@@ -105,11 +107,14 @@ export interface RecipientAccess {
 
 /**
  * Whether a person may get, or still see, a notification. Comment kinds need
- * the artifact and its comments; a waiting request needs the team role that
- * decides it (the team page shows the same request); a decision needs the
- * artifact. Someone who lost access gets nothing, not even the title.
+ * the artifact and its comments, except a mention in the document's own text
+ * (`inDocument`), which needs only the artifact; a waiting request needs the
+ * team role that decides it (the team page shows the same request); a
+ * decision needs the artifact. Someone who lost access gets nothing, not even
+ * the title.
  */
-export function mayNotify(type: NotificationType, access: RecipientAccess): boolean {
+export function mayNotify(type: NotificationType, access: RecipientAccess, inDocument = false): boolean {
+  if (inDocument) return access.canRead;
   if (isCommentType(type)) return access.canRead && access.seesComments;
   if (type === "share_request") return access.managesRequestTeam;
   return access.canRead;
@@ -121,5 +126,5 @@ export function draftsFor(
   channel: NotificationChannel,
   facts: { access: (recipientId: string) => RecipientAccess; preferences: (recipientId: string) => NotificationPreferences },
 ): NotificationDraft[] {
-  return drafts.filter((draft) => mayNotify(draft.type, facts.access(draft.recipientId)) && wants(facts.preferences(draft.recipientId), draft.type, channel));
+  return drafts.filter((draft) => mayNotify(draft.type, facts.access(draft.recipientId), draft.inDocument) && wants(facts.preferences(draft.recipientId), draft.type, channel));
 }

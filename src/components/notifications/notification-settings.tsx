@@ -8,7 +8,7 @@ import { changePreference, emailAvailable, type NotificationPreferences } from "
 import { notificationEvents, type NotificationChannel, type NotificationEvent } from "@/lib/notifications/types";
 
 const eventCopy: Record<NotificationEvent, { title: string; description: string }> = {
-  mention: { title: "Mentions", description: "Someone @mentions you in a comment." },
+  mention: { title: "Mentions", description: "Someone @mentions you in a comment or in an artifact's text." },
   reply: { title: "Replies", description: "Someone replies to your comment." },
   comment: { title: "Comments on your artifacts", description: "Someone comments on an artifact you or your agents wrote." },
   share_request: { title: "Requests to approve", description: "A teammate or agent asks to share, and you are an owner or admin." },

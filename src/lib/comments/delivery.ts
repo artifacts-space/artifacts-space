@@ -18,6 +18,9 @@ import { decideMentions, type MentionCandidate, type MentionDecision } from "./r
 import { canSeeComments } from "./setting-rules";
 import { toAuthorView } from "./views";
 
+/** What a mention shows its recipient: a comment (which needs the comments setting too), or the document's own text. */
+export type MentionSight = "comments" | "document";
+
 /** What happened to the mentions in a comment, for the writer. */
 export interface MentionOutcome {
   notified: { handle: string; kind: "person" | "agent" }[];
@@ -45,14 +48,23 @@ function unknownHandle(handle: string): MentionCandidate {
   return { handle, userId: null, kind: "person", canView: false, isArtifactAuthor: false, sharesTeamWithWriter: false, muted: false };
 }
 
+/** Whether a user can see what a mention shows them: the artifact, and for a comment's mention its comments too. */
+function canSee(artifact: ArtifactMetaRecord, userId: string, memberOf: ReadonlySet<string>, sees: MentionSight): boolean {
+  const isTeamMember = artifact.teamId !== null && memberOf.has(artifact.teamId);
+  const canRead = canViewArtifact(artifact, { userId, isTeamMember });
+  if (sees === "document") return canRead;
+  return canSeeComments(artifact.comments, { canViewArtifact: canRead, isAuthor: artifact.userId === userId, isTeamMember });
+}
+
 /**
  * The facts the mention rule needs for known users: people with a handle, and
  * agents still in their team. Visibility uses the same read rule as every
  * other path (canViewArtifact), with each user's own team memberships, and
- * the artifact's comments setting: someone who cannot see the comments is
- * never notified of one.
+ * for a comment's mention the artifact's comments setting: someone who cannot
+ * see the comments is never notified of one. A mention in the document's own
+ * text (`sees: "document"`) needs only the artifact.
  */
-export async function mentionFacts(userIds: string[], artifact: ArtifactMetaRecord, writerId: string, threadMutes: ReadonlySet<string>): Promise<MentionCandidate[]> {
+export async function mentionFacts(userIds: string[], artifact: ArtifactMetaRecord, writerId: string, threadMutes: ReadonlySet<string>, sees: MentionSight = "comments"): Promise<MentionCandidate[]> {
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return [];
   const [actors, teams] = await Promise.all([loadActors(ids), teamsByUser([...ids, writerId])]);
@@ -61,16 +73,11 @@ export async function mentionFacts(userIds: string[], artifact: ArtifactMetaReco
   for (const actor of actors.values()) {
     if (!actor.handle) continue;
     const memberOf = teams.get(actor.userId) ?? new Set<string>();
-    const isTeamMember = artifact.teamId !== null && memberOf.has(artifact.teamId);
     facts.push({
       handle: actor.handle,
       userId: actor.userId,
       kind: actor.kind,
-      canView: canSeeComments(artifact.comments, {
-        canViewArtifact: canViewArtifact(artifact, { userId: actor.userId, isTeamMember }),
-        isAuthor: artifact.userId === actor.userId,
-        isTeamMember,
-      }),
+      canView: canSee(artifact, actor.userId, memberOf, sees),
       isArtifactAuthor: artifact.userId === actor.userId,
       sharesTeamWithWriter: sharesTeam(memberOf, writerTeams),
       muted: actor.kind === "agent" && (actor.teamMuted || threadMutes.has(actor.userId)),
@@ -79,16 +86,16 @@ export async function mentionFacts(userIds: string[], artifact: ArtifactMetaReco
   return facts;
 }
 
-/** The mention facts for each handle in a comment. Unknown handles get facts that refuse them. */
-async function mentionCandidates(handles: string[], artifact: ArtifactMetaRecord, writerId: string, threadMutes: ReadonlySet<string>): Promise<MentionCandidate[]> {
+/** The mention facts for each handle in a comment or a document. Unknown handles get facts that refuse them. */
+export async function mentionCandidates(handles: string[], artifact: ArtifactMetaRecord, writerId: string, threadMutes: ReadonlySet<string>, sees: MentionSight = "comments"): Promise<MentionCandidate[]> {
   const users = await getDb().select({ id: user.id }).from(user).where(inArray(user.username, handles));
-  const facts = await mentionFacts(users.map((row) => row.id), artifact, writerId, threadMutes);
+  const facts = await mentionFacts(users.map((row) => row.id), artifact, writerId, threadMutes, sees);
   const byHandle = new Map(facts.map((fact) => [fact.handle, fact]));
   return handles.map((handle) => byHandle.get(handle) ?? unknownHandle(handle));
 }
 
 /** People who already had an unread mention on this artifact. They get no second email. */
-async function alreadyNotified(artifactId: string, recipientIds: string[]) {
+export async function alreadyNotified(artifactId: string, recipientIds: string[]) {
   if (recipientIds.length === 0) return new Set<string>();
   const rows = await getDb()
     .select({ recipientId: mention.recipientId })
@@ -110,7 +117,8 @@ async function keepsMentionEmail(people: { id: string; mentionId: string }[]) {
   });
 }
 
-async function emailPeople(input: { people: { id: string; mentionId: string }[]; artifact: ArtifactMetaRecord; commentId: string; writer: Actor }) {
+/** Emails the people who keep mention emails on. Without a `commentId` the mention is in the document's own text. */
+export async function emailPeople(input: { people: { id: string; mentionId: string }[]; artifact: ArtifactMetaRecord; commentId?: string; writer: Actor }) {
   if (input.people.length === 0) return;
   const people = await keepsMentionEmail(input.people);
   if (people.length === 0) return;

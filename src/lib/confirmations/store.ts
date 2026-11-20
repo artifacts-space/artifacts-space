@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { confirmationSkip } from "@/db/schema";
+import { confirmationSkip } from "@/db/confirmation-schema";
 
 import { confirmationActionSchema, type ConfirmationAction } from "./kinds";
 

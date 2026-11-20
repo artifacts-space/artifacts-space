@@ -44,7 +44,7 @@ function NotificationRow({ group, now, onOpen, onRead }: RowProps) {
         <span className="min-w-0 flex-1">
           <span className="block text-sm leading-5">
             <span className={cn("font-medium", group.unread && "text-foreground")}>{actorsLabel(groupLabels(group.items))}</span>{" "}
-            <span className="text-muted-foreground">{actionPhrase(newest.type, newest.requestKind)}</span>{" "}
+            <span className="text-muted-foreground">{actionPhrase(newest.type, newest.requestKind, newest.inDocument)}</span>{" "}
             {newest.artifact.icon ? <ArtifactIcon icon={newest.artifact.icon} className="mr-0.5 inline-block size-3.5 align-[-2px]" /> : null}
             <span className={cn("font-medium break-words", group.unread && "text-foreground")}>{newest.artifact.title || "Untitled"}</span>
           </span>

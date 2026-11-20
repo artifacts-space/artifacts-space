@@ -36,6 +36,17 @@ describe("notificationHref", () => {
   });
 });
 
+describe("a mention in the document's own text", () => {
+  it("should open the artifact without its comments when the mention is in the text", () => {
+    expect(notificationHref({ type: "mention", publicId: "abc", teamSlug: null, inDocument: true })).toBe("/app?artifact=abc");
+  });
+
+  it("should say the person was mentioned in the artifact, not on it", () => {
+    expect(actionPhrase("mention", null, true)).toBe("mentioned you in");
+    expect(actionPhrase("mention", null)).toBe("mentioned you on");
+  });
+});
+
 describe("actionPhrase", () => {
   it("should name what was asked for each request kind", () => {
     expect(actionPhrase("share_request", "sharing")).toBe("asked to share");

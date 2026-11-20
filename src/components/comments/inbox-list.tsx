@@ -12,6 +12,7 @@ import { PixelAvatar } from "@/components/pixel-avatar";
 import { Button } from "@/components/ui/button";
 import { artifactLinkHref } from "@/lib/app-link";
 import type { InboxEntryView } from "@/lib/comments/inbox";
+import { commentExcerpt } from "@/lib/notifications/display-rules";
 import { cn } from "@/lib/utils";
 
 const timeFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
@@ -22,9 +23,16 @@ function snippet(body: string) {
   return flat.length > SNIPPET_LENGTH ? `${flat.slice(0, SNIPPET_LENGTH - 1)}…` : flat;
 }
 
-/** Where a mention opens: its artifact in the workspace, with that comment in view. */
+/** Where a mention opens: its artifact in the workspace, with that comment in view, or the document alone for a mention in its text. */
 function entryHref(entry: InboxEntryView): string {
+  if (entry.source === "document") return artifactLinkHref({ publicId: entry.artifact.publicId, comments: false });
   return artifactLinkHref({ publicId: entry.artifact.publicId, comments: true, commentId: entry.comment.id });
+}
+
+/** Who mentioned the viewer, the words between their name and the title, and the text shown under them. */
+function entryParts(entry: InboxEntryView) {
+  if (entry.source === "document") return { author: entry.author, phrase: "mentioned you in", text: commentExcerpt(entry.block, SNIPPET_LENGTH) };
+  return { author: entry.comment.author, phrase: "mentioned you on", text: snippet(entry.comment.body) };
 }
 
 /**
@@ -33,7 +41,7 @@ function entryHref(entry: InboxEntryView): string {
  */
 function EntryRow({ entry, pending, onRead }: { entry: InboxEntryView; pending: boolean; onRead: (id: string) => void }) {
   const unread = entry.readAt === null;
-  const author = entry.comment.author;
+  const { author, phrase, text } = entryParts(entry);
   return (
     <li data-slot="inbox-entry" className={cn("relative flex gap-3 border-t px-5 py-3 transition-colors first:border-t-0 hover:bg-muted/50", unread ? "bg-card" : "bg-background/60")}>
       <span aria-hidden className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", unread ? "bg-foreground" : "bg-transparent")} />
@@ -41,17 +49,17 @@ function EntryRow({ entry, pending, onRead }: { entry: InboxEntryView; pending: 
         <p className="flex flex-wrap items-center gap-x-1.5 text-md">
           {author ? <PixelAvatar seed={author.userId} kind={author.kind} size={20} /> : null}
           <span className="font-medium">{author?.label ?? "Former member"}</span>
-          <span className="text-muted-foreground">mentioned you on</span>
+          <span className="text-muted-foreground">{phrase}</span>
           {entry.artifact.icon ? <ArtifactIcon icon={entry.artifact.icon} /> : null}
           <Link
             href={entryHref(entry)}
-            aria-label={`${author?.label ?? "Former member"} mentioned you on ${entry.artifact.title}`}
+            aria-label={`${author?.label ?? "Former member"} ${phrase} ${entry.artifact.title}`}
             className="truncate font-medium underline decoration-border underline-offset-[3px] outline-none after:absolute after:inset-0 after:content-[''] hover:decoration-foreground focus-visible:after:ring-3 focus-visible:after:ring-ring/50 focus-visible:after:ring-inset"
           >
             {entry.artifact.title}
           </Link>
         </p>
-        <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">{snippet(entry.comment.body)}</p>
+        <p className="line-clamp-2 text-sm leading-5 text-muted-foreground">{text}</p>
         <p className="text-xs text-muted-foreground">{timeFormat.format(new Date(entry.createdAt))} UTC</p>
       </div>
       {unread ? (
