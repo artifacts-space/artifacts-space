@@ -52,6 +52,9 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
     reset(loaded);
   }, [reset]);
 
+  /** Back to the read view until `start` is called again: for a page that was away and must load its editable copy anew. */
+  const lock = useCallback(() => { setArtifact(null); }, []);
+
   const restored = useCallback((next: ArtifactDto) => {
     reset(next);
     onUpdated(next);
@@ -84,7 +87,7 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
     changedFrames,
   }), [artifact, draft, update, onUpdated, revision, sourceOpen, toggleSource, changedFrames]);
 
-  return { artifact, draft, replace, sourceOpen, toggleSource, onUpdated, autosaved, restored, start, value, caughtUp, caughtUpWith, dismissCaughtUp };
+  return { artifact, draft, replace, sourceOpen, toggleSource, onUpdated, autosaved, restored, start, lock, value, caughtUp, caughtUpWith, dismissCaughtUp };
 }
 
 type PageEditor = ReturnType<typeof usePageEditor>;

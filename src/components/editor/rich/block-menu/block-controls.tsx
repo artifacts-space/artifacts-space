@@ -69,6 +69,8 @@ function contextAnchor(editor: Editor, event: MouseEvent): { pos: number; anchor
 /** Opens the block menu on right-click (and the keyboard's menu key) inside the document. */
 function useContextMenu(editor: Editor, touch: boolean, open: (pos: number, anchor: MenuAnchor) => void) {
   useEffect(() => {
+    // A page the browser kept for Back comes back with its editor destroyed; the new editor runs this again.
+    if (editor.isDestroyed) return;
     const dom = editor.view.dom;
     const onContextMenu = (event: MouseEvent) => {
       if (keepsNativeMenu(editor, event, touch)) return;

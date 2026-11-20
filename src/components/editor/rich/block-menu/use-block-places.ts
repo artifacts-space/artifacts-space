@@ -89,6 +89,8 @@ function measureAll(view: EditorView, frame: HTMLElement, positions: readonly nu
 function useResizeTick(editor: Editor): number {
   const [tick, setTick] = useState(0);
   useEffect(() => {
+    // A page the browser kept for Back comes back with its editor destroyed; the new editor runs this again.
+    if (editor.isDestroyed) return;
     const bump = () => { setTick((value) => value + 1); };
     const observer = new ResizeObserver(bump);
     observer.observe(editor.view.dom);
