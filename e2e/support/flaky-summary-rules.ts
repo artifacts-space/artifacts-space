@@ -1,3 +1,25 @@
+/** What the summary needs of a finished test: Playwright's TestCase has it, and a test passes a stand-in. */
+export interface FinishedTest {
+  outcome(): string;
+  titlePath(): string[];
+  location: { file: string; line: number };
+}
+
+/**
+ * The tests that passed only on their retry, as the summary's rows: the
+ * describe blocks and the title, and the file and line from `root`. A test
+ * that failed every attempt, was skipped, or passed first time is not one.
+ */
+export function flakyTests(tests: readonly FinishedTest[], relative: (file: string) => string): { title: string; location: string }[] {
+  return tests
+    .filter((test) => test.outcome() === "flaky")
+    .map((test) => ({
+      // The path starts with the root, the project, and the file: the row keeps the describe blocks and the title.
+      title: test.titlePath().slice(3).join(" › "),
+      location: `${relative(test.location.file)}:${String(test.location.line)}`,
+    }));
+}
+
 /**
  * The lines CI adds to a shard's job summary when tests passed only on
  * their retry, so a green check still shows them on the checks page, not
