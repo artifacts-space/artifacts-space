@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, use, useEffect, useMemo, useState } from "react";
+import { createContext, use, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MentionSource } from "@/components/comments/comment-mentions";
 import type { ActionResult } from "@/lib/artifact-types";
@@ -31,16 +31,37 @@ interface Loaded {
 }
 
 /**
+ * Asks again, once, the next time the window gets focus after a load that
+ * failed: a dropped request does not leave the editor without its list until
+ * a reload. Each failed answer waits for another focus, so a refusal costs
+ * one request per return to the window and nothing in between.
+ */
+function useRetryOnFocus(answer: Loaded | null, retry: () => void) {
+  const failed = answer !== null && answer.directory === null;
+  const retryRef = useRef(retry);
+  useEffect(() => { retryRef.current = retry; }, [retry]);
+  useEffect(() => {
+    if (!failed) return;
+    const onFocus = () => { retryRef.current(); };
+    window.addEventListener("focus", onFocus, { once: true });
+    return () => { window.removeEventListener("focus", onFocus); };
+  }, [failed, answer]);
+}
+
+/**
  * Gives the document editor inside it @mentions for one saved artifact: who
  * the editor can name, loaded once after the editor is on screen. Until the
  * list arrives, typing @ shows a short hint, and a handle typed in full still
- * notifies when the document is saved. Without an id (an artifact not stored
+ * reaches its owner: by the save, or once they can read the artifact. A list
+ * that could not be loaded is asked for again when the window next gets
+ * focus, never on a timer. Without an id (an artifact not stored
  * yet) or a loader, the editor has no @mentions. It always renders the same
  * tree, so an artifact that gets its id while it is being written keeps its
  * editor.
  */
 export function DocumentMentionsProvider({ publicId, children }: { publicId: string | null; children: React.ReactNode }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const load = use(LoaderContext);
 
   useEffect(() => {
@@ -53,10 +74,11 @@ export function DocumentMentionsProvider({ publicId, children }: { publicId: str
       .then((result) => { arrive(result.success ? result.data : null); })
       .catch(() => { arrive(null); });
     return () => { active = false; };
-  }, [load, publicId]);
+  }, [load, publicId, attempt]);
 
   // Another artifact's list is never offered: what was loaded counts only for the id it was loaded for.
   const mine = loaded?.publicId === publicId ? loaded : null;
+  useRetryOnFocus(mine, () => { setAttempt((count) => count + 1); });
   const value = useMemo<MentionSource | null>(() => {
     if (!load || !publicId) return null;
     const directory = mine?.directory ?? emptyDirectory;

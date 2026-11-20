@@ -91,12 +91,19 @@ test("should show the list under an @ already being typed as soon as the people 
   await expect(editor(page).locator("[data-mention=dana]")).toHaveText("@dana");
 });
 
-test("should say the list could not be loaded, and not that there is nobody to mention, when the load fails", async ({ page }) => {
+test("should say the list could not be loaded, and not that there is nobody to mention, when the load fails, and ask again when the window gets focus", async ({ page }) => {
   await openAtFirstParagraph(page, "&mentions=fail");
   await page.keyboard.type(" @da");
 
-  await expect(page.getByText("The list of people to mention could not be loaded. A handle typed in full still notifies when it is saved.")).toBeVisible();
+  await expect(page.getByText("The list of people to mention could not be loaded. A handle typed in full still reaches its owner once they can read this artifact.")).toBeVisible();
   await expect(page.getByText("No one to mention here yet.")).toHaveCount(0);
+
+  // The network is back, and coming back to the window asks again: the list shows under the same "@", with no further key.
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event("fixture:mentions-arrive"));
+    window.dispatchEvent(new Event("focus"));
+  });
+  await expect(suggestions(page).getByRole("option")).toHaveText([/@dana/]);
 });
 
 test("should offer no suggestions where the page gives the document nobody to mention", async ({ page }) => {

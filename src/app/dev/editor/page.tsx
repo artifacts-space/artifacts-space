@@ -23,7 +23,7 @@ function isFixtureKind(value: unknown): value is EditorFixtureKind {
 
 /**
  * What surrounds the editor fixture. `mentions`: the document takes @mentions
- * of three in-memory teammates, as a saved artifact does of real ones ("late": once the test lets the list arrive; "fail": the list cannot be loaded).
+ * of three in-memory teammates, as a saved artifact does of real ones ("late": once the test lets the list arrive; "fail": its requests fail until the test says otherwise).
  * `pageHost`: an HTML artifact's page runs on the page host; without it, as
  * on a deployment that has none.
  */
@@ -51,7 +51,7 @@ async function Fixture({ searchParams }: { searchParams: PageProps<"/dev/editor"
  * a long artifact, without a database. `?kind=` picks ui, json, markdown, blocks (a short interface), styled (every block styled by a screen prop), data, sheet (a CSV at the size limit), canvas (four phone screens), or html (a page with a script; `?pagehost=none` shows it where no page host is set up, and `?files=1` starts it with two page files; page files stay in the tab, fixture-page-files.ts),
  * or media: the Markdown editor with uploads kept in the tab (media-editor-fixture.tsx; `?doc=gallery` loads a document with several images, and `&as=reader` shows it in the read view),
  * or lists: the same editor on list items that hold code blocks (list-items-fixture.ts).
- * `?save=fail` fails every save; `?save=agent` lands the first save over an agent's save. `?mentions=1` gives the Markdown document people to @mention (`late`: the list arrives when the test says; `fail`: it cannot be loaded).
+ * `?save=fail` fails every save; `?save=agent` lands the first save over an agent's save. `?mentions=1` gives the Markdown document people to @mention (`late`: the list arrives when the test says; `fail`: its requests fail until the test says otherwise).
  * Returns 404 in every other environment.
  */
 export default function EditorFixturePage({ searchParams }: PageProps<"/dev/editor">) {

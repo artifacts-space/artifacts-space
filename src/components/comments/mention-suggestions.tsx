@@ -17,7 +17,7 @@ export function MentionHint({ query, self, hasCandidates, unavailable = false }:
 }
 
 /** The list could not be loaded: nothing is known about who can be mentioned, so the hint claims nothing about it. */
-export const MENTIONS_UNAVAILABLE = "The list of people to mention could not be loaded. A handle typed in full still notifies when it is saved.";
+export const MENTIONS_UNAVAILABLE = "The list of people to mention could not be loaded. A handle typed in full still reaches its owner once they can read this artifact.";
 
 function hintMessage(isSelf: boolean, hasCandidates: boolean, unavailable: boolean): string {
   if (isSelf) return "That is you. Mentioning yourself notifies no one.";

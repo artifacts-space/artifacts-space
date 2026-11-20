@@ -25,12 +25,19 @@ const loadFixturePeopleLate: LoadDocumentMentionables = async (publicId) => {
   return loadFixturePeople(publicId);
 };
 
-/** A list that cannot be loaded, as when the request fails. */
-const failToLoad: LoadDocumentMentionables = () => Promise.resolve({ success: false as const, error: "Suggestions could not be loaded." });
+let networkBack = false;
+if (typeof window !== "undefined") window.addEventListener(FIXTURE_MENTIONS_ARRIVE, () => { networkBack = true; });
+
+/**
+ * A list whose requests fail, as when the network drops them, until the page
+ * hears FIXTURE_MENTIONS_ARRIVE; a request after that brings the list. (Not
+ * "the first request fails": development runs each effect twice.)
+ */
+const failToLoad: LoadDocumentMentionables = (publicId) => (networkBack ? loadFixturePeople(publicId) : Promise.resolve({ success: false as const, error: "Suggestions could not be loaded." }));
 
 const loaders = { on: loadFixturePeople, late: loadFixturePeopleLate, fail: failToLoad } satisfies Record<string, LoadDocumentMentionables>;
 
-/** How the fixture's list behaves: there at once, held until the test lets it arrive, or never loaded. */
+/** How the fixture's list behaves: there at once, held until the test lets it arrive, or failing until the test says the network is back. */
 export type FixtureMentions = keyof typeof loaders;
 
 /**

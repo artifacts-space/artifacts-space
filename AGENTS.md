@@ -1898,7 +1898,8 @@ Markdown an agent reads agrees with the page. Every save of content
   while it is being written, and either change remounts the editor and drops
   the text (`e2e/new-artifact.spec.ts` fails on it). `DocumentMentionsProvider`
   always renders, with a null id until there is one.
-- A list that could not be loaded says so in the hint (`unavailable`), and a
+- A list that could not be loaded says so in the hint (`unavailable`) and
+  is asked for again when the window next gets focus (never on a timer); a
   list loaded for one artifact is never offered on another.
 - A list that arrives while an `@` is already being typed redraws the open
   menu (`refreshList` in the extension's storage): the suggestion plugin
