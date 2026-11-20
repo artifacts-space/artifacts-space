@@ -174,9 +174,9 @@ describe("autosave over an hour of typing", () => {
   for (let at = 0; at < hourMs; at += keystrokes.length % 8 === 7 ? AUTOSAVE_DELAY_MS + 100 : 150) keystrokes.push(at);
   const saves = simulateAutosave(keystrokes);
 
-  it("should stay well under the autosave cap when someone types without stopping for an hour", () => {
+  it("should stay under half the autosave cap when someone types without stopping for an hour", () => {
     expect(saves.length).toBeLessThanOrEqual(hourMs / AUTOSAVE_MIN_INTERVAL_MS);
-    expect(saves.length).toBeLessThan(rateLimits.artifactAutosave.limit / 4);
+    expect(saves.length).toBeLessThan(rateLimits.artifactAutosave.limit / 2);
   });
 
   it("should count only the session's first save as an edit when typing never pauses for long", () => {

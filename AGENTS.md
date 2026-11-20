@@ -2294,7 +2294,47 @@ fixtures do not, since they have no server copy. Do not put a
 `revalidatePath` or a per-save `router.refresh()` back on the autosave path;
 a save that must show at once on the server's page goes through `now`.
 `e2e/autosave-refresh-db.spec.ts` counts the requests against a real
-database.
+database, and types while the quiet refresh's render is on its way.
+
+On the server a save is as slow as its chain of statements is long: on
+production each statement is its own HTTPS round trip (`neon-http`). An
+autosave that continues a session on a private or team artifact is 13
+statements, 6 round trips deep (it was 18 and 13, #255), and
+`src/lib/save-query-budget.db.test.ts` holds it there: a change that adds a
+statement to the save path fails that test and has to say why. How it stays
+short:
+
+- Checks that need nothing of each other start together and refuse in a
+  fixed order (`firstRefusal` in `src/lib/artifact-save.ts`): the rate
+  limit (started beside the read of the artifact, `startSaveLimit`), the
+  agent rule, and the quota. Do not turn them back into a chain of awaits.
+  Because the limit starts before the artifact is read, an attempt that
+  files nothing (the artifact is gone, the content is refused) counts
+  against it too.
+- The history is read once after the write (`readHistory` in
+  `src/lib/versions/history.ts`): the latest version and the protected
+  versions, together. The latest version comes without its text
+  (`latestVersionBeside`): the database compares the content with the saved
+  row by hash, and returns the text only when it can point at uploaded
+  files, which the rule that keeps a dropped file restorable reads
+  (`dropsShownImage`; `content-file-lifecycle.db.test.ts` fails without it).
+  Never read `latestVersion` (the whole row) on the private or team save
+  path, apart from `ensureHistoryStart`, which runs once, when the artifact
+  has no version yet. A link or public save still reads it (`planSave` in
+  `src/lib/versions/save-write.ts`): it decides whether the write reuses
+  the latest version, inside the one statement that writes both.
+- History is pruned only when a save added a version row (`fileSave`'s
+  `added`, `newVersion` for a link or public artifact). A save that merged
+  into the session's version adds nothing to prune; versions that age out
+  go with the next new version or the cleanup job (`pruneAllVersions`).
+
+The editor waits a second after the last change (`AUTOSAVE_DELAY_MS`), saves
+at least every 5 seconds while typing goes on, and at most once every 2
+(`AUTOSAVE_MIN_INTERVAL_MS`, 1,800 an hour, half the `artifactAutosave`
+cap). It was 5 seconds until #255: a small change made right after a save
+then showed "Saving…" for up to four more seconds. "Saving…" shows from the
+first keystroke, on purpose: a label that switched between "Unsaved" and
+"Saving…" would flicker every couple of seconds while someone types.
 
 ### Workspaces and an artifact's home
 

@@ -14,7 +14,7 @@ import { cleanUp, createTestArtifact, localDatabaseEnabled, localDatabaseSkipRea
 
 test.skip(!localDatabaseEnabled(), localDatabaseSkipReason);
 
-/** Autosave sends at most one save every 5 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
+/** Autosave waits a second after the last change and sends at most one save every 2 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
 const savedWithin = { timeout: 12_000 };
 const created: string[] = [];
 
@@ -60,6 +60,47 @@ test("should render no page while autosaves follow each other, and ask for the p
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Artifact content" }).getByText("First draft. One. Two.")).toBeVisible();
   expect(seen.renders, "the reload is a document request, not another render the page asked for").toBe(1);
+});
+
+test("should keep every word typed while the quiet refresh's render is on its way and after it lands", async ({ page }, testInfo) => {
+  await page.goto("/api/dev/sign-in");
+  await page.waitForURL(/\/app/);
+  const publicId = await createTestArtifact({ userId: await readyDevUser(), title: `Autosave mid-edit ${testInfo.project.name}`, content: "First draft.", visibility: "private", theme: null });
+  created.push(publicId);
+
+  await page.goto(`/artifact/${publicId}`);
+  const body = page.getByRole("textbox", { name: "Artifact content" });
+  const indicator = page.getByRole("banner").locator("[data-slot=save-indicator]");
+  await body.getByText("First draft.").click();
+  await page.keyboard.press("End");
+
+  // The render the page asks for once the saves go quiet is held, so the typing below happens while it is on its way.
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let asked = 0;
+  await page.route(`**/artifact/${publicId}*`, async (route) => {
+    const request = route.request();
+    if (request.method() !== "GET" || !request.headers().rsc) return route.continue();
+    asked += 1;
+    await held;
+    return route.continue();
+  });
+
+  await page.keyboard.type(" One.");
+  await expect(indicator).toHaveText("Saved", savedWithin);
+  await expect.poll(() => asked, { timeout: 20_000 }).toBe(1);
+
+  // Typed with the render still out, then the render lands under the caret, then more is typed.
+  await page.keyboard.type(" Two.");
+  release();
+  await expect(body.getByText("First draft. One. Two.")).toBeVisible();
+  await page.keyboard.type(" Three.");
+  await expect(body.getByText("First draft. One. Two. Three.")).toBeVisible();
+  await expect(indicator).toHaveText("Saved", savedWithin);
+
+  await page.unroute(`**/artifact/${publicId}*`);
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Artifact content" }).getByText("First draft. One. Two. Three.")).toBeVisible();
 });
 
 test("should ask the server for the artifact again on Back when the reader left before the page caught up", async ({ page }, testInfo) => {

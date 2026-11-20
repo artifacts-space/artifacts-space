@@ -29,7 +29,7 @@ import {
 test.skip(!localDatabaseEnabled(), localDatabaseSkipReason);
 test.describe.configure({ mode: "serial" });
 
-/** Autosave sends at most one save every 5 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
+/** Autosave waits a second after the last change and sends at most one save every 2 seconds (autosave-rules.ts), so "Saved" can take a little over that. */
 const savedWithin = { timeout: 12_000 };
 const devEmail = "dev@artifacts.space";
 const seeded = { publicIds: [] as string[], teamIds: [] as string[], userIds: [] as string[] };

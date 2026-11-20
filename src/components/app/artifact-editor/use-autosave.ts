@@ -52,7 +52,7 @@ function isNewerOrSame(next: ArtifactDto, current: ArtifactDto) {
 
 /**
  * Saves the draft about a second after typing stops, at least every 5
- * seconds while typing goes on, and never more than once every 5 seconds
+ * seconds while typing goes on, and never more than once every 2 seconds
  * (nextSaveDelay); leaving a field, the tab, or the artifact saves at once.
  * Every save names the
  * version the draft is based on, so it is refused instead of overwriting a

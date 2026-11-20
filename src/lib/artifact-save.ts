@@ -44,6 +44,8 @@ export interface SaveContext {
   actor: SharingActor;
   options: SaveOptions;
   restoredFromId?: string | null;
+  /** The save's rate limit, when the caller already started it beside reading the artifact (startSaveLimit). */
+  limited?: Promise<void>;
 }
 
 /** What a save wrote: the row, the row it changed, and whether it went over agents' newer saves (a person's save only). */
@@ -70,8 +72,33 @@ function saveKindOf(context: SaveContext) {
  * editing session folds into that session's version, so it has its own
  * runaway cap; every other save can file a version and counts as an edit.
  */
-function saveLimit(context: SaveContext) {
+function saveLimit(context: Pick<SaveContext, "options" | "restoredFromId">) {
   return !context.restoredFromId && context.options.session === "continue" ? "artifactAutosave" : "artifactUpdate";
+}
+
+/**
+ * Counts an edit's save against its limit, started beside the read of the
+ * artifact instead of after it: the two need nothing of each other. Hand the
+ * promise to writeArtifactSave as `limited`, which waits for it before it
+ * writes. It never rejects unheard: a caller that returns early (the artifact
+ * is gone) may drop it. The attempt is counted all the same: a save that
+ * comes back null, or whose content is refused, has spent one of the limit.
+ */
+export function startSaveLimit(editorId: string, options: SaveOptions): Promise<void> {
+  const limited = enforceRateLimit(saveLimit({ options }), editorId);
+  limited.catch(() => undefined);
+  return limited;
+}
+
+/**
+ * Waits for checks that were started together, and throws the first refusal
+ * in the order given: the same refusal as running them one after another,
+ * in the time of the slowest.
+ */
+async function firstRefusal(checks: readonly Promise<void>[]): Promise<void> {
+  for (const result of await Promise.allSettled(checks)) {
+    if (result.status === "rejected") throw result.reason;
+  }
 }
 
 /** An agent's base version, parsed; undefined when it sent none. */
@@ -191,10 +218,13 @@ function writeGuarded(write: Write, base: BaseVersion | undefined): Promise<Land
 export async function writeArtifactSave(changes: ArtifactChanges, context: SaveContext): Promise<SavedRow | null> {
   const { editorId, before } = context;
   const base = agentBase(context);
-  await enforceRateLimit(saveLimit(context), editorId);
-  await assertAgentMayWrite(changes, context, base);
-  // Content counts toward the author's account, whoever edits it.
-  if (changes.content !== undefined) await assertContentFits(before.userId, changes.content, before.content, editorId);
+  // The limit, the agent rule, and the quota need nothing of each other: they run together, and refuse in this order.
+  await firstRefusal([
+    context.limited ?? enforceRateLimit(saveLimit(context), editorId),
+    assertAgentMayWrite(changes, context, base),
+    // Content counts toward the author's account, whoever edits it.
+    changes.content === undefined ? Promise.resolve() : assertContentFits(before.userId, changes.content, before.content, editorId),
+  ]);
   await assertValidArtifactUpdate(changes, () => Promise.resolve(before));
   // A restore keeps the version's theme as it was; a team preset it may no longer use just falls back.
   if (!context.restoredFromId && changes.theme !== before.theme) await assertTeamPresetUsable(editorId, before, changes.theme);

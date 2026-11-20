@@ -17,12 +17,15 @@ export const AUTOSAVE_DELAY_MS = 1000;
 export const AUTOSAVE_MAX_WAIT_MS = 5000;
 
 /**
- * The shortest time between two autosaves, so an editor sends at most 720
- * an hour however it types: well under the runaway cap on autosaves
- * (`artifactAutosave` in src/lib/abuse/limits.ts). Leaving the field, the
- * tab, or the artifact saves at once.
+ * The shortest time between two autosaves, so an editor sends at most 1,800
+ * an hour however it types: half the runaway cap on autosaves
+ * (`artifactAutosave` in src/lib/abuse/limits.ts). Short enough that it
+ * rarely adds to the second's wait: only a change made within a second of
+ * the last save waits for it (#255: at 5 seconds, a small change made right
+ * after a save showed "Saving…" for up to four more). Leaving the field,
+ * the tab, or the artifact saves at once.
  */
-export const AUTOSAVE_MIN_INTERVAL_MS = 5000;
+export const AUTOSAVE_MIN_INTERVAL_MS = 2000;
 
 /** When the next autosave may go, as of a change made `now`. Times are ms since the epoch. */
 export interface SaveTiming {

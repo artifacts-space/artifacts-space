@@ -27,7 +27,7 @@ export const rateLimits = {
    * Web editor autosaves that continue an open editing session, per user per
    * hour. They fold into the session's one version, so they count here
    * instead of artifactUpdate (the session's first save counts there). The
-   * editor sends at most one every 5 seconds (720 an hour, see
+   * editor sends at most one every 2 seconds (1,800 an hour, see
    * autosave-rules.ts); this is the runaway cap.
    */
   artifactAutosave: { limit: 3600, windowSeconds: hour },
