@@ -53,6 +53,15 @@ describe("listPeople", () => {
     expect(listPeople([{ handle: "ada", kind: "person" }], actors)).not.toHaveProperty("hidden");
   });
 
+  it("should list a person whose handle is also the name of an object's built-in property", () => {
+    const tricky = new Map(["constructor", "tostring", "hasownproperty", "valueof"].map((handle) => [handle, { handle, kind: "person" as const, name: { untrustedText: handle } }]));
+    const shown = [...tricky.values()].map(({ handle, kind }) => ({ handle, kind }));
+    const people = listPeople(shown, tricky);
+    expect(Object.keys(people)).toEqual(["constructor", "tostring", "hasownproperty", "valueof"]);
+    expect(Object.hasOwn(people, "constructor")).toBe(true);
+    expect(JSON.parse(JSON.stringify(people))).toEqual(people);
+  });
+
   it("should leave out someone without a handle, whom the row already names in full", () => {
     expect(listPeople([{ handle: null, kind: "person", name: { untrustedText: "No Handle" } }], actors)).toEqual({});
   });

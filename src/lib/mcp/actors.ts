@@ -87,12 +87,13 @@ export type McpPerson = Omit<McpActor, "handle">;
 export function listPeople(shown: readonly (McpActor | null | undefined)[], actors: McpActors): Record<string, McpPerson> {
   const byHandle = new Map<string, McpActor>();
   for (const actor of actors.values()) if (actor.handle) byHandle.set(actor.handle, actor);
-  const people: Record<string, McpPerson> = {};
+  // A Map, then own properties: a handle such as "constructor" or "toString" is an ordinary key, never an inherited one.
+  const people = new Map<string, McpPerson>();
   for (const actor of shown) {
     const full = actor?.handle ? byHandle.get(actor.handle) : undefined;
-    if (!full?.handle || full.handle in people) continue;
+    if (!full?.handle || people.has(full.handle)) continue;
     const { handle, ...person } = full;
-    people[handle] = person;
+    people.set(handle, person);
   }
-  return people;
+  return Object.fromEntries(people);
 }

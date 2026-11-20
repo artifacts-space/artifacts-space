@@ -13,7 +13,12 @@ import { actorFacts, toMcpActor } from "./actors";
  * page. Never an email, and never a team the caller is not in.
  */
 
-/** A name or other text its owner typed, labelled untrusted as comment bodies are. */
+/**
+ * Text that one member or agent typed about themselves or for the team's
+ * roles, labelled untrusted as comment bodies are: a member's name, an
+ * agent's owner's name, a custom role's name. Not wrapped, as in every
+ * result: the team's own name, like artifact titles and project names.
+ */
 function untrusted(text: string) {
   return { untrustedText: text };
 }
