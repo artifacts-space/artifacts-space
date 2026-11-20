@@ -446,7 +446,10 @@ describe("proxy on the landing and sign-in pages", () => {
     // The artifact check asks for the session alone, the entry pages with its headers: no session either way.
     mocks.getSession.mockImplementation((input: { returnHeaders?: boolean }) => Promise.resolve(input.returnHeaders ? { headers: new Headers(), response: null } : null));
     mocks.checkArtifactPage.mockResolvedValue(page(false));
+    // The artifact hop's rate limit hashes the network with this secret before it asks; without it the limit fails open in its catch.
+    vi.stubEnv("BETTER_AUTH_SECRET", "test-network-key-secret");
     mocks.hitRateLimits.mockResolvedValue(null);
+    const logged = vi.spyOn(console, "error");
     for (const start of ["/", "/sign-in", "/sign-up", "/app", "/artifact/abc"]) {
       let cookie: string | null = `__Secure-${sessionCookie}`;
       let path = start;
@@ -464,6 +467,9 @@ describe("proxy on the landing and sign-in pages", () => {
       // With the cookie gone, / is the static landing page.
       expect(location(await proxy(request("/")))).toBeNull();
     }
+    expect(logged, "no check failed on the way").not.toHaveBeenCalled();
+    logged.mockRestore();
+    vi.unstubAllEnvs();
   });
 
   it("should show the sign-in page when the session check fails", async () => {

@@ -343,9 +343,11 @@ catch this, so test the generated SQL with `.toSQL()`, as
   never redirect only for artifacts that exist. The Markdown version
   (`.md`, or `Accept: text/markdown`) keeps its 404: an agent cannot use a
   sign-in form. A sign-in page with a return address (`?next=`) is noindex
-  (`next.config.ts`), so the redirect never puts one in a search engine. A link unfurler is signed out too: it follows the redirect
-  and shows the sign-in page's card, which is the site's
-  (`e2e/link-preview.prod.spec.ts`). `src/proxy.test.ts` holds this in CI and
+  (`next.config.ts`), so a search engine that follows the redirect lists
+  neither the artifact's address nor that sign-in page. A link unfurler is
+  signed out too: it follows the redirect and shows the sign-in page's
+  card, which is the site's (`e2e/link-preview.prod.spec.ts`).
+  `src/proxy.test.ts` holds this in CI and
   `e2e/artifact-sign-in-redirect-db.spec.ts` against a real database.
 - Every MCP tool is classified read or write in `src/lib/mcp/tool-access.ts`.
   A tool missing from that list cannot be registered, and read-only
