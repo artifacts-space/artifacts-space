@@ -8,18 +8,21 @@ import { cn } from "@/lib/utils";
 export const mentionPopoverClass = "z-50 max-w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md";
 
 /** Why no suggestion shows for the "@" being typed, so the writer is never left guessing. */
-export function MentionHint({ query, self, hasCandidates }: { query: string; self: Mentionable | null; hasCandidates: boolean }) {
-  const isSelf = self !== null && query.length > 0 && self.handle.startsWith(query);
-  const message = isSelf
-    ? "That is you. Mentioning yourself notifies no one."
-    : hasCandidates
-      ? "No match. You can mention this artifact's author and your teammates."
-      : "No one to mention here yet. You can mention this artifact's author and your teammates.";
+export function MentionHint({ query, self, hasCandidates, unavailable = false }: { query: string; self: Mentionable | null; hasCandidates: boolean; unavailable?: boolean }) {
   return (
     <p role="status" className="px-3 py-2 text-sm text-muted-foreground">
-      {message}
+      {hintMessage(self !== null && query.length > 0 && self.handle.startsWith(query), hasCandidates, unavailable)}
     </p>
   );
+}
+
+/** The list could not be loaded: nothing is known about who can be mentioned, so the hint claims nothing about it. */
+export const MENTIONS_UNAVAILABLE = "The list of people to mention could not be loaded. A handle typed in full still notifies when it is saved.";
+
+function hintMessage(isSelf: boolean, hasCandidates: boolean, unavailable: boolean): string {
+  if (isSelf) return "That is you. Mentioning yourself notifies no one.";
+  if (unavailable) return MENTIONS_UNAVAILABLE;
+  return hasCandidates ? "No match. You can mention this artifact's author and your teammates." : "No one to mention here yet. You can mention this artifact's author and your teammates.";
 }
 
 interface ListProps {

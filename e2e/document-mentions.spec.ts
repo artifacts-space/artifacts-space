@@ -14,11 +14,23 @@ import { expectNoAxeViolations } from "./support/a11y";
 const editor = (page: Page) => page.getByRole("textbox", { name: "Artifact content" });
 const suggestions = (page: Page) => page.getByRole("listbox", { name: "Mention suggestions" });
 
-/** Opens the fixture and puts the caret at the end of its first paragraph. */
+/**
+ * Opens the fixture and puts the caret at the end of its first paragraph.
+ * The caret is set through the selection, not with End: End goes to the end
+ * of the line the click landed on, which depends on where the text wraps.
+ */
 async function openAtFirstParagraph(page: Page, query = "&mentions=1") {
   await page.goto(`/dev/editor?kind=markdown${query}`);
-  await editor(page).getByText("A paragraph that runs long enough").first().click();
-  await page.keyboard.press("End");
+  const paragraph = editor(page).getByText("A paragraph that runs long enough").first();
+  await paragraph.click();
+  await paragraph.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  });
 }
 
 test("should list the people and agents to mention when @ is typed, and narrow the list as letters follow", async ({ page }) => {
@@ -77,6 +89,14 @@ test("should show the list under an @ already being typed as soon as the people 
   await expect(suggestions(page).getByRole("option")).toHaveText([/@dana/]);
   await page.keyboard.press("Enter");
   await expect(editor(page).locator("[data-mention=dana]")).toHaveText("@dana");
+});
+
+test("should say the list could not be loaded, and not that there is nobody to mention, when the load fails", async ({ page }) => {
+  await openAtFirstParagraph(page, "&mentions=fail");
+  await page.keyboard.type(" @da");
+
+  await expect(page.getByText("The list of people to mention could not be loaded. A handle typed in full still notifies when it is saved.")).toBeVisible();
+  await expect(page.getByText("No one to mention here yet.")).toHaveCount(0);
 });
 
 test("should offer no suggestions where the page gives the document nobody to mention", async ({ page }) => {

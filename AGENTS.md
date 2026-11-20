@@ -1891,6 +1891,15 @@ Markdown an agent reads agrees with the page. Every save of content
   (`mentionables.ts`): the save's own rule without "can read it", since a
   mention in a draft lands once it is shared; only someone who may edit the
   artifact gets it (`loadDocumentMentionablesAction`), once per open editor.
+- The extension is always in the document editor and starts off
+  (`startsOff`); `setMentionSource(null)` keeps `@` plain text. Never add it
+  only when a page offers mentions, and never wrap the editor in something
+  that appears only once the artifact has an id: a new artifact gets its id
+  while it is being written, and either change remounts the editor and drops
+  the text (`e2e/new-artifact.spec.ts` fails on it). `DocumentMentionsProvider`
+  always renders, with a null id until there is one.
+- A list that could not be loaded says so in the hint (`unavailable`), and a
+  list loaded for one artifact is never offered on another.
 - A list that arrives while an `@` is already being typed redraws the open
   menu (`refreshList` in the extension's storage): the suggestion plugin
   redraws only when the query changes.

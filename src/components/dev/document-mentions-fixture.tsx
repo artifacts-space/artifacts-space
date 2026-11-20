@@ -25,11 +25,18 @@ const loadFixturePeopleLate: LoadDocumentMentionables = async (publicId) => {
   return loadFixturePeople(publicId);
 };
 
+/** A list that cannot be loaded, as when the request fails. */
+const failToLoad: LoadDocumentMentionables = () => Promise.resolve({ success: false as const, error: "Suggestions could not be loaded." });
+
+const loaders = { on: loadFixturePeople, late: loadFixturePeopleLate, fail: failToLoad } satisfies Record<string, LoadDocumentMentionables>;
+
+/** How the fixture's list behaves: there at once, held until the test lets it arrive, or never loaded. */
+export type FixtureMentions = keyof typeof loaders;
+
 /**
  * Development only: turns on @mentions in the document editors inside, from
- * an in-memory list (e2e/document-mentions.spec.ts). `late` holds the list
- * until the test lets it arrive.
+ * an in-memory list (e2e/document-mentions.spec.ts).
  */
-export function DocumentMentionsFixture({ late = false, children }: { late?: boolean; children: React.ReactNode }) {
-  return <DocumentMentionsLoader load={late ? loadFixturePeopleLate : loadFixturePeople}>{children}</DocumentMentionsLoader>;
+export function DocumentMentionsFixture({ mode, children }: { mode: FixtureMentions; children: React.ReactNode }) {
+  return <DocumentMentionsLoader load={loaders[mode]}>{children}</DocumentMentionsLoader>;
 }

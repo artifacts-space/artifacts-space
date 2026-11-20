@@ -285,9 +285,8 @@ export function hasInlineField(kind: ArtifactKind, sourceOpen: boolean): boolean
 function DocumentContent({ kind, content, revision, pageKey, place, onChange, onShowSource }: Pick<InlineContentProps, "content" | "revision" | "pageKey" | "onChange" | "onShowSource"> & { kind: DocumentKind; place: Placement }) {
   const document = <DocumentEditor key={revision} kind={kind} value={content} onChange={onChange} label="Artifact content" sourceToggle={false} onEditSource={onShowSource} />;
   if (kind !== "markdown") return <ContentFrame place={place}>{document}</ContentFrame>;
-  // A saved Markdown artifact (it has a public id) takes @mentions in its text.
-  const withMentions = pageKey ? <DocumentMentionsProvider publicId={pageKey}>{document}</DocumentMentionsProvider> : document;
-  return <ContentFrame place={place}><InlineCommentSurface>{withMentions}</InlineCommentSurface></ContentFrame>;
+  // A saved Markdown artifact (it has a public id) takes @mentions in its text. The same tree before and after it is stored, so the editor is never remounted.
+  return <ContentFrame place={place}><InlineCommentSurface><DocumentMentionsProvider publicId={pageKey ?? null}>{document}</DocumentMentionsProvider></InlineCommentSurface></ContentFrame>;
 }
 
 /** The content in its frame: the source, or the format's own view. */

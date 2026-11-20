@@ -69,6 +69,9 @@ function SourceSwitch({ markdown, onClick }: { markdown: boolean; onClick: () =>
   );
 }
 
+/** The comment box's @mentions for a document, off until setMentionSource gives it people. */
+const documentMentions = CommentMentions.configure({ startsOff: true });
+
 /** True when there is something to link: a selection, or a link under the cursor. */
 function canEditLink(editor: Editor): boolean {
   return !editor.state.selection.empty || editor.isActive("link");
@@ -93,9 +96,8 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const coarse = useCoarsePointer();
   const blocks = useBlockHandles(blockHandles === true);
-  // @mentions, where the page around this editor offers them (a saved artifact's document).
+  // @mentions, where the page around this editor offers them (a saved artifact's document); null leaves "@" as plain text.
   const mentions = useDocumentMentions();
-  const hasMentions = mentions !== null;
 
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
@@ -111,9 +113,10 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
         onMediaRefused: () => { setMediaRefused(true); },
       }),
       ...blocks.extensions,
-      ...(hasMentions ? [CommentMentions] : []),
+      // Always part of the editor, and off until the page offers people: an editor's extensions cannot change once it exists.
+      documentMentions,
     ],
-    [media, blocks.extensions, hasMentions],
+    [media, blocks.extensions],
   );
 
   const editor = useEditor({
@@ -133,7 +136,7 @@ export default function RichMarkdownEditor({ value, onChange, label, autoFocus =
 
   // People to mention load after the editor: their chips are drawn once they arrive.
   useEffect(() => {
-    if (editor && !editor.isDestroyed && mentions) editor.commands.setMentionSource(mentions);
+    if (editor && !editor.isDestroyed) editor.commands.setMentionSource(mentions);
   }, [editor, mentions]);
 
   function showMarkdown() {
