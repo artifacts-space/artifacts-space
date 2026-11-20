@@ -120,6 +120,14 @@ Next.js code. This version differs from most training data:
   export `export const instant = false`.
 - Route segment `dynamic` exports are not allowed.
 - `pnpm typecheck` runs `next typegen` first; bare `tsc` misses route types.
+- The router keeps a page the reader left and shows it again on Back, with
+  its state, running every effect anew. The editor library destroys an editor
+  whose page was put away, so on return a component can hold a dead editor
+  for one render: an effect that reads `editor.view` first returns on
+  `editor.isDestroyed` (the new editor runs it again), or the page shows
+  "This page couldn't load" (#267). The artifact page goes back to its read
+  view on return and loads its editable copy again (`edit-surface.tsx`);
+  `e2e/artifact-back-db.spec.ts` holds both surfaces.
 
 ## Code standards
 
