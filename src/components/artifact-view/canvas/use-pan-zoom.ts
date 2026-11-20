@@ -228,8 +228,11 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
   // glide; once the board is drawn at rest, the focused control is brought into view again, and that scroll is exact.
   // Whether a glide ran is asked when the focus moves, not only when the scroll arrives: the scroll event comes a
   // frame later, and on a busy page the glide can be over by then, with the scroll still measured in the middle of it.
+  // The note lasts one frame: the scroll event of this focus runs before that frame's callbacks, so once they run the
+  // note cannot apply any more (a focus that needed no scroll), and a later scroll from another cause never reads it.
   const onFocus = (event: FocusEvent<HTMLElement>) => {
     focusedMidGlide.current = event.target !== event.currentTarget && isGliding(event.currentTarget);
+    if (focusedMidGlide.current) requestAnimationFrame(() => { focusedMidGlide.current = false; });
   };
 
   const onScroll = (event: UIEvent<HTMLElement>) => {

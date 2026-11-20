@@ -1,4 +1,4 @@
-import { board, boxOf, frame, frameBody, openCanvas as open } from "./support/canvas";
+import { board, boardAtRest, boxOf, frame, frameBody, openCanvas as open, pannedIntoView } from "./support/canvas";
 import { expect, test } from "./support/test";
 
 /*
@@ -19,12 +19,7 @@ test.describe("on a desktop", () => {
     await open(page, "flow", "board");
     await page.getByRole("button", { name: /Show at 100%/ }).click();
     await expect(board(page)).toHaveAttribute("data-canvas-zoom", "100%");
-    const world = board(page).locator("[data-canvas-world]");
-    const atRest = () => world.evaluate(async (element) => {
-      await Promise.allSettled(element.getAnimations({ subtree: false }).map((animation) => animation.finished));
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    });
-    await atRest();
+    await boardAtRest(page);
     const pane = await boxOf(board(page));
     const alerts = frame(page, "settings").getByRole("switch", { name: "Push alerts" });
     expect((await boxOf(alerts)).x).toBeGreaterThan(pane.x + pane.width);
@@ -47,13 +42,10 @@ test.describe("on a desktop", () => {
     await expect(alerts).toBeFocused();
     // The end state, read together: the focus scroll was turned into a pan (the box is back at 0), and the control is
     // inside the board. Right after the focus the box is still scrolled, which alone would put the control in view.
-    const atRestInView = async () => {
-      const [scroll, box] = await Promise.all([board(page).evaluate((element) => [element.scrollLeft, element.scrollTop]), boxOf(alerts)]);
-      return scroll[0] === 0 && scroll[1] === 0 && box.x >= pane.x && box.x + box.width <= pane.x + pane.width;
-    };
+    const atRestInView = () => pannedIntoView(page, alerts, pane);
     await expect.poll(atRestInView).toBe(true);
     // And it stays so once nothing moves any more: no later pan takes the control out again.
-    await atRest();
+    await boardAtRest(page);
     expect(await atRestInView()).toBe(true);
   });
 
@@ -61,12 +53,7 @@ test.describe("on a desktop", () => {
     await open(page, "flow", "board");
     await page.getByRole("button", { name: /Show at 100%/ }).click();
     await expect(board(page)).toHaveAttribute("data-canvas-zoom", "100%");
-    const world = board(page).locator("[data-canvas-world]");
-    const atRest = () => world.evaluate(async (element) => {
-      await Promise.allSettled(element.getAnimations({ subtree: false }).map((animation) => animation.finished));
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    });
-    await atRest();
+    await boardAtRest(page);
     const pane = await boxOf(board(page));
     const alerts = frame(page, "settings").getByRole("switch", { name: "Push alerts" });
     expect((await boxOf(alerts)).x).toBeGreaterThan(pane.x + pane.width);
@@ -95,12 +82,9 @@ test.describe("on a desktop", () => {
     });
     expect(glide).toBe("gliding");
     await expect(alerts).toBeFocused();
-    const atRestInView = async () => {
-      const [scroll, box] = await Promise.all([board(page).evaluate((element) => [element.scrollLeft, element.scrollTop]), boxOf(alerts)]);
-      return scroll[0] === 0 && scroll[1] === 0 && box.x >= pane.x && box.x + box.width <= pane.x + pane.width;
-    };
+    const atRestInView = () => pannedIntoView(page, alerts, pane);
     await expect.poll(atRestInView).toBe(true);
-    await atRest();
+    await boardAtRest(page);
     expect(await atRestInView()).toBe(true);
     // Brought in by the least pan: it rests at the board's edge. A second scroll measured before the first pan was
     // drawn would carry it further in (25 px here).

@@ -2000,7 +2000,8 @@ that true on a busy page (#257: this was the board's test that failed in
 CI, about once in thirty runs). Whether a glide ran is noted when the focus
 moves (`onFocus`), not only when the scroll event arrives: that event comes
 a frame later, and when the frame is slow the glide is already over, with
-the scroll still measured in the middle of it. And the pan is drawn before
+the scroll still measured in the middle of it. The note lasts that one
+frame, so a later scroll from another cause never reads it. And the pan is drawn before
 the handler returns (`flushSync`): the reveal runs in the same frame as the
 scroll event, before React would otherwise draw, and a second scroll
 measured on the old drawing carries the control too far. A test that
