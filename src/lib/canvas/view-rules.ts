@@ -131,6 +131,33 @@ export function panBy(view: BoardView, delta: { x: number; y: number }, bounds: 
   return keepInWindow({ zoom: view.zoom, x: view.x + delta.x, y: view.y + delta.y }, bounds, window);
 }
 
+/** A box on the page, in CSS pixels, as `getBoundingClientRect` gives it. */
+export interface Edges {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/** How far the view moves along one axis so `[start, end]` sits inside `[low, high]`: none when it does, the start first when it cannot fit. */
+function nearestAxis(start: number, end: number, low: number, high: number): number {
+  if (start < low) return low - start;
+  if (end > high) return Math.max(high - end, low - start);
+  return 0;
+}
+
+/**
+ * How far the view must move, on the page, so `control` sits inside the
+ * board's window `pane`: what `scrollIntoView` with "nearest" would scroll,
+ * with the sign of a pan (a control past the right edge moves the view left).
+ * Zero on an axis where it is inside already. A scroll of the window is held
+ * to how far its content reaches, and that can be short of the control; a
+ * pan has no such limit.
+ */
+export function panToReveal(control: Edges, pane: Edges): { x: number; y: number } {
+  return { x: nearestAxis(control.left, control.right, pane.left, pane.right), y: nearestAxis(control.top, control.bottom, pane.top, pane.bottom) };
+}
+
 /** A point in the board's window, in CSS pixels from its top left corner. */
 export interface Point {
   x: number;

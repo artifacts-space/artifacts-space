@@ -2055,6 +2055,16 @@ what a slow frame does, do not wait for a slow runner: focus inside the
 page and keep the page busy in that same task (`e2e/canvas-focus.spec.ts`,
 "the page is busy until the glide has ended").
 
+The reveal pans; it never asks the browser to scroll (`panToReveal` in
+`src/lib/canvas/view-rules.ts`, what `scrollIntoView` "nearest" would move,
+measured once the board is at rest). A scroll of the board's box stops where
+its scrollable content ends, and on a page that had just loaded on a fresh
+`next dev` that was 80 pixels of a 550-pixel way, twice: the control stayed
+outside the board (CI, 20 Nov 2026, the first canvas test of a shard; locally
+2 runs in 5 with `.next/dev` deleted before each, 0 in 8 after the change).
+The first pan, from the browser's own focus scroll, has the same limit, and
+the reveal makes up the rest.
+
 ### Frame captures
 
 A frame capture is an image of one canvas frame, drawn by the browser of

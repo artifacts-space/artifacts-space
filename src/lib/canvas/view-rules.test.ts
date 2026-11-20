@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { canvasLimits, frameSizes } from "./limits";
-import { boundsOf, clampZoom, fitPadding, fitView, frameView, keepInWindow, nextZoomStep, panBy, pinchOf, pinchView, wheelZoom, zoomAbout, zoomPercent, zoomRange } from "./view-rules";
+import { boundsOf, clampZoom, fitPadding, fitView, frameView, keepInWindow, nextZoomStep, panBy, panToReveal, pinchOf, pinchView, wheelZoom, zoomAbout, zoomPercent, zoomRange } from "./view-rules";
 
 const window = { width: 1000, height: 600 };
 
@@ -112,6 +112,26 @@ describe("panBy", () => {
   it("should keep part of the board in the window when a drag would push it out", () => {
     expect(panBy({ zoom: 1, x: 0, y: 0 }, { x: 5000, y: 5000 }, bounds, window)).toEqual({ zoom: 1, x: 920, y: 520 });
     expect(panBy({ zoom: 1, x: 0, y: 0 }, { x: -5000, y: -5000 }, bounds, window)).toEqual({ zoom: 1, x: -720, y: -320 });
+  });
+});
+
+describe("panToReveal", () => {
+  const pane = { left: 232, top: 62, right: 1208, bottom: 710 };
+
+  it("should not move the view when the control is inside the window", () => {
+    expect(panToReveal({ left: 400, top: 100, right: 444, bottom: 124 }, pane)).toEqual({ x: 0, y: 0 });
+  });
+
+  it("should move the view left by what the control lacks when it is past the right edge", () => {
+    expect(panToReveal({ left: 1713, top: 100, right: 1757, bottom: 124 }, pane)).toEqual({ x: -549, y: 0 });
+  });
+
+  it("should move the view right and down when the control is past the left and top edges", () => {
+    expect(panToReveal({ left: 100, top: 10, right: 144, bottom: 34 }, pane)).toEqual({ x: 132, y: 52 });
+  });
+
+  it("should bring the control's start into the window when it is wider than the window", () => {
+    expect(panToReveal({ left: 1300, top: 100, right: 2400, bottom: 124 }, pane)).toEqual({ x: -1068, y: 0 });
   });
 });
 
