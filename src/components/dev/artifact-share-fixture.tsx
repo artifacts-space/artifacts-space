@@ -108,7 +108,7 @@ export function ArtifactShareFixture({ as, themeId = null }: { as: "owner" | "re
   const initial = useMemo(() => fixtureArtifact({ id: "fixture-share", kind: "markdown", title: "Launch checklist", content: "# Launch checklist" }), []);
   const [artifact, setArtifact] = useState(initial);
   const [actions] = useState(() => memoryShareStore(initial));
-  if (as === "reader") return <FixturePage artifact={{ ...artifact, visibility: "team", teamId: "fixture-platform" }} share={null} />;
+  if (as === "reader") return <FixturePage artifact={{ ...artifact, visibility: "team", teamId: "fixture-platform" }} share={null} theme={theme} />;
   const share = <ArtifactPageShare artifact={artifact} teams={fixtureTeams} sentence={sentenceFor(artifact)} shareUrl={`https://artifacts.space/artifact/${artifact.publicId}`} actions={actions} onSaved={setArtifact} />;
   return <FixturePage artifact={artifact} share={share} theme={theme} />;
 }
