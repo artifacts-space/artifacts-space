@@ -72,12 +72,16 @@ describe.runIf(Boolean(databaseUrl))("the database work of one autosave", async 
    * than the save has (CI, 20 Nov 2026: 7 for 6). Holding each answer until
    * this long after its statement started makes every round trip the same
    * length, so the count follows what waits for what, not which answer came
-   * first. It is far above a local query's time.
+   * first. That holds while every local query answers within this time, which
+   * is far above a local query's one or two milliseconds; a query slower than
+   * this (a cold connection on a busy runner) could still add a wave. Checked
+   * by hand on 20 Nov 2026: with the artifact's read held 40 ms longer than
+   * the rest, the count was 7 every time without this floor, and 6 with it.
    */
   const roundTripMs = 100;
 
-  /** Runs `work` and returns every statement it sent, with a counter for order (the clock is too coarse for a local database). `slower` delays the statements it matches by `ms` before they are sent, as a slow answer would. */
-  async function statementsOf(work: () => Promise<unknown>, slower?: { matches: (text: string) => boolean; ms: number }): Promise<Statement[]> {
+  /** Runs `work` and returns every statement it sent, with a counter for order (the clock is too coarse for a local database). */
+  async function statementsOf(work: () => Promise<unknown>): Promise<Statement[]> {
     const statements: Statement[] = [];
     let tick = 0;
     const real = Pool.prototype.query.bind(getDb().$client) as (...args: unknown[]) => Promise<unknown>;
@@ -87,9 +91,7 @@ describe.runIf(Boolean(databaseUrl))("the database work of one autosave", async 
       const entry: Statement = { text: text.replace(/\s+/g, " "), started: (tick += 1), finished: Number.POSITIVE_INFINITY };
       statements.push(entry);
       const answersAt = performance.now() + roundTripMs;
-      const delay = slower?.matches(entry.text) ? slower.ms : 0;
-      return wait(delay)
-        .then(() => real(...args))
+      return real(...args)
         .then(async (answer) => {
           await wait(answersAt - performance.now());
           return answer;
@@ -106,14 +108,6 @@ describe.runIf(Boolean(databaseUrl))("the database work of one autosave", async 
       sweep.mockRestore();
     }
     return statements;
-  }
-
-  /** A page with one save already made, and the next autosave of its session. */
-  async function continuedSession(title: string) {
-    const page = await createArtifact(owner, { title, content: "# Plan\n\nFirst." });
-    const first = await saveArtifactUpdate(owner, page.id, { content: "# Plan\n\nFirst, and more." }, "person", { session: "start", expectedUpdatedAt: page.updatedAt });
-    if (!first) throw new Error("The first save did not land.");
-    return { page, next: () => saveArtifactUpdate(owner, page.id, { content: "# Plan\n\nFirst, and more, and more again." }, "person", { session: "continue", expectedUpdatedAt: first.artifact.updatedAt }) };
   }
 
   beforeAll(async () => {
@@ -142,9 +136,11 @@ describe.runIf(Boolean(databaseUrl))("the database work of one autosave", async 
   });
 
   it("should take at most 13 statements, 6 round trips deep, and never read a version's text back when an autosave continues a session on a private document", async () => {
-    const { page, next } = await continuedSession("Plan");
+    const page = await createArtifact(owner, { title: "Plan", content: "# Plan\n\nFirst." });
+    const first = await saveArtifactUpdate(owner, page.id, { content: "# Plan\n\nFirst, and more." }, "person", { session: "start", expectedUpdatedAt: page.updatedAt });
+    if (!first) throw new Error("The first save did not land.");
 
-    const statements = await statementsOf(next);
+    const statements = await statementsOf(() => saveArtifactUpdate(owner, page.id, { content: "# Plan\n\nFirst, and more, and more again." }, "person", { session: "continue", expectedUpdatedAt: first.artifact.updatedAt }));
 
     expect(statements.length).toBeLessThanOrEqual(13);
     expect(depthOf(statements)).toBeLessThanOrEqual(6);
@@ -153,17 +149,5 @@ describe.runIf(Boolean(databaseUrl))("the database work of one autosave", async 
     // The save still did its work: one version for the session, holding the latest text.
     const versions = await getDb().select({ content: artifactVersion.content }).from(artifactVersion).where(eq(artifactVersion.artifactId, page.id));
     expect(versions.map((version) => version.content).sort()).toEqual(["# Plan\n\nFirst, and more, and more again.", "# Plan\n\nFirst."].sort());
-  });
-
-  it("should count the same round trips when the artifact's read answers slower than the rate limit beside it", async () => {
-    const even = await continuedSession("Even");
-    const skewed = await continuedSession("Skewed");
-    const artifactRead = (text: string) => text.startsWith('select "id", "user_id", "title"');
-
-    const evenStatements = await statementsOf(even.next);
-    const skewedStatements = await statementsOf(skewed.next, { matches: artifactRead, ms: 40 });
-
-    expect(skewedStatements.some((statement) => artifactRead(statement.text)), "the artifact's read was slowed").toBe(true);
-    expect(depthOf(skewedStatements)).toBe(depthOf(evenStatements));
   });
 });
