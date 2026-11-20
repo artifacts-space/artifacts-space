@@ -13,6 +13,7 @@ import { attachesBeside, attachLabel } from "@/lib/files/loose-rules";
 
 import { PageEditContext, type PageEdit } from "./page-edit-context";
 import { useOwnSaves, usePublishPageEditorChrome, type PageEditorChrome } from "./page-editor-chrome";
+import { savedCopyAfterSave } from "./page-lock-rules";
 import { ownSaveBase } from "./restore-base-rules";
 import { saveIndicatorFor } from "./save-indicator-rules";
 import { usePageFullWidth } from "./use-page-full-width";
@@ -36,13 +37,14 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
   const { draft, update, replace, reset, remount, revision } = useArtifactDraft(initial ?? placeholderDraft);
   const [sourceOpen, setSourceOpen] = useState(false);
 
+  // A save's answer never unlocks a locked page (page-lock-rules.ts).
   const onUpdated = useCallback((next: ArtifactDto) => {
-    setArtifact(next);
+    setArtifact((current) => savedCopyAfterSave(current, next));
     onSaved(next);
   }, [onSaved]);
   /** An autosave's answer: the editor already shows it, so the page around it can catch up later (`onAutosaved`). */
   const autosaved = useCallback((next: ArtifactDto) => {
-    setArtifact(next);
+    setArtifact((current) => savedCopyAfterSave(current, next));
     onAutosaved(next);
   }, [onAutosaved]);
 
@@ -51,6 +53,9 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
     setArtifact(loaded);
     reset(loaded);
   }, [reset]);
+
+  /** Back to the read view until `start` is called again: for a page that was away and must load its editable copy anew. */
+  const lock = useCallback(() => { setArtifact(null); }, []);
 
   const restored = useCallback((next: ArtifactDto) => {
     reset(next);
@@ -84,7 +89,7 @@ export function usePageEditor(initial: ArtifactDto | null, onSaved: (artifact: A
     changedFrames,
   }), [artifact, draft, update, onUpdated, revision, sourceOpen, toggleSource, changedFrames]);
 
-  return { artifact, draft, replace, sourceOpen, toggleSource, onUpdated, autosaved, restored, start, value, caughtUp, caughtUpWith, dismissCaughtUp };
+  return { artifact, draft, replace, sourceOpen, toggleSource, onUpdated, autosaved, restored, start, lock, value, caughtUp, caughtUpWith, dismissCaughtUp };
 }
 
 type PageEditor = ReturnType<typeof usePageEditor>;

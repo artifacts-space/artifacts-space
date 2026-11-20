@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { loadEditableArtifactAction } from "@/app/artifact/[publicId]/edit-actions";
 import { serverCaptureApi } from "@/components/artifact-view/canvas/capture/capture-api";
@@ -40,9 +40,16 @@ export function EditSurface({ publicId, title, updatedAt, reviewed, fullWidth, f
   // The page around the editor catches up once the autosaves go quiet; a restore or a newer save taken when the tab came back shows at once.
   const refresh = useQuietRefresh();
   const editor = usePageEditor(null, refresh.now, refresh.soon);
-  const { start } = editor;
+  const { start, lock } = editor;
+  /** This page was put away (the browser keeps it for Back) since its editable copy last loaded. */
+  const away = useRef(false);
 
   useEffect(() => {
+    // Back to a page the browser kept: the editor was destroyed while it was away (the editor library does that to an
+    // editor whose page is put away), and the copy it held may be older than the server's. So it is a first visit
+    // again: the read view until the editable copy has loaded, then a new editor. Typing before that would be lost.
+    if (away.current) lock();
+    away.current = false;
     let active = true;
     loadEditableArtifactAction(publicId)
       .then((result) => {
@@ -51,8 +58,11 @@ export function EditSurface({ publicId, title, updatedAt, reviewed, fullWidth, f
         else setError(result.error);
       })
       .catch(() => { if (active) setError(loadFailed); });
-    return () => { active = false; };
-  }, [publicId, start]);
+    return () => {
+      active = false;
+      away.current = true;
+    };
+  }, [publicId, start, lock]);
 
   const waitingInput = useMemo(() => ({ publicId, title, updatedAt, reviewed, fullWidth, files }), [publicId, title, updatedAt, reviewed, fullWidth, files]);
   const failed = useWaitingChrome(waitingInput, error);
