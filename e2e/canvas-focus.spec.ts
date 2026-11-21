@@ -50,15 +50,16 @@ test.describe("on a desktop", () => {
   test("should bring a control into view when focus moves to it during a glide and the board's box cannot scroll as far as the control", async ({ page }) => {
     const { pane, alerts } = await alertsOutsideBoard(page);
     // A scroll of the board's box stops where its scrollable content ends. On a page that has just loaded on a fresh
-    // dev server that was 80 pixels, far short of the control (CI, 20 Nov 2026). Made certain here: any scroll asked of
-    // an element moves the box 80 pixels at most. The browser's own focus scroll is not touched.
+    // dev server that was 80 pixels, far short of the control (CI, 20 Nov 2026). Made certain here, for both ways the
+    // box can be scrolled: the focus scrolls it 80 pixels and no more, and so does any scroll asked of an element.
+    // The board asks for none; the second half is here so that a reveal that went back to `scrollIntoView` fails.
     await page.evaluate(() => {
       HTMLElement.prototype.scrollIntoView = function scrollShort(this: HTMLElement) {
         const box = this.closest("[data-canvas-board]");
         if (box) box.scrollLeft += 80;
       };
     });
-    expect(await focusMidGlide(alerts)).toBe("gliding");
+    expect(await focusMidGlide(alerts, { scrollsOnly: 80 })).toBe("gliding");
     await expect(alerts).toBeFocused();
     await expect.poll(() => pannedIntoView(page, alerts, pane)).toBe(true);
     await boardAtRest(page);
