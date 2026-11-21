@@ -2041,10 +2041,10 @@ the view, a 200 ms transition), the browser measures against the board as
 it is drawn at that moment, so the board brings the focused control into
 view again once it is drawn at rest (`revealFocusedAtRest`). Two rules keep
 that true on a busy page (#257: this was the board's test that failed in
-CI, about once in thirty runs). Whether a glide ran is noted when the focus
-moves (`onFocus`), not only when the scroll event arrives: that event comes
-a frame later, and when the frame is slow the glide is already over, with
-the scroll still measured in the middle of it. The note lasts that one
+CI, about once in thirty runs). That a focus moved is noted when it moves
+(`onFocus`), not read from the board when the scroll event arrives: that
+event comes a frame later, and when the frame is slow the glide is already
+over, with the scroll still measured in the middle of it. The note lasts that one
 frame, so a later scroll from another cause never reads it. And the pan is drawn before
 the handler returns (`flushSync`): the reveal runs in the same frame as the
 scroll event, before React would otherwise draw, and a second scroll
@@ -2063,7 +2063,10 @@ its scrollable content ends, and on a page that had just loaded on a fresh
 outside the board (CI, 20 Nov 2026, the first canvas test of a shard; locally
 2 runs in 5 with `.next/dev` deleted before each, 0 in 8 after the change).
 The first pan, from the browser's own focus scroll, has the same limit, and
-the reveal makes up the rest. Like every pan it ends in `keepInWindow`
+the reveal makes up the rest. So it runs after the scroll of every focus,
+with a glide or without one: the limit is the box's, not the glide's. It
+does not run for a focus that scrolled nothing, which is taken as a control
+already in view. Like every pan it ends in `keepInWindow`
 (`panBy`). A control that already covers the board's window from edge to
 edge on an axis is not moved on that axis; one too large to fit shows its
 start. A test that starts with the control outside the board says so before

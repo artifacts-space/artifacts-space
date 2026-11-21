@@ -65,6 +65,20 @@ test.describe("on a desktop", () => {
     expect(await pannedIntoView(page, alerts, pane)).toBe(true);
   });
 
+  test("should bring a control into view when focus moves to it at rest and the board's box cannot scroll as far as the control", async ({ page }) => {
+    const { pane, alerts } = await alertsOutsideBoard(page);
+    // The same short scroll with nothing gliding, made certain: the focus scrolls the box 80 pixels and no more.
+    await alerts.evaluate((control: HTMLElement | SVGElement) => {
+      control.focus({ preventScroll: true });
+      const box = control.closest("[data-canvas-board]");
+      if (box) box.scrollLeft = 80;
+    });
+    await expect(alerts).toBeFocused();
+    await expect.poll(() => pannedIntoView(page, alerts, pane)).toBe(true);
+    await boardAtRest(page);
+    expect(await pannedIntoView(page, alerts, pane)).toBe(true);
+  });
+
   test("should bring a control into view when focus moves to it during a glide and the page is busy until the glide has ended", async ({ page }) => {
     const { pane, alerts } = await alertsOutsideBoard(page);
     // What a slow runner does, made certain: the control is focused a few frames into a glide, so the browser scrolls
