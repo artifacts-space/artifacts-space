@@ -29,6 +29,22 @@ async function alertsOutsideBoard(page: Page) {
   return { pane, alerts };
 }
 
+/**
+ * The same board after its last frame's switch took the focus: the board has moved left to show it, and the first
+ * frame's button is now past the board's left edge. A box scrolls no further back than its own start, so a focus on
+ * that button scrolls nothing, and no scroll event tells the board of it.
+ */
+async function firstButtonPastLeftEdge(page: Page) {
+  const { pane, alerts } = await alertsOutsideBoard(page);
+  await alerts.focus();
+  await expect.poll(() => pannedIntoView(page, alerts, pane)).toBe(true);
+  await boardAtRest(page);
+  const first = frame(page, "sign-in").getByRole("button", { name: "Continue with email" });
+  const box = await boxOf(first);
+  expect(box.x + box.width).toBeLessThan(pane.x);
+  return { pane, first };
+}
+
 test.describe("on a desktop", () => {
   test.beforeEach(({ isMobile }) => {
     test.skip(isMobile, "the board shows on wide columns; phones stack the frames");
@@ -78,6 +94,40 @@ test.describe("on a desktop", () => {
     await expect.poll(() => pannedIntoView(page, alerts, pane)).toBe(true);
     await boardAtRest(page);
     expect(await pannedIntoView(page, alerts, pane)).toBe(true);
+  });
+
+  test("should bring a control into view when the keyboard's focus moves to one past the board's left edge, where the box has nothing to scroll", async ({ page }) => {
+    const { pane, first } = await firstButtonPastLeftEdge(page);
+    // The focus is the keyboard's from here on: one real key press, and a focus a script moves on from it stays so.
+    await page.keyboard.press("Shift+Tab");
+    const before = await boxOf(first);
+    expect(before.x + before.width).toBeLessThan(pane.x);
+    await first.focus();
+    await expect(first).toBeFocused();
+    await expect.poll(() => pannedIntoView(page, first, pane)).toBe(true);
+    await boardAtRest(page);
+    expect(await pannedIntoView(page, first, pane)).toBe(true);
+  });
+
+  test("should not move the board when a pointer press focuses a control that is partly past the board's left edge", async ({ page }) => {
+    const { pane, first } = await firstButtonPastLeftEdge(page);
+    // Drag the board until the button's left half is cut off by the board's edge.
+    const hidden = await boxOf(first);
+    const across = pane.x - hidden.x - hidden.width / 2;
+    const from = { x: pane.x + 40, y: pane.y + pane.height - 12 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + across / 2, from.y, { steps: 4 });
+    await page.mouse.move(from.x + across, from.y, { steps: 4 });
+    await page.mouse.up();
+    await boardAtRest(page);
+    const cut = await boxOf(first);
+    expect(cut.x).toBeLessThan(pane.x);
+    expect(cut.x + cut.width).toBeGreaterThan(pane.x + 8);
+    await page.mouse.click(pane.x + (cut.x + cut.width - pane.x) / 2, cut.y + cut.height / 2);
+    await expect(first).toBeFocused();
+    await boardAtRest(page);
+    expect((await boxOf(first)).x).toBe(cut.x);
   });
 
   test("should bring a control into view when focus moves to it during a glide and the page is busy until the glide has ended", async ({ page }) => {
