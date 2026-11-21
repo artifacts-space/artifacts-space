@@ -139,20 +139,28 @@ export interface Edges {
   bottom: number;
 }
 
-/** How far the view moves along one axis so `[start, end]` sits inside `[low, high]`: none when it does, the start first when it cannot fit. */
+/**
+ * How far the view moves along one axis so `[start, end]` sits inside `[low, high]`. None when it is inside, and none
+ * when it covers the whole of `[low, high]`: a move would hide as much of it as it shows. One that fits moves by the
+ * least that brings it in. One that cannot fit shows its start.
+ */
 function nearestAxis(start: number, end: number, low: number, high: number): number {
-  if (start < low) return low - start;
-  if (end > high) return Math.max(high - end, low - start);
-  return 0;
+  if (start >= low && end <= high) return 0;
+  if (start <= low && end >= high) return 0;
+  if (end - start > high - low) return low - start;
+  return start < low ? low - start : high - end;
 }
 
 /**
  * How far the view must move, on the page, so `control` sits inside the
  * board's window `pane`: what `scrollIntoView` with "nearest" would scroll,
  * with the sign of a pan (a control past the right edge moves the view left).
- * Zero on an axis where it is inside already. A scroll of the window is held
- * to how far its content reaches, and that can be short of the control; a
- * pan has no such limit.
+ * Zero on an axis where it is inside already, or where it covers the whole
+ * window. One difference from "nearest": a control too large for the window
+ * that leaves part of the window empty shows its start, where the browser
+ * would show its nearer end. A scroll of the window is held to how far its
+ * content reaches, and that can be short of the control; a pan has no such
+ * limit.
  */
 export function panToReveal(control: Edges, pane: Edges): { x: number; y: number } {
   return { x: nearestAxis(control.left, control.right, pane.left, pane.right), y: nearestAxis(control.top, control.bottom, pane.top, pane.bottom) };

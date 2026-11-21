@@ -133,6 +133,18 @@ describe("panToReveal", () => {
   it("should bring the control's start into the window when it is wider than the window", () => {
     expect(panToReveal({ left: 1300, top: 100, right: 2400, bottom: 124 }, pane)).toEqual({ x: -1068, y: 0 });
   });
+
+  it("should bring the control's start into the window when it is wider than the window and starts before it", () => {
+    expect(panToReveal({ left: 100, top: 100, right: 1150, bottom: 124 }, pane)).toEqual({ x: 132, y: 0 });
+  });
+
+  it("should not move the view when the control covers the window from edge to edge", () => {
+    expect(panToReveal({ left: 100, top: 10, right: 1400, bottom: 800 }, pane)).toEqual({ x: 0, y: 0 });
+  });
+
+  it("should move the view on one axis only when the control covers the window on the other", () => {
+    expect(panToReveal({ left: 100, top: 720, right: 1400, bottom: 744 }, pane)).toEqual({ x: 0, y: -34 });
+  });
 });
 
 describe("keepInWindow", () => {

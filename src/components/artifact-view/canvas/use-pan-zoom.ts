@@ -238,10 +238,9 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
     if (focusedMidGlide.current) requestAnimationFrame(() => { focusedMidGlide.current = false; });
   };
 
-  /** Moves the view by a pan on the page, from the newest view (`latest`), with no glide. */
+  /** Moves the view by a pan on the page, from the newest view (`latest`), with no glide. Like every pan, it ends in `keepInWindow` (`panBy`), which only ever brings more of the board into the window, and a control is drawn on the board. */
   const panToFocused = (delta: { x: number; y: number }) => {
-    const current = latest.current.view;
-    move({ zoom: current.zoom, x: current.x + delta.x, y: current.y + delta.y }, false);
+    move(panBy(latest.current.view, delta, latest.current.bounds, latest.current.room), false);
   };
 
   const onScroll = (event: UIEvent<HTMLElement>) => {

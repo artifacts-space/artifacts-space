@@ -2063,7 +2063,12 @@ its scrollable content ends, and on a page that had just loaded on a fresh
 outside the board (CI, 20 Nov 2026, the first canvas test of a shard; locally
 2 runs in 5 with `.next/dev` deleted before each, 0 in 8 after the change).
 The first pan, from the browser's own focus scroll, has the same limit, and
-the reveal makes up the rest.
+the reveal makes up the rest. Like every pan it ends in `keepInWindow`
+(`panBy`). A control that already covers the board's window from edge to
+edge on an axis is not moved on that axis; one too large to fit shows its
+start. A test that starts with the control outside the board says so before
+it acts (`alertsOutsideBoard`), or it passes with nothing to do; the glide
+and the focus in one task are `focusMidGlide` (`e2e/support/canvas.ts`).
 
 ### Frame captures
 
