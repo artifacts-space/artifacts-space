@@ -61,7 +61,7 @@ interface ListedTeam {
 
 /** What each tool the tests call returns. */
 interface Results {
-  teams_list: ListedTeam[];
+  teams_list: { teams: ListedTeam[] };
   comment_create: CommentResult;
   artifacts_create: Saved;
   artifacts_update: Saved;
@@ -184,21 +184,21 @@ describe.runIf(Boolean(databaseUrl))("agents mentioning teammates over MCP", asy
     for (const caller of [ids.owner, ids.bot]) {
       const { call } = await connect(caller);
       const listed = await call("teams_list", {});
-      const crew = listed.json.find((item) => item.slug === ids.crew);
+      const crew = listed.json.teams.find((item) => item.slug === ids.crew);
       const members = new Map((crew?.members ?? []).map((member) => [member.handle, member]));
 
-      expect(members.get(handle("ada"))).toEqual({ handle: handle("ada"), kind: "person", name: { untrustedText: "Ada Lovelace" } });
+      expect(members.get(handle("ada"))).toMatchObject({ handle: handle("ada"), kind: "person", name: { untrustedText: "Ada Lovelace" } });
       expect(members.get(handle("helper"))?.kind).toBe("agent");
       expect(members.has(handle(caller === ids.owner ? "owner" : "bot"))).toBe(false);
       // Nobody outside the caller's teams, and never an email.
-      expect(listed.json.map((item) => item.slug)).not.toContain(ids.press);
+      expect(listed.json.teams.map((item) => item.slug)).not.toContain(ids.press);
       expect(listed.text).not.toContain(handle("outsider"));
       expect(listed.text).not.toContain("Olga");
       expect(listed.text).not.toContain("@example.com");
       expect(listed.text).not.toContain("agents.artifacts.invalid");
     }
     const { call } = await connect(ids.owner);
-    const home = (await call("teams_list", {})).json.find((item) => item.slug === ids.home);
+    const home = (await call("teams_list", {})).json.teams.find((item) => item.slug === ids.home);
     expect(home).toMatchObject({ personal: true });
     expect(home?.members).toBeUndefined();
   });

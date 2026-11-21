@@ -24,6 +24,7 @@ const data = vi.hoisted(() => ({
   listPresetsForTeams: vi.fn(),
   teamDefaultsFor: vi.fn(),
 }));
+vi.mock("@/lib/mcp/actors", async (importOriginal) => ({ ...(await importOriginal<object>()), loadMcpActors: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/artifacts", () => ({ createArtifact: data.createArtifact, updateArtifact: data.updateArtifact, deleteArtifact: vi.fn(), getOwnArtifactByPublicId: vi.fn(), listArtifacts: vi.fn() }));
 vi.mock("@/lib/access", () => ({ getEditableArtifact: data.getEditableArtifact }));
 vi.mock("@/lib/artifact-read", () => ({ loadArtifactForViewer: vi.fn() }));

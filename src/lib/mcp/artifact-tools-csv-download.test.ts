@@ -21,6 +21,7 @@ const data = vi.hoisted(() => ({
   setArtifactFullWidth: vi.fn(),
   setCsvDownload: vi.fn(),
 }));
+vi.mock("@/lib/mcp/actors", async (importOriginal) => ({ ...(await importOriginal<object>()), loadMcpActors: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/artifacts", () => ({
   createArtifact: vi.fn(),
   updateArtifact: data.updateArtifact,

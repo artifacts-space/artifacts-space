@@ -52,8 +52,9 @@ function cannedResult(tool: string, args: unknown): unknown {
     const artifact = { id: stubArtifactId, url: `https://artifacts.space/artifact/${stubArtifactId}`, title: title ?? "Untitled", kind: kind ?? "markdown", visibility: "private" };
     return { artifact, edit: "applied", sharing: null, comments: null, note: "Routing eval stub: nothing was saved." };
   }
-  if (tool === "teams_list") return [{ slug: "acme", name: "Acme", role: "owner", personal: false, teamSharingNeedsApproval: false }];
+  if (tool === "teams_list") return { you: { handle: "eval-agent", kind: "agent" }, teams: [{ slug: "acme", name: "Acme", role: "owner", roleKey: "owner", roleName: "Owner", capabilities: [], personal: false, teamSharingNeedsApproval: false }] };
   if (tool === "artifacts_get") return { error: "Artifact not found." };
+  if (tool === "artifacts_list") return { people: {}, artifacts: [] };
   if (tool.endsWith("_list")) return [];
   return { ok: true, note: "Routing eval stub: nothing was changed." };
 }

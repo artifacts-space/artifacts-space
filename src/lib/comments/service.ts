@@ -38,6 +38,8 @@ const idSchema = z.string().trim().min(1).max(200);
 export interface CommentWriteResult {
   comment: CommentView;
   mentions: MentionOutcome;
+  /** The artifact's public id, for the comment's own link. */
+  publicId: string;
 }
 
 const MAX_THREAD_COMMENTS = 500;
@@ -117,7 +119,7 @@ export async function createComment(input: {
     threadMutes,
   });
   notifyComment({ artifact: thread.artifact, commentId: record.id, parentId, writer: thread.actor, writerThreadMuted: threadMutes.has(thread.actor.userId) });
-  return { comment: await viewOf(record, thread), mentions };
+  return { comment: await viewOf(record, thread), mentions, publicId: thread.artifact.publicId };
 }
 
 /** A comment and its artifact's public id, by comment id, or null; the caller checks access. */
@@ -165,7 +167,7 @@ export async function updateComment(input: { actorId: string; commentId: string;
   if (mentions.notified.length > 0) {
     notifyComment({ artifact: thread.artifact, commentId: record.id, parentId: record.parentId, writer: thread.actor, writerThreadMuted: threadMutes.has(thread.actor.userId), edited: true });
   }
-  return { comment: await viewOf(updated, thread), mentions };
+  return { comment: await viewOf(updated, thread), mentions, publicId: thread.artifact.publicId };
 }
 
 /**

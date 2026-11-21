@@ -19,6 +19,7 @@ const data = vi.hoisted(() => ({
   loadArtifactForViewer: vi.fn(),
   setArtifactFullWidth: vi.fn(),
 }));
+vi.mock("@/lib/mcp/actors", async (importOriginal) => ({ ...(await importOriginal<object>()), loadMcpActors: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/artifacts", () => ({
   createArtifact: vi.fn(),
   updateArtifact: data.updateArtifact,
@@ -85,7 +86,7 @@ describe("fullWidth in reads", () => {
   it("should show fullWidth on each item when an agent lists artifacts", async () => {
     data.listArtifacts.mockResolvedValue([listItem(false)]);
     const result = await call("artifacts_list", {});
-    expect(JSON.parse(result.text)).toMatchObject([{ fullWidth: false }]);
+    expect(JSON.parse(result.text)).toMatchObject({ artifacts: [{ fullWidth: false }] });
   });
 });
 

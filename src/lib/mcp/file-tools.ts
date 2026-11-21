@@ -11,7 +11,6 @@ import { pageFileLimits, pageFileTypesHint } from "@/lib/page-files/rules";
 import { finalizeUpload, requestUpload } from "@/lib/files/uploads";
 import type { ArtifactRecord } from "@/db/schema";
 import type { McpAccess } from "@/lib/oauth/scopes";
-import { siteUrl } from "@/lib/site-origin";
 import { listTeamsForUser } from "@/lib/teams/queries";
 import { UserFacingError } from "@/lib/user-facing-error";
 import { getVersionOf } from "@/lib/versions/history";
@@ -21,6 +20,7 @@ import { toMcpArtifact } from "./artifact-view";
 import { baseVersionOf } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
 import { gateTools, type ToolServer } from "./tool-access";
+import { baseViewContext, withActorsAfterSave } from "./view-context";
 
 const fileIdField = z.uuid().describe("File id from files_request_upload");
 const fileIdsField = z.array(z.uuid()).min(1).max(fileLimits.maxFilesPerArtifact).describe("Ids of finished uploads (files_finalize)");
@@ -49,7 +49,8 @@ export async function respond(run: () => Promise<unknown>) {
 export async function artifactResult(userId: string, record: ArtifactRecord) {
   const [[dto], teams, base] = await Promise.all([toArtifactDtos([record], userId), listTeamsForUser(userId), baseVersionOf(record.id, record.updatedAt.toISOString())]);
   if (!dto) throw new UserFacingError("Artifact not found.");
-  return { ...toMcpArtifact(dto, { viewerId: userId, teamSlugs: new Map(teams.map((team) => [team.id, team.slug])), urlFor: (publicId) => siteUrl(`/artifact/${publicId}`) }, { canEdit: true }), ...base };
+  const view = await withActorsAfterSave(baseViewContext(userId, teams), [dto]);
+  return { ...toMcpArtifact(dto, view, { canEdit: true }), ...base };
 }
 
 /**

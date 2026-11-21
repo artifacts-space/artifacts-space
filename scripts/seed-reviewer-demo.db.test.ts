@@ -105,7 +105,7 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
   }
 
   async function findOne(title: string) {
-    const found = (await call<McpListItem[]>("artifacts_list", { query: title })).filter((item) => item.title === title);
+    const found = (await call<{ artifacts: McpListItem[] }>("artifacts_list", { query: title })).artifacts.filter((item) => item.title === title);
     expect(found).toHaveLength(1);
     return call<McpRead>("artifacts_get", { id: found[0]?.id ?? "" });
   }
@@ -159,7 +159,7 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
   });
 
   it("should find the onboarding artifacts newest first when the reviewer searches for onboarding", async () => {
-    const found = await call<McpListItem[]>("artifacts_list", { query: "onboarding" });
+    const { artifacts: found } = await call<{ artifacts: McpListItem[] }>("artifacts_list", { query: "onboarding" });
 
     expect(found.map((item) => item.title)).toEqual(["Onboarding guide", "Onboarding checklist", "Onboarding notes"]);
     const times = found.map((item) => Date.parse(item.updatedAt));
@@ -189,12 +189,13 @@ describe.runIf(Boolean(databaseUrl))("reviewer demo data with a database", async
     const versions = await call<McpVersion[]>("artifacts_versions", { id: roadmap.id });
 
     expect(versions).toHaveLength(3);
-    expect(versions.map((version) => version.savedBy)).toEqual(Array(3).fill({ handle: reviewer.handle, kind: "person" }));
+    // The reviewer reads their own name too: a caller counts as their own teammate.
+    expect(versions.map((version) => version.savedBy)).toEqual(Array(3).fill(expect.objectContaining({ handle: reviewer.handle, kind: "person" })));
     expect(roadmap.content).toBe(rules.roadmapVersions[2]);
   });
 
   it("should show no acme-finance team and nothing to approve when the reviewer checks teams and requests", async () => {
-    const teams = await call<{ slug: string; personal: boolean }[]>("teams_list");
+    const { teams } = await call<{ teams: { slug: string; personal: boolean }[] }>("teams_list");
     const memberOf = getDb().select({ teamId: teamMember.teamId }).from(teamMember).where(eq(teamMember.userId, reviewer.id));
     const pending = await getDb().select({ id: sharingRequest.id }).from(sharingRequest).where(and(eq(sharingRequest.status, "pending"), inArray(sharingRequest.teamId, memberOf)));
 

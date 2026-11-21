@@ -22,6 +22,7 @@ const data = vi.hoisted(() => ({
   getEditableArtifact: vi.fn(),
   loadArtifactForViewer: vi.fn(),
 }));
+vi.mock("@/lib/mcp/actors", async (importOriginal) => ({ ...(await importOriginal<object>()), loadMcpActors: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/artifacts", () => ({
   createArtifact: data.createArtifact,
   updateArtifact: data.updateArtifact,
@@ -140,7 +141,7 @@ describe("reading the harness over MCP", () => {
   it("should return the harness in lists and null when no agent made it", async () => {
     data.listArtifacts.mockResolvedValue([{ ...dto({ id: "claude-code", stamped: "claude-code", overridden: false }), preview: "" }, { ...dto(null), preview: "" }]);
     const result = (await client.callTool({ name: "artifacts_list", arguments: {} })) as { content: { text: string }[] };
-    const items = JSON.parse(result.content[0]?.text ?? "[]") as { harness: unknown }[];
+    const { artifacts: items } = JSON.parse(result.content[0]?.text ?? "{}") as { artifacts: { harness: unknown }[] };
     expect(items.map((item) => item.harness)).toEqual([{ id: "claude-code", name: "Claude Code" }, null]);
   });
 

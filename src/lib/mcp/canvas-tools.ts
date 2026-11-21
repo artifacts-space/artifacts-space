@@ -16,6 +16,7 @@ import type { McpAccess } from "@/lib/oauth/scopes";
 import { siteUrl } from "@/lib/site-origin";
 import { UserFacingError } from "@/lib/user-facing-error";
 
+import { actorOf, loadMcpActors } from "./actors";
 import { ARTIFACT_REF_WORDS, artifactRefField } from "./artifact-ref-field";
 import { registerCanvasImageTool } from "./canvas-image-tool";
 import { baseVersionOf, editConflictResult } from "./edit-conflict-tools";
@@ -114,10 +115,14 @@ async function readableCanvas(userId: string, publicId: string) {
   if (!loaded) throw new UserFacingError("Artifact not found.");
   assertCanvas(loaded.dto.kind);
   const { dto, viewable } = loaded;
-  const about = { id: dto.publicId, title: dto.title, url: siteUrl(`/artifact/${dto.publicId}`), version: viewable.version.source, editPending: viewable.editPending };
   // Editors read the latest version: they get its id, the baseVersion a frame write sends back, and which frames have an image.
   const editor = viewable.canEdit && viewable.version.source === "latest";
-  const [base, images] = editor ? await Promise.all([baseVersionOf(dto.id, dto.updatedAt), imagesOf(userId, publicId)]) : [{}, noImages];
+  const [actors, [base, images]] = await Promise.all([
+    loadMcpActors(userId, [dto.updatedBy?.id]),
+    editor ? Promise.all([baseVersionOf(dto.id, dto.updatedAt), imagesOf(userId, publicId)]) : Promise.resolve([{}, noImages] as const),
+  ]);
+  // Who saved the version this caller reads, and when: the canvas as a whole, since frames keep no saver of their own.
+  const about = { id: dto.publicId, title: dto.title, url: siteUrl(`/artifact/${dto.publicId}`), version: viewable.version.source, editPending: viewable.editPending, updatedAt: dto.updatedAt, updatedBy: actorOf(actors, dto.updatedBy?.id) };
   return { content: dto.content, about, base, images };
 }
 

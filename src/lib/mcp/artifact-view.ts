@@ -1,8 +1,34 @@
 import type { ArtifactDto, ArtifactListItemDto, ArtifactVisibility, CommentSetting, SharingLevel } from "@/lib/artifact-types";
 import { mcpCoverFields } from "@/lib/covers/cover";
 import { csvDownloadOffNote, mayExportCsv } from "@/lib/csv-export/rules";
+import type { FileDto } from "@/lib/files/types";
 import { harnessFor } from "@/lib/harness/harnesses";
+import type { SheetFormat } from "@/lib/sheet-format/rules";
 import type { StoredArtifactTheme } from "@/lib/themes/artifact-theme";
+
+import { actorOf, listPeople, shortActor, type McpActor, type McpActors } from "./actors";
+import { callerAccess, isMemberOfTeam, type CallerAccess, type CallerCan } from "./caller-rules";
+
+/** An attached file as an agent reads it. Fields that are unset, null, or false are left out. */
+export interface McpFile {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  /** A page file of an HTML artifact: the relative path its page loads it by. */
+  pagePath?: string;
+  /** In artifacts_get and write results only: when it was uploaded. */
+  createdAt?: string;
+  /** When a newer upload replaced its content (it keeps its id, place, and name). Left out until then. */
+  replacedAt?: string;
+  /** An image's pixel size, when the server could read it. */
+  width?: number;
+  height?: number;
+  /** Editors only: the document embeds it (it changes in the document, so files_replace refuses it). */
+  embedded?: true;
+  /** Editors only: a version shows it as the icon or cover (it changes through those fields, so files_replace refuses it). */
+  pictured?: true;
+}
 
 /** How an artifact looks to an agent. Ids are public ids; internal ids never leave the server. */
 export interface McpArtifact {
@@ -19,6 +45,8 @@ export interface McpArtifact {
   coverPosition: number | null;
   /** Whether the page shows the body full width (true) or at the reading width (false, the default). */
   fullWidth: boolean;
+  /** A CSV's banded rows and column alignment, as every reader sees them. Only on a CSV that has some. */
+  sheetFormat?: SheetFormat;
   summary: string;
   /** The full content. Only artifacts_get and writes return it. "" when `contentWithheld` says why. */
   content?: string;
@@ -48,6 +76,8 @@ export interface McpArtifact {
   showInSearch: boolean;
   /** The team's slug, shown only when the caller belongs to that team. */
   team: string | null;
+  /** Its workspace, for callers who may edit it: its author's Personal one, or the workspace of `team`. Left out for everyone else. */
+  home?: "personal" | "team";
   /** An open sharing request, shown only to the author (and the person who added the agent that wrote it). */
   pendingSharing: { visibility: SharingLevel; team: string | null; comments: CommentSetting | null; requestedAt: string } | null;
   /** An open request to open comments to anyone signed in, shown only to the author. */
@@ -55,10 +85,18 @@ export interface McpArtifact {
   /** When the author's latest edit waits for approval, shown only to the author. */
   pendingEdit: { requestedAt: string } | null;
   isAuthor: boolean;
-  /** Who saved it last, as "@handle" (or a name). Null when they are gone. */
-  updatedBy: string | null;
-  /** Attached files. Get a download link with files_get_download_url. A page file of an HTML artifact also has `pagePath`: the relative path its page loads it by. */
-  files: { id: string; filename: string; contentType: string; size: number; pagePath?: string }[];
+  /** The caller added the agent that wrote it, and is still in its team: they read, edit, share, and delete it as its author would. Left out otherwise. */
+  actsForAuthor?: true;
+  /** What the caller may do with it, by the rules each tool enforces again: edit, share, comment, delete. */
+  can: CallerCan[];
+  /** Who wrote it (its owner). Null when they are gone. In artifacts_list, this and the two below are handle and kind; the list's `people` gives each person once in full (listPeople). */
+  author: McpActor | null;
+  /** Editors only: who wrote it first, when a team owner took it over from a member who left. */
+  firstAuthor?: McpActor;
+  /** Who saved the version the caller reads. Null when they are gone. */
+  updatedBy: McpActor | null;
+  /** Attached files. Get a download link with files_get_download_url. */
+  files: McpFile[];
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -66,10 +104,17 @@ export interface McpArtifact {
 
 export interface McpViewContext {
   viewerId: string;
-  /** Team id to slug, for the caller's own teams only. */
-  teamSlugs: ReadonlyMap<string, string>;
+  /** The caller's own teams, by team id. */
+  teams: ReadonlyMap<string, { slug: string; personal: boolean }>;
   /** Builds the canonical URL for a public id. */
   urlFor: (publicId: string) => string;
+  /** The people and agents the artifacts name (artifactActorIds), as the caller sees them. Missing ids read as gone. */
+  actors: McpActors;
+}
+
+/** Every user id an artifact's result names, for loadMcpActors. */
+export function artifactActorIds(dtos: readonly Pick<ArtifactDto, "authorId" | "originalAuthorId" | "updatedBy">[]): string[] {
+  return dtos.flatMap((dto) => [dto.authorId, dto.originalAuthorId, dto.updatedBy?.id].filter((id): id is string => typeof id === "string"));
 }
 
 /** The project's name for agents, or "" for none (and for callers outside the team, whose DTO has none). */
@@ -82,15 +127,69 @@ function mcpHarness(harness: ArtifactDto["harness"]): McpArtifact["harness"] {
   return harness ? { id: harness.id, name: harnessFor(harness.id).name } : null;
 }
 
-/** Maps an artifact, with or without its content, to the agent-facing shape. */
-function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext): McpArtifact {
-  const isAuthor = dto.authorId === context.viewerId;
-  // The person who added the agent that wrote it shares it as the author would, so they see its open requests too.
-  const seesRequests = isAuthor || dto.actsForAuthor === true;
-  const slug = (teamId: string | null) => (teamId ? context.teamSlugs.get(teamId) ?? null : null);
-  const pending = seesRequests && dto.pendingSharing
-    ? { visibility: dto.pendingSharing.level, team: slug(dto.pendingSharing.teamId), comments: dto.pendingSharing.comments, requestedAt: dto.pendingSharing.requestedAt }
-    : null;
+/** A file in a list: what it is, and no more. */
+function listedFile({ id, filename, contentType, size, pagePath }: FileDto): McpFile {
+  return { id, filename, contentType, size, ...(pagePath === undefined ? {} : { pagePath }) };
+}
+
+/** A file in a full artifact. The editing flags (embedded, pictured) go to editors only. */
+function fullFile(file: FileDto, canEdit: boolean): McpFile {
+  const sized = file.width !== undefined && file.height !== undefined ? { width: file.width, height: file.height } : {};
+  return {
+    ...listedFile(file),
+    createdAt: file.createdAt,
+    ...(file.replacedAt ? { replacedAt: file.replacedAt } : {}),
+    ...sized,
+    ...(canEdit && file.embedded === true ? { embedded: true as const } : {}),
+    ...(canEdit && file.pictured === true ? { pictured: true as const } : {}),
+  };
+}
+
+/** The caller's standing toward the artifact, from their own teams. `canEdit` is the access check's decision, when it made one. */
+function accessFor(dto: Omit<ArtifactDto, "content">, context: McpViewContext, canEdit: boolean | undefined): CallerAccess {
+  const isTeamMember = isMemberOfTeam(dto, new Set(context.teams.keys()));
+  const teamPersonal = dto.teamId ? context.teams.get(dto.teamId)?.personal ?? null : null;
+  const standing = { viewerId: context.viewerId, isTeamMember, teamPersonal, actsForAuthor: dto.actsForAuthor === true };
+  return callerAccess({ userId: dto.authorId, visibility: dto.visibility, teamId: dto.teamId, comments: dto.comments }, canEdit === undefined ? standing : { ...standing, canEdit });
+}
+
+/** Open requests, for the author and the person who added the agent that wrote it. */
+function requestFields(dto: Omit<ArtifactDto, "content">, context: McpViewContext, slug: (teamId: string | null) => string | null) {
+  const seesRequests = dto.authorId === context.viewerId || dto.actsForAuthor === true;
+  if (!seesRequests) return { pendingSharing: null, pendingComments: null, pendingEdit: null };
+  const { pendingSharing: sharing, pendingComments: comments, pendingEdit: edit } = dto;
+  return {
+    pendingSharing: sharing ? { visibility: sharing.level, team: slug(sharing.teamId), comments: sharing.comments, requestedAt: sharing.requestedAt } : null,
+    pendingComments: comments ? { comments: comments.comments, requestedAt: comments.requestedAt } : null,
+    pendingEdit: edit ? { requestedAt: edit.requestedAt } : null,
+  };
+}
+
+/** Who wrote it, wrote it first, and saved it last, and what the caller may do. A list names people in their short form (shortActor). */
+function whoFields(dto: Omit<ArtifactDto, "content">, context: McpViewContext, access: CallerAccess, full: boolean) {
+  const shown = (actor: McpActor | null) => (full ? actor : shortActor(actor));
+  const firstAuthor = access.canEdit ? shown(actorOf(context.actors, dto.originalAuthorId)) : null;
+  return {
+    isAuthor: dto.authorId === context.viewerId,
+    ...(dto.actsForAuthor === true ? { actsForAuthor: true as const } : {}),
+    can: access.can,
+    author: shown(actorOf(context.actors, dto.authorId)),
+    ...(firstAuthor ? { firstAuthor } : {}),
+    updatedBy: shown(actorOf(context.actors, dto.updatedBy?.id)),
+  };
+}
+
+/** A CSV's formatting, only when it has some. */
+function sheetFields(dto: Omit<ArtifactDto, "content">) {
+  const { sheetFormat } = dto;
+  if (dto.kind !== "csv" || (sheetFormat.banding === null && Object.keys(sheetFormat.align).length === 0)) return {};
+  return { sheetFormat };
+}
+
+/** Maps an artifact, with or without its content, to the agent-facing shape. `full` adds each file's dates, size in pixels, and editing flags. */
+function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext, options: { canEdit?: boolean; full: boolean }): McpArtifact {
+  const access = accessFor(dto, context, options.canEdit);
+  const slug = (teamId: string | null) => (teamId ? context.teams.get(teamId)?.slug ?? null : null);
   return {
     id: dto.publicId,
     url: context.urlFor(dto.publicId),
@@ -99,6 +198,7 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     theme: dto.theme,
     ...mcpCoverFields(dto.cover),
     fullWidth: dto.fullWidth,
+    ...sheetFields(dto),
     allowCsvDownload: dto.allowCsvDownload,
     summary: dto.summary,
     kind: dto.kind,
@@ -112,12 +212,10 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
     comments: dto.comments,
     showInSearch: dto.showInSearch,
     team: slug(dto.teamId),
-    pendingSharing: pending,
-    pendingComments: seesRequests && dto.pendingComments ? { comments: dto.pendingComments.comments, requestedAt: dto.pendingComments.requestedAt } : null,
-    pendingEdit: seesRequests && dto.pendingEdit ? { requestedAt: dto.pendingEdit.requestedAt } : null,
-    isAuthor,
-    updatedBy: dto.updatedBy ? (dto.updatedBy.handle ? `@${dto.updatedBy.handle}` : dto.updatedBy.name) : null,
-    files: dto.files.map(({ id, filename, contentType, size, pagePath }) => ({ id, filename, contentType, size, ...(pagePath === undefined ? {} : { pagePath }) })),
+    ...(access.home ? { home: access.home } : {}),
+    ...requestFields(dto, context, slug),
+    ...whoFields(dto, context, access, options.full),
+    files: dto.files.map((file) => (options.full ? fullFile(file, access.canEdit) : listedFile(file))),
     metadata: dto.metadata,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
@@ -126,18 +224,30 @@ function toMcpShape(dto: Omit<ArtifactDto, "content">, context: McpViewContext):
 
 /**
  * Maps a full DTO to the agent-facing shape, with its content. `reader`
- * says whether the connection may edit it: a CSV whose owner turned
- * downloads off comes without its content to one that cannot, as the
- * Markdown and raw versions do (mayExportCsv). Attached files stay listed,
- * here and in artifacts_list: they are outside the rule. Writes pass
- * canEdit: true, since only editors write.
+ * says whether the connection may edit it, as the access check decided: a
+ * CSV whose owner turned downloads off comes without its content to one
+ * that cannot, as the Markdown and raw versions do (mayExportCsv). Attached
+ * files stay listed, here and in artifacts_list: they are outside the rule.
+ * Writes pass canEdit: true, since only editors write.
  */
 export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, reader: { canEdit: boolean }): McpArtifact {
-  if (!mayExportCsv(reader, dto)) return { ...toMcpShape(dto, context), content: "", contentWithheld: csvDownloadOffNote };
-  return { ...toMcpShape(dto, context), content: dto.content };
+  const shape = toMcpShape(dto, context, { canEdit: reader.canEdit, full: true });
+  if (!mayExportCsv(reader, dto)) return { ...shape, content: "", contentWithheld: csvDownloadOffNote };
+  return { ...shape, content: dto.content };
 }
 
-/** Maps a list item to the compact agent-facing shape: a preview, never the content. */
+/** Maps a list item to the compact agent-facing shape: a preview, never the content, and each file without its dates. */
 export function toMcpListItem(item: ArtifactListItemDto, context: McpViewContext): McpArtifact {
-  return { ...toMcpShape(item, context), preview: item.preview };
+  return { ...toMcpShape(item, context, { full: false }), preview: item.preview };
+}
+
+/**
+ * artifacts_list's result: the items, which name people by handle and kind,
+ * and `people`, each of them once in full (listPeople). Nothing about a
+ * person is left out of a list; it is only not repeated on every row.
+ */
+export function toMcpList(items: readonly ArtifactListItemDto[], context: McpViewContext) {
+  const artifacts = items.map((item) => toMcpListItem(item, context));
+  const shown = artifacts.flatMap((item) => [item.author, item.firstAuthor, item.updatedBy]);
+  return { people: listPeople(shown, context.actors), artifacts };
 }

@@ -136,8 +136,9 @@ export interface ArtifactDto {
   authorId: string;
   /**
    * True when the viewer added the agent that wrote it and is still in the
-   * agent's team: they read, edit, and share it as its author would, but
-   * never delete it. Left out means no.
+   * agent's team: they read, edit, share, and delete it as its author would
+   * (findDeletableArtifact; the owner confirmed delete on 2026-11-20). Left
+   * out means no.
    */
   actsForAuthor?: boolean;
   /** Set when a team owner took the artifact over from a member who left. */

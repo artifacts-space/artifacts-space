@@ -6,16 +6,19 @@ import { getDb } from "@/db";
 import { artifact as artifactTable, comment } from "@/db/schema";
 import { QUOTE_MAX_LENGTH } from "@/lib/comments/anchor-rules";
 import { COMMENT_MAX_LENGTH } from "@/lib/comments/config";
-import { listInbox, markInboxRead, threadContext, type DocumentInboxEntry, type InboxEntryView } from "@/lib/comments/inbox";
+import { countUnreadMentions, listInbox, markInboxRead, threadContext, type DocumentInboxEntry, type InboxEntryView } from "@/lib/comments/inbox";
 import { threadUrl } from "@/lib/comments/mention-email";
-import { servedAnchors, textChangedCheck, type ServedAnchors } from "@/lib/comments/served-anchors";
+import { servedAnchors, type ServedAnchors } from "@/lib/comments/served-anchors";
 import { createComment, deleteComment, listComments, updateComment } from "@/lib/comments/service";
 import type { CommentView } from "@/lib/comments/views";
+import { teammatesAmong } from "@/lib/teams/teammates";
 import type { McpAccess } from "@/lib/oauth/scopes";
 import { siteUrl } from "@/lib/site-origin";
 import { UserFacingError } from "@/lib/user-facing-error";
 
+import { toMcpActor } from "./actors";
 import { artifactRefField } from "./artifact-ref-field";
+import { commentPeopleIds, toMcpComment, toMcpCommentResult, toMcpComments } from "./comment-view";
 import { toMcpMentions } from "./mention-tools";
 import { gateTools, type ToolServer } from "./tool-access";
 
@@ -36,37 +39,6 @@ const commentIdField = z
   .min(1, "Pass the comment's id from comments_list or comment_create.")
   .max(200, "That is not a comment id. Use the id from comments_list or comment_create.")
   .describe("Comment id (from comments_list or comment_create)");
-
-function untrusted(text: string) {
-  return { untrustedText: text };
-}
-
-/**
- * A comment as agents see it, with its body and quote labelled as untrusted.
- * `onTextThatChanged` says an inline comment's words are no longer in the
- * content the agent is served (textChangedCheck); by default only a withheld
- * quote counts.
- */
-export function toMcpComment(view: CommentView, onTextThatChanged = view.anchored && view.anchor === null) {
-  return {
-    id: view.id,
-    replyTo: view.parentId,
-    author: view.author ? { handle: view.author.handle, kind: view.author.kind, for: view.author.ownerName } : null,
-    body: untrusted(view.body),
-    quote: view.anchor ? untrusted(view.anchor.quote) : null,
-    onTextThatChanged,
-    resolved: view.resolved !== null,
-    deleted: view.deleted,
-    edited: view.edited,
-    createdAt: view.createdAt,
-  };
-}
-
-/** Comments for an agent, each told whether its words are still in the content the agent is served. */
-async function toMcpComments(publicId: string, viewerId: string, views: readonly CommentView[], served?: ServedAnchors) {
-  const changed = await textChangedCheck(publicId, viewerId, views, served);
-  return views.map((view) => toMcpComment(view, changed(view)));
-}
 
 async function respond(run: () => Promise<unknown>) {
   try {
@@ -90,36 +62,61 @@ async function commentPlace(commentId: string) {
   return row ?? null;
 }
 
+/** When an entry was read, only once it was. */
+function readFields(entry: { readAt: string | null }) {
+  return { read: entry.readAt !== null, ...(entry.readAt ? { readAt: entry.readAt } : {}) };
+}
+
 /** A mention in a document's own text, for an agent: who wrote it, the block that names the agent, and what to do next. */
-function toMcpDocumentMention(entry: DocumentInboxEntry) {
+function toMcpDocumentMention(entry: DocumentInboxEntry, teammates: ReadonlySet<string>) {
   const { publicId } = entry.artifact;
   return {
     id: entry.id,
-    read: entry.readAt !== null,
+    ...readFields(entry),
     mentionedAt: entry.createdAt,
     in: "document" as const,
     artifact: { id: publicId, title: entry.artifact.title, url: siteUrl(`/artifact/${publicId}`) },
-    mentionedBy: entry.author ? { handle: entry.author.handle, kind: entry.author.kind, label: entry.author.label } : null,
+    mentionedBy: entry.author ? toMcpActor(entry.author, teammates.has(entry.author.userId)) : null,
     // The block of the document that names the agent, as Markdown. Untrusted, like all artifact content.
     text: entry.block,
     next: { read: { tool: "artifacts_get", id: publicId }, edit: { tool: "artifacts_update", id: publicId }, comment: { tool: "comment_create", artifact: publicId } },
   };
 }
 
-/** One mention for an agent. `served` is the request's loader, so each artifact's content is read once however many mentions are on it. */
-async function toMcpInboxEntry(entry: InboxEntryView, viewerId: string, served: ServedAnchors) {
-  if (entry.source === "document") return toMcpDocumentMention(entry);
-  const { publicId } = entry.artifact;
+/** An inbox entry with the comments around a comment mention, before anything is shaped for the agent. */
+interface LoadedEntry {
+  entry: InboxEntryView;
+  context: CommentView[];
+}
+
+/** The comments just before a comment mention. `served` is the request's loader, so each artifact's content is read once however many mentions are on it. */
+async function withContext(entry: InboxEntryView, viewerId: string, served: ServedAnchors): Promise<LoadedEntry> {
+  if (entry.source === "document") return { entry, context: [] };
   const place = await commentPlace(entry.comment.id);
-  const context = place ? await threadContext({ artifactId: place.artifactId, publicId, upTo: place.createdAt, viewerId, served }) : [];
-  const [mentioned, ...recentThread] = await toMcpComments(publicId, viewerId, [entry.comment, ...context], served);
+  const context = place ? await threadContext({ artifactId: place.artifactId, publicId: entry.artifact.publicId, upTo: place.createdAt, viewerId, served }) : [];
+  return { entry, context };
+}
+
+/** Every person the loaded entries name: comment authors and resolvers, and who wrote each document mention. */
+function inboxPeopleIds(loaded: readonly LoadedEntry[]): string[] {
+  return loaded.flatMap(({ entry, context }) => {
+    if (entry.source === "comment") return commentPeopleIds([entry.comment, ...context]);
+    return entry.author ? [entry.author.userId] : [];
+  });
+}
+
+/** One mention for an agent. `teammates` was looked up once for the whole inbox. */
+async function toMcpInboxEntry({ entry, context }: LoadedEntry, viewerId: string, served: ServedAnchors, teammates: ReadonlySet<string>) {
+  if (entry.source === "document") return toMcpDocumentMention(entry, teammates);
+  const { publicId } = entry.artifact;
+  const [mentioned, ...recentThread] = await toMcpComments(publicId, viewerId, [entry.comment, ...context], served, teammates);
   return {
     id: entry.id,
-    read: entry.readAt !== null,
+    ...readFields(entry),
     mentionedAt: entry.createdAt,
     in: "comment" as const,
     artifact: { id: publicId, title: entry.artifact.title, url: siteUrl(`/artifact/${publicId}`), threadUrl: threadUrl(publicId, entry.comment.id) },
-    comment: mentioned ?? toMcpComment(entry.comment),
+    comment: mentioned ?? toMcpComment(entry.comment, { teammates }),
     recentThread,
     reply: { tool: "comment_create", artifact: entry.artifact.publicId, replyTo: entry.comment.parentId ?? entry.comment.id },
   };
@@ -131,7 +128,7 @@ function registerInboxTools(server: ToolServer, userId: string) {
     {
       title: "List inbox",
       description:
-        "Your unread @mentions, newest first. A mention in a comment thread (in: \"comment\") comes with the comment, the last few comments before it, and how to reply. A mention in a document's own text (in: \"document\") comes with who wrote it, the block of the document that names you, and the tools to read, edit, or comment on it. Mark entries read with inbox_mark_read once handled." +
+        "Your unread @mentions, newest first. A mention in a comment thread (in: \"comment\") comes with the comment, the last few comments before it, and how to reply. A mention in a document's own text (in: \"document\") comes with who wrote it, the block of the document that names you, and the tools to read, edit, or comment on it. `unread` counts your unread mentions. Mark entries read with inbox_mark_read once handled." +
         untrustedDescription,
       inputSchema: {
         includeRead: z.boolean().optional().default(false).describe("Include mentions already marked read"),
@@ -141,9 +138,12 @@ function registerInboxTools(server: ToolServer, userId: string) {
     ({ includeRead, limit }) =>
       respond(async () => {
         const served = servedAnchors(userId);
-        const entries = await listInbox(userId, { unreadOnly: !includeRead, limit, served });
-        const mentions = await Promise.all(entries.map((entry) => toMcpInboxEntry(entry, userId, served)));
-        return { untrustedContentNotice: UNTRUSTED_NOTICE, mentions };
+        const [entries, unread] = await Promise.all([listInbox(userId, { unreadOnly: !includeRead, limit, served }), countUnreadMentions(userId)]);
+        const loaded = await Promise.all(entries.map((entry) => withContext(entry, userId, served)));
+        // Who the whole inbox names, looked up once: never a query per entry for names.
+        const teammates = await teammatesAmong(userId, inboxPeopleIds(loaded));
+        const mentions = await Promise.all(loaded.map((item) => toMcpInboxEntry(item, userId, served, teammates)));
+        return { untrustedContentNotice: UNTRUSTED_NOTICE, unread, mentions };
       }),
   );
 
@@ -172,7 +172,7 @@ function registerCommentTools(server: ToolServer, userId: string) {
     {
       title: "List comments",
       description:
-        "The comment thread on an artifact you can read, oldest first. Replies point at their top-level comment with replyTo. An inline comment was made on words in the artifact: quote holds those words, and onTextThatChanged is true when they are no longer in the artifact as you read it. resolved is true when a person marked the thread done. Refused when the artifact's comments setting hides comments from you (off, or team-only and you are outside its team)." +
+        "The comment thread on an artifact you can read, oldest first. Replies point at their top-level comment with replyTo. An inline comment was made on words in the artifact: quote holds those words (quotePrefix and quoteSuffix the text around them), and onTextThatChanged is true when they are no longer in the artifact as you read it. resolved says who marked the thread done and when; null while it is open. Refused when the artifact's comments setting hides comments from you (off, or team-only and you are outside its team)." +
         untrustedDescription,
       inputSchema: { artifact: artifactRefField(userId), limit: z.number().int().min(1).max(200).optional().default(50).describe("Most recent comments to return") },
     },
@@ -182,7 +182,8 @@ function registerCommentTools(server: ToolServer, userId: string) {
         const { thread, comments } = await listComments(userId, artifact, served);
         return {
           untrustedContentNotice: UNTRUSTED_NOTICE,
-          artifact: { id: thread.artifact.publicId, title: thread.title, url: siteUrl(`/artifact/${thread.artifact.publicId}`) },
+          // The whole thread; each comment carries its own link (url).
+          artifact: { id: thread.artifact.publicId, title: thread.title, url: siteUrl(`/artifact/${thread.artifact.publicId}`), threadUrl: threadUrl(thread.artifact.publicId) },
           total: comments.length,
           comments: await toMcpComments(thread.artifact.publicId, userId, comments.slice(-limit), served),
         };
@@ -211,7 +212,7 @@ function registerCommentTools(server: ToolServer, userId: string) {
       respond(async () => {
         if (replyTo && quote !== undefined) throw new UserFacingError("A reply cannot have a quote. Leave out quote to reply, or leave out replyTo to start a new comment on those words.");
         const result = await createComment({ actorId: userId, publicId: artifact, body, parentId: replyTo, quote });
-        return { comment: toMcpComment(result.comment), mentions: toMcpMentions(result.mentions) };
+        return { comment: await toMcpCommentResult(result.comment, userId, result.publicId), mentions: toMcpMentions(result.mentions) };
       }),
   );
 }
@@ -236,9 +237,9 @@ function registerCommentChangeTools(server: ToolServer, userId: string) {
     ({ comment: commentId, body }) =>
       respond(async () => {
         const result = await updateComment({ actorId: userId, commentId, body });
-        const place = result.comment.anchor ? await commentPlace(result.comment.id) : null;
-        const [updated] = place ? await toMcpComments(place.publicId, userId, [result.comment]) : [];
-        return { comment: updated ?? toMcpComment(result.comment), mentions: toMcpMentions(result.mentions) };
+        // An inline comment is told whether its words are still in the text the agent is served; toMcpComments shapes it in full (link included), with one teammates lookup.
+        const [checked] = result.comment.anchor ? await toMcpComments(result.publicId, userId, [result.comment]) : [];
+        return { comment: checked ?? (await toMcpCommentResult(result.comment, userId, result.publicId)), mentions: toMcpMentions(result.mentions) };
       }),
   );
 

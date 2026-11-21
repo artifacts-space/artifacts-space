@@ -147,11 +147,10 @@ describe.runIf(Boolean(databaseUrl))("artifact references with a database", asyn
   it("should put the artifact first in artifacts_list when the query is its link, and list nothing for a caller who cannot read it", async () => {
     const origin = process.env.BETTER_AUTH_URL ?? "";
     const link = `${origin}/artifact/${publicIds.private ?? ""}`;
-    const mine = JSON.parse((await callTool(author, "artifacts_list", { query: link })).text) as { id: string }[];
-    expect(mine[0]?.id).toBe(publicIds.private);
-    const theirs = JSON.parse((await callTool(outsider, "artifacts_list", { query: link })).text) as { id: string }[];
-    expect(theirs).toEqual([]);
-    expect(JSON.parse((await callTool(outsider, "artifacts_list", { query: ids.private })).text)).toEqual([]);
+    const listed = async (userId: string, query: string) => (JSON.parse((await callTool(userId, "artifacts_list", { query })).text) as { artifacts: { id: string }[] }).artifacts;
+    expect((await listed(author, link))[0]?.id).toBe(publicIds.private);
+    expect(await listed(outsider, link)).toEqual([]);
+    expect(await listed(outsider, ids.private)).toEqual([]);
   });
 
   it("should find the artifact by its internal id in a search only for a caller who may read it", async () => {

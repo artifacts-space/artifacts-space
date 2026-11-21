@@ -19,6 +19,7 @@ const data = vi.hoisted(() => ({
   getEditableArtifact: vi.fn(),
   setArtifactProject: vi.fn(),
 }));
+vi.mock("@/lib/mcp/actors", async (importOriginal) => ({ ...(await importOriginal<object>()), loadMcpActors: () => Promise.resolve(new Map()) }));
 vi.mock("@/lib/artifacts", () => ({
   createArtifact: data.createArtifact,
   updateArtifact: data.updateArtifact,
