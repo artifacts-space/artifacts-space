@@ -2113,9 +2113,13 @@ own start, so a control past the board's left or top edge gets no scroll
 and no scroll event, and stayed out of view while it held the focus. The
 focus's note, still there one frame on, starts the reveal (`onFocus`), for
 a focus the browser shows a ring for (`:focus-visible`): a pointer press on
-a control that is partly in view must not move the board under the pointer. It
-waits for a glide by the clock (`REVEAL_WAIT_MS`), never by a count of
-frames, which is shorter on a fast display. Like every pan it ends in `keepInWindow`
+a control that is partly in view must not move the board under the pointer.
+The reveal never measures a board that still moves: its pan is added to the
+view the glide is going to, so it would be off by what the glide had left.
+While a glide runs it waits for that glide's own end (the animation's
+`finished`), then looks again; never a clock or a count of frames, which a
+long or chained glide outlasts (`e2e/canvas-focus.spec.ts`, "a glide runs
+long", makes one three seconds). Like every pan it ends in `keepInWindow`
 (`panBy`). A control that already covers the board's window from edge to
 edge on an axis is not moved on that axis; one too large to fit shows its
 start. A test that starts with the control outside the board says so before

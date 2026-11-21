@@ -109,6 +109,36 @@ test.describe("on a desktop", () => {
     expect(await pannedIntoView(page, first, pane)).toBe(true);
   });
 
+  test("should bring a control into view only once the board is at rest when a glide runs long after the keyboard's focus moved to it", async ({ page }) => {
+    const { pane, first } = await firstButtonPastLeftEdge(page);
+    await page.keyboard.press("Shift+Tab");
+    const before = await boxOf(first);
+    expect(before.x + before.width).toBeLessThan(pane.x);
+    // A glide of three seconds, made certain: longer than any wait the board could give up after. This focus scrolls
+    // nothing (the control is past the left edge), so nothing ends the glide early, and the glide takes the control
+    // further out. A pan measured while the board still moves would be short by what the glide had left. Only a
+    // glide is made long (the world has that class only while it glides): a pan must still land at once.
+    await page.addStyleTag({ content: "[data-canvas-world].transition-transform { transition-duration: 3000ms !important; }" });
+    expect(await focusMidGlide(first, { key: "ArrowRight" })).toBe("gliding");
+    await expect(first).toBeFocused();
+    // Half way through, the board has not jumped: the glide still runs, and the control is still out of view.
+    const halfWay = await first.evaluate(async (control) => {
+      const glide = control.closest("[data-canvas-board]")?.querySelector("[data-canvas-world]")?.getAnimations({ subtree: false })[0];
+      const reached = async (): Promise<"gliding" | "at rest"> => {
+        if (glide?.playState !== "running") return "at rest";
+        if (Number(glide.currentTime ?? 0) >= 1500) return "gliding";
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        return reached();
+      };
+      return reached();
+    });
+    expect(halfWay).toBe("gliding");
+    expect((await boxOf(first)).x).toBeLessThan(pane.x);
+    await expect.poll(() => pannedIntoView(page, first, pane), { timeout: 10_000 }).toBe(true);
+    await boardAtRest(page);
+    expect(await pannedIntoView(page, first, pane)).toBe(true);
+  });
+
   test("should not move the board when a pointer press focuses a control that is partly past the board's left edge", async ({ page }) => {
     const { pane, first } = await firstButtonPastLeftEdge(page);
     // Drag the board until the button's left half is cut off by the board's edge.
