@@ -37,6 +37,40 @@ export const boardAtRest = (page: Page) => board(page).locator("[data-canvas-wor
 });
 
 /**
+ * Focuses `control` while the board glides, and says whether a glide ran at that moment. In the page and in one task
+ * (no frame in between), so it holds on a runner of any speed: an arrow key starts a glide that takes a control to the
+ * board's right further out, and the control is focused before the glide has moved at all. The browser then scrolls
+ * by where the control is drawn at that moment, not by where the view comes to rest, and the scroll reaches the
+ * board a frame later, while the glide runs. `glidedMs` lets the glide get that far first, a frame at a time, so the
+ * board is drawn between where it was and where it rests. `busyMs` keeps the page busy after the focus (no frame is
+ * drawn and no event runs), which is what a slow runner does: the scroll then reaches the board only afterwards.
+ * `scrollsOnly` makes the focus scroll the board's box that many pixels across and no more, as a box whose content
+ * ends short of the control does: the browser's own scroll is turned off and the box is scrolled here, in that task.
+ */
+export const focusMidGlide = (control: Locator, { glidedMs = 0, busyMs = 0, scrollsOnly }: { glidedMs?: number; busyMs?: number; scrollsOnly?: number } = {}): Promise<"gliding" | "at rest" | "missing"> =>
+  control.evaluate(async (element: HTMLElement | SVGElement, wait) => {
+    const pane = element.closest("[data-canvas-board]");
+    const moving = pane?.querySelector("[data-canvas-world]");
+    if (!pane || !moving) return "missing";
+    pane.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", shiftKey: true, bubbles: true, cancelable: true }));
+    // React draws the key press in a microtask of this same task.
+    await new Promise<void>((resolve) => { queueMicrotask(resolve); });
+    const underWay = async (): Promise<boolean> => {
+      const [animation] = moving.getAnimations({ subtree: false });
+      if (!animation) return false;
+      if (Number(animation.currentTime ?? 0) >= wait.glidedMs) return true;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      return underWay();
+    };
+    const running = await underWay();
+    element.focus({ preventScroll: wait.scrollsOnly !== null });
+    if (wait.scrollsOnly !== null) pane.scrollLeft = wait.scrollsOnly;
+    const until = performance.now() + wait.busyMs;
+    while (performance.now() < until) { /* busy */ }
+    return running ? "gliding" : "at rest";
+  }, { glidedMs, busyMs, scrollsOnly: scrollsOnly ?? null });
+
+/**
  * The end state of a focus scroll, read together: the board turned the scroll into a pan (its box is back at 0), and
  * `control` is inside the board, whose box on the page is `pane`. Right after the focus the box is still scrolled,
  * which alone would put the control in view, so neither half says enough without the other.

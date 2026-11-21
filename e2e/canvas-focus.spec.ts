@@ -1,4 +1,6 @@
-import { board, boardAtRest, boxOf, frame, frameBody, openCanvas as open, pannedIntoView } from "./support/canvas";
+import type { Page } from "@playwright/test";
+
+import { board, boardAtRest, boxOf, focusMidGlide, frame, frameBody, openCanvas as open, pannedIntoView } from "./support/canvas";
 import { expect, test } from "./support/test";
 
 /*
@@ -6,9 +8,42 @@ import { expect, test } from "./support/test";
  * when focus moves to a control outside the board's window, the browser
  * scrolls the board's box and the board turns that scroll into a pan
  * (use-pan-zoom.ts). These tests hold that to its end state: the box back at
- * 0 and the control inside the board, at rest, while a glide runs, and when
- * the page is too busy to hear of the scroll before the glide is over.
+ * 0 and the control inside the board, at rest, while a glide runs, when the
+ * box cannot scroll as far as the control, and when the page is too busy to
+ * hear of the scroll before the glide is over.
  */
+
+/**
+ * The flow board at 100% and at rest, with the "Push alerts" switch of its Settings frame outside the board's window,
+ * to its right. Every test that starts here needs that last part: with the switch in view from the start, the end
+ * state these tests wait for is already there, and they would pass without the board doing anything.
+ */
+async function alertsOutsideBoard(page: Page) {
+  await open(page, "flow", "board");
+  await page.getByRole("button", { name: /Show at 100%/ }).click();
+  await expect(board(page)).toHaveAttribute("data-canvas-zoom", "100%");
+  await boardAtRest(page);
+  const pane = await boxOf(board(page));
+  const alerts = frame(page, "settings").getByRole("switch", { name: "Push alerts" });
+  expect((await boxOf(alerts)).x).toBeGreaterThan(pane.x + pane.width);
+  return { pane, alerts };
+}
+
+/**
+ * The same board after its last frame's switch took the focus: the board has moved left to show it, and the first
+ * frame's button is now past the board's left edge. A box scrolls no further back than its own start, so a focus on
+ * that button scrolls nothing, and no scroll event tells the board of it.
+ */
+async function firstButtonPastLeftEdge(page: Page) {
+  const { pane, alerts } = await alertsOutsideBoard(page);
+  await alerts.focus();
+  await expect.poll(() => pannedIntoView(page, alerts, pane)).toBe(true);
+  await boardAtRest(page);
+  const first = frame(page, "sign-in").getByRole("button", { name: "Continue with email" });
+  const box = await boxOf(first);
+  expect(box.x + box.width).toBeLessThan(pane.x);
+  return { pane, first };
+}
 
 test.describe("on a desktop", () => {
   test.beforeEach(({ isMobile }) => {
@@ -16,29 +51,8 @@ test.describe("on a desktop", () => {
   });
 
   test("should bring a control into view when focus moves to it while the board still glides", async ({ page }) => {
-    await open(page, "flow", "board");
-    await page.getByRole("button", { name: /Show at 100%/ }).click();
-    await expect(board(page)).toHaveAttribute("data-canvas-zoom", "100%");
-    await boardAtRest(page);
-    const pane = await boxOf(board(page));
-    const alerts = frame(page, "settings").getByRole("switch", { name: "Push alerts" });
-    expect((await boxOf(alerts)).x).toBeGreaterThan(pane.x + pane.width);
-    // In the page and in one task (no frame in between), so it holds on a runner of any speed: an arrow key starts a
-    // glide that takes the control further out, and the control is focused before the glide has moved at all. The
-    // browser then scrolls by where the control is drawn at that moment, not by where the view comes to rest, and
-    // the scroll reaches the board a frame later, while the glide runs.
-    const glide = await alerts.evaluate(async (control: HTMLElement) => {
-      const pane = control.closest("[data-canvas-board]");
-      const moving = pane?.querySelector("[data-canvas-world]");
-      if (!pane || !moving) return "missing";
-      pane.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", shiftKey: true, bubbles: true, cancelable: true }));
-      // React draws the key press in a microtask of this same task.
-      await new Promise<void>((resolve) => { queueMicrotask(resolve); });
-      const running = moving.getAnimations({ subtree: false }).length > 0;
-      control.focus();
-      return running ? "gliding" : "at rest";
-    });
-    expect(glide).toBe("gliding");
+    const { pane, alerts } = await alertsOutsideBoard(page);
+    expect(await focusMidGlide(alerts)).toBe("gliding");
     await expect(alerts).toBeFocused();
     // The end state, read together: the focus scroll was turned into a pan (the box is back at 0), and the control is
     // inside the board. Right after the focus the box is still scrolled, which alone would put the control in view.
@@ -49,38 +63,79 @@ test.describe("on a desktop", () => {
     expect(await atRestInView()).toBe(true);
   });
 
-  test("should bring a control into view when focus moves to it during a glide and the page is busy until the glide has ended", async ({ page }) => {
-    await open(page, "flow", "board");
-    await page.getByRole("button", { name: /Show at 100%/ }).click();
-    await expect(board(page)).toHaveAttribute("data-canvas-zoom", "100%");
-    await boardAtRest(page);
-    const pane = await boxOf(board(page));
-    const alerts = frame(page, "settings").getByRole("switch", { name: "Push alerts" });
-    expect((await boxOf(alerts)).x).toBeGreaterThan(pane.x + pane.width);
-    // What a slow runner does, made certain: the control is focused while a glide runs, so the browser scrolls by
-    // where the control is drawn then, and the page stays busy until the glide is over. The scroll reaches the
-    // board only afterwards, when nothing glides any more, and must still not leave the control off by the glide.
-    const glide = await alerts.evaluate(async (control: HTMLElement) => {
-      const pane = control.closest("[data-canvas-board]");
-      const moving = pane?.querySelector("[data-canvas-world]");
-      if (!pane || !moving) return "missing";
-      pane.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", shiftKey: true, bubbles: true, cancelable: true }));
-      await new Promise<void>((resolve) => { queueMicrotask(resolve); });
-      // Let the glide get under way: a few frames in, the board is drawn between where it was and where it rests.
-      const midway = async (): Promise<boolean> => {
-        const [animation] = moving.getAnimations({ subtree: false });
-        if (!animation) return false;
-        if (Number(animation.currentTime ?? 0) >= 60) return true;
-        await new Promise((resolve) => requestAnimationFrame(resolve));
-        return midway();
+  test("should bring a control into view when focus moves to it during a glide and the board's box cannot scroll as far as the control", async ({ page }) => {
+    const { pane, alerts } = await alertsOutsideBoard(page);
+    // A scroll of the board's box stops where its scrollable content ends. On a page that has just loaded on a fresh
+    // dev server that was 80 pixels, far short of the control (CI, 20 Nov 2026). Made certain here, for both ways the
+    // box can be scrolled: the focus scrolls it 80 pixels and no more, and so does any scroll asked of an element.
+    // The board asks for none; the second half is here so that a reveal that went back to `scrollIntoView` fails.
+    await page.evaluate(() => {
+      HTMLElement.prototype.scrollIntoView = function scrollShort(this: HTMLElement) {
+        const box = this.closest("[data-canvas-board]");
+        if (box) box.scrollLeft += 80;
       };
-      const running = await midway();
-      control.focus();
-      const until = performance.now() + 600;
-      while (performance.now() < until) { /* busy: no frame is drawn and no event runs */ }
-      return running ? "gliding" : "at rest";
     });
-    expect(glide).toBe("gliding");
+    expect(await focusMidGlide(alerts, { scrollsOnly: 80 })).toBe("gliding");
+    await expect(alerts).toBeFocused();
+    await expect.poll(() => pannedIntoView(page, alerts, pane)).toBe(true);
+    await boardAtRest(page);
+    expect(await pannedIntoView(page, alerts, pane)).toBe(true);
+  });
+
+  test("should bring a control into view when focus moves to it at rest and the board's box cannot scroll as far as the control", async ({ page }) => {
+    const { pane, alerts } = await alertsOutsideBoard(page);
+    // The same short scroll with nothing gliding, made certain: the focus scrolls the box 80 pixels and no more.
+    await alerts.evaluate((control: HTMLElement | SVGElement) => {
+      control.focus({ preventScroll: true });
+      const box = control.closest("[data-canvas-board]");
+      if (box) box.scrollLeft = 80;
+    });
+    await expect(alerts).toBeFocused();
+    await expect.poll(() => pannedIntoView(page, alerts, pane)).toBe(true);
+    await boardAtRest(page);
+    expect(await pannedIntoView(page, alerts, pane)).toBe(true);
+  });
+
+  test("should bring a control into view when the keyboard's focus moves to one past the board's left edge, where the box has nothing to scroll", async ({ page }) => {
+    const { pane, first } = await firstButtonPastLeftEdge(page);
+    // The focus is the keyboard's from here on: one real key press, and a focus a script moves on from it stays so.
+    await page.keyboard.press("Shift+Tab");
+    const before = await boxOf(first);
+    expect(before.x + before.width).toBeLessThan(pane.x);
+    await first.focus();
+    await expect(first).toBeFocused();
+    await expect.poll(() => pannedIntoView(page, first, pane)).toBe(true);
+    await boardAtRest(page);
+    expect(await pannedIntoView(page, first, pane)).toBe(true);
+  });
+
+  test("should not move the board when a pointer press focuses a control that is partly past the board's left edge", async ({ page }) => {
+    const { pane, first } = await firstButtonPastLeftEdge(page);
+    // Drag the board until the button's left half is cut off by the board's edge.
+    const hidden = await boxOf(first);
+    const across = pane.x - hidden.x - hidden.width / 2;
+    const from = { x: pane.x + 40, y: pane.y + pane.height - 12 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + across / 2, from.y, { steps: 4 });
+    await page.mouse.move(from.x + across, from.y, { steps: 4 });
+    await page.mouse.up();
+    await boardAtRest(page);
+    const cut = await boxOf(first);
+    expect(cut.x).toBeLessThan(pane.x);
+    expect(cut.x + cut.width).toBeGreaterThan(pane.x + 8);
+    await page.mouse.click(pane.x + (cut.x + cut.width - pane.x) / 2, cut.y + cut.height / 2);
+    await expect(first).toBeFocused();
+    await boardAtRest(page);
+    expect((await boxOf(first)).x).toBe(cut.x);
+  });
+
+  test("should bring a control into view when focus moves to it during a glide and the page is busy until the glide has ended", async ({ page }) => {
+    const { pane, alerts } = await alertsOutsideBoard(page);
+    // What a slow runner does, made certain: the control is focused a few frames into a glide, so the browser scrolls
+    // by where the control is drawn then, and the page stays busy until the glide is over. The scroll reaches the
+    // board only afterwards, when nothing glides any more, and must still not leave the control off by the glide.
+    expect(await focusMidGlide(alerts, { glidedMs: 60, busyMs: 600 })).toBe("gliding");
     await expect(alerts).toBeFocused();
     const atRestInView = () => pannedIntoView(page, alerts, pane);
     await expect.poll(atRestInView).toBe(true);

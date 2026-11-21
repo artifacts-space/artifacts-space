@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type FocusEvent, type KeyboardEvent, type PointerEvent, type RefObject, type UIEvent } from "react";
 import { flushSync } from "react-dom";
 
-import { fitView, frameView, keepInWindow, nextZoomStep, panBy, wheelZoom, zoomAbout, type BoardView, type Box, type Size } from "@/lib/canvas/view-rules";
+import { fitView, frameView, keepInWindow, nextZoomStep, panBy, panToReveal, wheelZoom, zoomAbout, type BoardView, type Box, type Size } from "@/lib/canvas/view-rules";
 
 import { usePinch } from "./use-pinch";
 
@@ -63,25 +63,32 @@ function isGliding(pane: HTMLElement): boolean {
   return (pane.querySelector("[data-canvas-world]")?.getAnimations({ subtree: false }).length ?? 0) > 0;
 }
 
-/** How many frames the board waits for a glide to end before it gives up bringing the focused control into view. */
-const REVEAL_FRAMES = 30;
+/**
+ * How long the board waits for a glide to end before it measures anyway: five glides. Time, not a count of frames,
+ * so a fast display waits as long as a slow one. A backstop: a glide ends by itself in a fifth of this.
+ */
+const REVEAL_WAIT_MS = 1000;
 
 /**
  * Brings the focused control inside `pane` into view once the board is drawn at rest. It waits, a frame at a time,
- * for the glide to end, then asks the browser to scroll to the control; the board turns that scroll into a pan.
- * One wait runs at a time (`pending` holds its frame), and it ends when the focus leaves the board.
+ * for the glide to end, then measures where the control is drawn and pans by what it lacks (`panToReveal`). It pans
+ * rather than asking the browser to scroll: a scroll of the window stops where its content ends, which was short of
+ * the control on a page still loading (CI, 20 Nov 2026: 80 pixels of a 550-pixel way, twice), and not at all toward
+ * a control past the window's left or top edge. One wait runs at a time (`pending` holds its frame), and it ends
+ * when the focus leaves the board.
  */
-function revealFocusedAtRest(pane: HTMLElement, pending: { frame: number | null }, left = REVEAL_FRAMES) {
+function revealFocusedAtRest(pane: HTMLElement, pending: { frame: number | null }, pan: (delta: { x: number; y: number }) => void, until = performance.now() + REVEAL_WAIT_MS) {
   if (pending.frame !== null) cancelAnimationFrame(pending.frame);
   pending.frame = requestAnimationFrame(() => {
     pending.frame = null;
     const focused = document.activeElement;
     if (!(focused instanceof HTMLElement) || focused === pane || !pane.contains(focused)) return;
-    if (isGliding(pane) && left > 0) {
-      revealFocusedAtRest(pane, pending, left - 1);
+    if (isGliding(pane) && performance.now() < until) {
+      revealFocusedAtRest(pane, pending, pan, until);
       return;
     }
-    focused.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const delta = panToReveal(focused.getBoundingClientRect(), pane.getBoundingClientRect());
+    if (delta.x !== 0 || delta.y !== 0) pan(delta);
   });
 }
 
@@ -108,7 +115,7 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
   const [glide, setGlide] = useState(false);
   const press = useRef<Press | null>(null);
   const reveal = useRef<{ frame: number | null }>({ frame: null });
-  const focusedMidGlide = useRef(false);
+  const focusMoved = useRef(false);
   useEffect(() => {
     const pending = reveal.current;
     return () => { if (pending.frame !== null) cancelAnimationFrame(pending.frame); };
@@ -222,31 +229,48 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
     action();
   };
 
+  /** Moves the view by a pan on the page, from the newest view (`latest`), with no glide. Like every pan, it ends in `keepInWindow` (`panBy`), which only ever brings more of the board into the window, and a control is drawn on the board. */
+  const panToFocused = (delta: { x: number; y: number }) => {
+    move(panBy(latest.current.view, delta, latest.current.bounds, latest.current.room), false);
+  };
+
   // Focus moving to a control outside the window (Tab) makes the browser scroll the window, even though it shows no scrollbars. Turn that scroll into a pan, so the control comes into view and the view stays the one source of the board's place.
-  // While a glide runs, the browser measures that scroll against the board as it is drawn at that moment, not where
-  // the view comes to rest, so the pan would leave the control off by what the glide had left. The pan ends the
-  // glide; once the board is drawn at rest, the focused control is brought into view again, and that scroll is exact.
-  // Whether a glide ran is asked when the focus moves, not only when the scroll arrives: the scroll event comes a
-  // frame later, and on a busy page the glide can be over by then, with the scroll still measured in the middle of it.
-  // The note lasts one frame: the scroll event of this focus runs before that frame's callbacks, so once they run the
-  // note cannot apply any more (a focus that needed no scroll), and a later scroll from another cause never reads it.
+  // That pan can be short of the control, in three ways. While a glide runs, the browser measures the scroll against
+  // the board as it is drawn at that moment, not where the view comes to rest, so the pan is off by what the glide
+  // had left. The window scrolls no further than its content reaches, at rest too. And it never scrolls back past
+  // its own start, so a control past its left or top edge gets no scroll at all, and no scroll event. So after every
+  // focus on a control, once the board is drawn at rest, the board pans by what the focused control still lacks,
+  // measured then; nothing when it lacks nothing.
+  // That a focus moved is noted when it moves, not read from the board when the scroll arrives: the scroll event comes
+  // a frame later, and on a busy page a glide can be over by then, with the scroll still measured in the middle of it.
+  // The note lasts one frame: the scroll event of this focus runs before that frame's callbacks and takes the note,
+  // so a later scroll from another cause never reads it. A note still there in that frame's callback is a focus
+  // that scrolled nothing, and the reveal starts from there, for a focus the browser would show a ring for
+  // (`:focus-visible`: the keyboard). A pointer press on a control that is partly in view focuses it too, and the
+  // board must not move under the pointer.
   const onFocus = (event: FocusEvent<HTMLElement>) => {
-    focusedMidGlide.current = event.target !== event.currentTarget && isGliding(event.currentTarget);
-    if (focusedMidGlide.current) requestAnimationFrame(() => { focusedMidGlide.current = false; });
+    const pane = event.currentTarget;
+    focusMoved.current = enabled && event.target !== pane;
+    if (!focusMoved.current) return;
+    requestAnimationFrame(() => {
+      if (!focusMoved.current) return;
+      focusMoved.current = false;
+      if (document.activeElement?.matches(":focus-visible")) revealFocusedAtRest(pane, reveal.current, panToFocused);
+    });
   };
 
   const onScroll = (event: UIEvent<HTMLElement>) => {
     const element = event.currentTarget;
     const { scrollLeft, scrollTop } = element;
     if (scrollLeft === 0 && scrollTop === 0) return;
-    const gliding = isGliding(element) || focusedMidGlide.current;
-    focusedMidGlide.current = false;
+    const reveals = focusMoved.current || isGliding(element);
+    focusMoved.current = false;
     element.scrollLeft = 0;
     element.scrollTop = 0;
     const current = latest.current.view;
     // Drawn before this returns: the reveal below measures the board in this same frame, and must find the pan in it.
     flushSync(() => { move({ zoom: current.zoom, x: current.x - scrollLeft, y: current.y - scrollTop }, false); });
-    if (gliding) revealFocusedAtRest(element, reveal.current);
+    if (reveals) revealFocusedAtRest(element, reveal.current, panToFocused);
   };
 
   // The browser took the pointer for its own gesture: a one-finger swipe that turned out to scroll the page. Any pan it caused before that is undone, so scrolling past the board never nudges it.
