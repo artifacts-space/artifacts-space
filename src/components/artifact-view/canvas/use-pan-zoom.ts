@@ -56,35 +56,51 @@ export interface PanZoom {
 }
 
 /**
- * True while the board's world still moves toward the view (a button's glide, a CSS transition on the world itself).
- * Only the world's own animations count, never those of what the frames show: a spinner in a frame is no glide.
+ * The moves of the board's world toward the view that still run (a button's glide, a CSS transition on the world
+ * itself). Only the world's own transitions count: never the animations of what the frames show (a spinner in a
+ * frame is no glide), and never an animation that repeats, which has no end to wait for.
  */
+function glidesOf(pane: HTMLElement): Animation[] {
+  const animations = pane.querySelector("[data-canvas-world]")?.getAnimations({ subtree: false }) ?? [];
+  return animations.filter((animation) => animation instanceof CSSTransition);
+}
+
+/** True while the board's world still moves toward the view. */
 function isGliding(pane: HTMLElement): boolean {
-  return (pane.querySelector("[data-canvas-world]")?.getAnimations({ subtree: false }).length ?? 0) > 0;
+  return glidesOf(pane).length > 0;
+}
+
+/** The reveal that waits: the frame it runs in, and its turn, so a wait that a newer reveal replaced does nothing. */
+interface PendingReveal {
+  frame: number | null;
+  turn: number;
 }
 
 /**
- * How long the board waits for a glide to end before it measures anyway: five glides. Time, not a count of frames,
- * so a fast display waits as long as a slow one. A backstop: a glide ends by itself in a fifth of this.
+ * Brings the focused control inside `pane` into view once the board is drawn at rest: it measures where the control
+ * is drawn and pans by what it lacks (`panToReveal`). It pans rather than asking the browser to scroll: a scroll of
+ * the window stops where its content ends, which was short of the control on a page still loading (CI, 20 Nov 2026:
+ * 80 pixels of a 550-pixel way, twice), and not at all toward a control past the window's left or top edge.
+ *
+ * It never measures a board that still moves: the pan is added to the view the glide is going to, so it would be
+ * off by what the glide had left, and it would cut the glide short. While a glide runs it waits for that glide's own
+ * end (`finished`; a glide that is cut short ends there too), with no clock and no count of frames, then looks
+ * again, since another glide can have started. One wait runs at a time (`pending`), and it ends when the focus
+ * leaves the board.
  */
-const REVEAL_WAIT_MS = 1000;
-
-/**
- * Brings the focused control inside `pane` into view once the board is drawn at rest. It waits, a frame at a time,
- * for the glide to end, then measures where the control is drawn and pans by what it lacks (`panToReveal`). It pans
- * rather than asking the browser to scroll: a scroll of the window stops where its content ends, which was short of
- * the control on a page still loading (CI, 20 Nov 2026: 80 pixels of a 550-pixel way, twice), and not at all toward
- * a control past the window's left or top edge. One wait runs at a time (`pending` holds its frame), and it ends
- * when the focus leaves the board.
- */
-function revealFocusedAtRest(pane: HTMLElement, pending: { frame: number | null }, pan: (delta: { x: number; y: number }) => void, until = performance.now() + REVEAL_WAIT_MS) {
+function revealFocusedAtRest(pane: HTMLElement, pending: PendingReveal, pan: (delta: { x: number; y: number }) => void) {
   if (pending.frame !== null) cancelAnimationFrame(pending.frame);
+  pending.turn += 1;
+  const turn = pending.turn;
   pending.frame = requestAnimationFrame(() => {
     pending.frame = null;
     const focused = document.activeElement;
     if (!(focused instanceof HTMLElement) || focused === pane || !pane.contains(focused)) return;
-    if (isGliding(pane) && performance.now() < until) {
-      revealFocusedAtRest(pane, pending, pan, until);
+    const glides = glidesOf(pane);
+    if (glides.length > 0) {
+      const atRest = Promise.allSettled(glides.map((glide) => glide.finished));
+      // `allSettled` never rejects; the catch is for a throw in the next look itself.
+      atRest.then(() => { if (pending.turn === turn) revealFocusedAtRest(pane, pending, pan); }).catch(() => undefined);
       return;
     }
     const delta = panToReveal(focused.getBoundingClientRect(), pane.getBoundingClientRect());
@@ -114,11 +130,15 @@ export function usePanZoom(windowRef: RefObject<HTMLElement | null>, bounds: Box
   const [dragging, setDragging] = useState(false);
   const [glide, setGlide] = useState(false);
   const press = useRef<Press | null>(null);
-  const reveal = useRef<{ frame: number | null }>({ frame: null });
+  const reveal = useRef<PendingReveal>({ frame: null, turn: 0 });
   const focusMoved = useRef(false);
   useEffect(() => {
     const pending = reveal.current;
-    return () => { if (pending.frame !== null) cancelAnimationFrame(pending.frame); };
+    return () => {
+      if (pending.frame !== null) cancelAnimationFrame(pending.frame);
+      // A reveal that waits for a glide to end finds its turn gone.
+      pending.turn += 1;
+    };
   }, []);
   const room = size ?? { width: 0, height: 0 };
   const view = moved ?? fitView(bounds, room);

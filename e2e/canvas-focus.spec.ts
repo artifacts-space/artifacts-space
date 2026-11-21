@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { board, boardAtRest, boxOf, focusMidGlide, frame, frameBody, openCanvas as open, pannedIntoView } from "./support/canvas";
 import { expect, test } from "./support/test";
@@ -44,6 +44,37 @@ async function firstButtonPastLeftEdge(page: Page) {
   expect(box.x + box.width).toBeLessThan(pane.x);
   return { pane, first };
 }
+
+/**
+ * The keyboard's focus on the first frame's button, past the board's left edge, taken while a glide of three seconds
+ * runs: longer than any wait the board could give up after. This focus scrolls nothing, so nothing ends the glide
+ * early, and the glide takes the control further out. A pan measured while the board still moves would be short by
+ * what the glide had left. Only a glide is made long (the world has that class only while it glides): a pan must
+ * still land at once.
+ */
+async function focusedDuringLongGlide(page: Page) {
+  const { pane, first } = await firstButtonPastLeftEdge(page);
+  // The focus is the keyboard's from here on: one real key press, and a focus a script moves on from it stays so.
+  await page.keyboard.press("Shift+Tab");
+  const before = await boxOf(first);
+  expect(before.x + before.width).toBeLessThan(pane.x);
+  await page.addStyleTag({ content: "[data-canvas-world].transition-transform { transition-duration: 3000ms !important; }" });
+  expect(await focusMidGlide(first, { key: "ArrowRight" })).toBe("gliding");
+  await expect(first).toBeFocused();
+  return { pane, first };
+}
+
+/** Waits, a frame at a time, until the board's glide has run for `ms`, and says whether it still runs then. */
+const glideAt = (control: Locator, ms: number): Promise<"gliding" | "at rest"> => control.evaluate(async (element, reach) => {
+  const glide = element.closest("[data-canvas-board]")?.querySelector("[data-canvas-world]")?.getAnimations({ subtree: false })[0];
+  const reached = async (): Promise<"gliding" | "at rest"> => {
+    if (glide?.playState !== "running") return "at rest";
+    if (Number(glide.currentTime ?? 0) >= reach) return "gliding";
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    return reached();
+  };
+  return reached();
+}, ms);
 
 test.describe("on a desktop", () => {
   test.beforeEach(({ isMobile }) => {
@@ -105,6 +136,40 @@ test.describe("on a desktop", () => {
     await first.focus();
     await expect(first).toBeFocused();
     await expect.poll(() => pannedIntoView(page, first, pane)).toBe(true);
+    await boardAtRest(page);
+    expect(await pannedIntoView(page, first, pane)).toBe(true);
+  });
+
+  test("should bring a control into view only once the board is at rest when a glide runs long after the keyboard's focus moved to it", async ({ page }) => {
+    const { pane, first } = await focusedDuringLongGlide(page);
+    // Half way through, the board has not jumped: the glide still runs, and the control is still out of view.
+    expect(await glideAt(first, 1500)).toBe("gliding");
+    expect((await boxOf(first)).x).toBeLessThan(pane.x);
+    await expect.poll(() => pannedIntoView(page, first, pane), { timeout: 10_000 }).toBe(true);
+    await boardAtRest(page);
+    expect(await pannedIntoView(page, first, pane)).toBe(true);
+  });
+
+  test("should bring a control into view only once the board is at rest when a second glide cuts the first short", async ({ page }) => {
+    const { pane, first } = await focusedDuringLongGlide(page);
+    expect(await glideAt(first, 1000)).toBe("gliding");
+    // A second arrow turns the board round part way: the first glide is cut short, which ends the board's wait for
+    // it, and another glide runs. The board must wait again, not take the first one's end for rest.
+    const second = await first.evaluate(async (control) => {
+      const pane = control.closest("[data-canvas-board]");
+      const moving = pane?.querySelector("[data-canvas-world]");
+      if (!pane || !moving) return "missing";
+      const [cut] = moving.getAnimations({ subtree: false });
+      pane.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", shiftKey: true, bubbles: true, cancelable: true }));
+      // Long enough for a board that took the cut for rest to have panned: three frames.
+      for (let frame = 0; frame < 3; frame += 1) await new Promise((resolve) => requestAnimationFrame(resolve));
+      const [next] = moving.getAnimations({ subtree: false });
+      if (next?.playState !== "running") return "at rest";
+      return next === cut ? "same glide" : "gliding anew";
+    });
+    expect(second).toBe("gliding anew");
+    expect((await boxOf(first)).x).toBeLessThan(pane.x);
+    await expect.poll(() => pannedIntoView(page, first, pane), { timeout: 10_000 }).toBe(true);
     await boardAtRest(page);
     expect(await pannedIntoView(page, first, pane)).toBe(true);
   });

@@ -46,13 +46,14 @@ export const boardAtRest = (page: Page) => board(page).locator("[data-canvas-wor
  * drawn and no event runs), which is what a slow runner does: the scroll then reaches the board only afterwards.
  * `scrollsOnly` makes the focus scroll the board's box that many pixels across and no more, as a box whose content
  * ends short of the control does: the browser's own scroll is turned off and the box is scrolled here, in that task.
+ * `key` is the arrow that starts the glide: "ArrowRight" takes a control past the board's left edge further out.
  */
-export const focusMidGlide = (control: Locator, { glidedMs = 0, busyMs = 0, scrollsOnly }: { glidedMs?: number; busyMs?: number; scrollsOnly?: number } = {}): Promise<"gliding" | "at rest" | "missing"> =>
+export const focusMidGlide = (control: Locator, { glidedMs = 0, busyMs = 0, scrollsOnly, key = "ArrowLeft" }: { glidedMs?: number; busyMs?: number; scrollsOnly?: number; key?: "ArrowLeft" | "ArrowRight" } = {}): Promise<"gliding" | "at rest" | "missing"> =>
   control.evaluate(async (element: HTMLElement | SVGElement, wait) => {
     const pane = element.closest("[data-canvas-board]");
     const moving = pane?.querySelector("[data-canvas-world]");
     if (!pane || !moving) return "missing";
-    pane.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", shiftKey: true, bubbles: true, cancelable: true }));
+    pane.dispatchEvent(new KeyboardEvent("keydown", { key: wait.key, shiftKey: true, bubbles: true, cancelable: true }));
     // React draws the key press in a microtask of this same task.
     await new Promise<void>((resolve) => { queueMicrotask(resolve); });
     const underWay = async (): Promise<boolean> => {
@@ -68,7 +69,7 @@ export const focusMidGlide = (control: Locator, { glidedMs = 0, busyMs = 0, scro
     const until = performance.now() + wait.busyMs;
     while (performance.now() < until) { /* busy */ }
     return running ? "gliding" : "at rest";
-  }, { glidedMs, busyMs, scrollsOnly: scrollsOnly ?? null });
+  }, { glidedMs, busyMs, scrollsOnly: scrollsOnly ?? null, key });
 
 /**
  * The end state of a focus scroll, read together: the board turned the scroll into a pan (its box is back at 0), and
