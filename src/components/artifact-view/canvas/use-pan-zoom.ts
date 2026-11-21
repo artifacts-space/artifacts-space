@@ -57,10 +57,12 @@ export interface PanZoom {
 
 /**
  * The moves of the board's world toward the view that still run (a button's glide, a CSS transition on the world
- * itself). Only the world's own animations count, never those of what the frames show: a spinner in a frame is no glide.
+ * itself). Only the world's own transitions count: never the animations of what the frames show (a spinner in a
+ * frame is no glide), and never an animation that repeats, which has no end to wait for.
  */
 function glidesOf(pane: HTMLElement): Animation[] {
-  return pane.querySelector("[data-canvas-world]")?.getAnimations({ subtree: false }) ?? [];
+  const animations = pane.querySelector("[data-canvas-world]")?.getAnimations({ subtree: false }) ?? [];
+  return animations.filter((animation) => animation instanceof CSSTransition);
 }
 
 /** True while the board's world still moves toward the view. */
@@ -97,6 +99,7 @@ function revealFocusedAtRest(pane: HTMLElement, pending: PendingReveal, pan: (de
     const glides = glidesOf(pane);
     if (glides.length > 0) {
       const atRest = Promise.allSettled(glides.map((glide) => glide.finished));
+      // `allSettled` never rejects; the catch is for a throw in the next look itself.
       atRest.then(() => { if (pending.turn === turn) revealFocusedAtRest(pane, pending, pan); }).catch(() => undefined);
       return;
     }
