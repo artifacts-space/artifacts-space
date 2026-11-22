@@ -143,7 +143,8 @@ describe("every edit to a list", () => {
     expect(tally.patched).toBeGreaterThan(tally.whole);
   });
 
-  it("should save a patch that reads back as the edit, or the whole list as the round trip's own writer has it, on the corpus", () => {
+  // A fixed amount of work (about 2s alone), run beside the whole suite: on a CI runner it went past Vitest's 5s default.
+  it("should save a patch that reads back as the edit, or the whole list as the round trip's own writer has it, on the corpus", { timeout: 60_000 }, () => {
     const tally: Tally = { problems: [], whole: 0, patched: 0, unjudged: 0 };
     for (const [name, markdown] of Object.entries(listCorpus)) {
       for (let round = 1; round <= 3; round += 1) check(name, markdown, seeded(round), tally);
