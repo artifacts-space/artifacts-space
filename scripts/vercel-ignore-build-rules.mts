@@ -40,9 +40,10 @@ const unreadRootFiles = new Set(["README.md", "AGENTS.md", "CLAUDE.md", "CONTRIB
 
 /**
  * Folders the deployed app never reads: GitHub settings, workflows, and issue
- * templates (Vercel runs none of them), and the README's screenshots.
+ * templates (Vercel runs none of them), the README's screenshots, and the
+ * topic guides that AGENTS.md links.
  */
-const unreadFolders = [".github/", "docs/images/"];
+const unreadFolders = [".github/", "docs/images/", "docs/agents/"];
 
 /** True when the deployed app never reads `path`, so changing it alone needs no new preview. */
 export function isUnreadByApp(path: string): boolean {

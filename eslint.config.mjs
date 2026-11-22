@@ -73,6 +73,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Agent worktrees (.claude/worktrees/*) hold whole copies of the repo:
+    // linting them doubles the work and ran ESLint out of memory.
+    ".claude/**",
   ]),
 ]);
 
