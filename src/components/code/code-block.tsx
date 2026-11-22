@@ -7,7 +7,7 @@ import type { SyntaxKind, SyntaxLine } from "@/lib/syntax/tokens";
 import { cn } from "@/lib/utils";
 
 import { codeBlockModel } from "./code-block-model";
-import { codeToolsClass } from "./code-tools";
+import { codeClearsToolsClass, codeToolsClass } from "./code-tools";
 import { scrollStopProps, scrollStopRing } from "./scroll-stop";
 import { useHighlightedLines } from "./use-highlighted-lines";
 import { useScrollable } from "./use-scrollable";
@@ -165,7 +165,7 @@ function CodeFigure({ code, language, title, lines, capHeight = false, copyLabel
         lines={highlighted}
         name={title ?? model.label}
         wrap={wrap}
-        className={cn("overflow-auto px-4", title ? "pt-1 pb-3.5" : "py-3.5", capHeight && "max-h-[32rem]")}
+        className={cn("overflow-auto px-4", title ? "pt-1 pb-3.5" : cn("py-3.5", codeClearsToolsClass), capHeight && "max-h-[32rem]")}
       />
     </figure>
   );

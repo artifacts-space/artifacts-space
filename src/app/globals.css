@@ -1063,6 +1063,12 @@
     /* The frame clips to its rounded corners, so long lines scroll here, as on the read side. */
     overflow-x: auto;
   }
+  /* Touch screens always show the tools (code-tools.ts), so the code starts below them: codeClearsToolsClass. */
+  @media (pointer: coarse) {
+    .rich-editor-content .rich-code-block pre {
+      padding-top: 2.75rem;
+    }
+  }
   /* Wrap code: long lines fold instead of scrolling sideways. */
   .rich-editor-content .rich-code-block pre[data-wrap] {
     white-space: pre-wrap;

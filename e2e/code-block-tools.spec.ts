@@ -44,6 +44,8 @@ test("should fill a code block with a color other than the page's when it is dra
   const pageFill = await backgroundOf(page.locator("body"));
   expect(await backgroundOf(block)).not.toBe(pageFill);
   expect(await backgroundOf((await editorCodeBlock(page)).locator(".rich-code-frame"))).toBe(await backgroundOf(block));
+  // The tools are a chip off the fill, so their buttons' hover fill (--muted, the fill's own step) still shows on them.
+  expect(await backgroundOf(block.locator("[data-code-tools]"))).not.toBe(await backgroundOf(block));
 });
 
 test.describe("with a mouse", () => {
@@ -104,5 +106,17 @@ test.describe("on a touch screen", () => {
     await openFixture(page);
     await expect.poll(() => opacityOf(readBlock(page).locator("[data-code-tools]"))).toBe("1");
     await expect.poll(async () => opacityOf((await editorCodeBlock(page)).locator("[data-code-tools]"))).toBe("1");
+  });
+
+  test("should start the code below the tools when they always show, so none of it is covered", async ({ page }) => {
+    await openFixture(page);
+    const read = readBlock(page);
+    const edited = await editorCodeBlock(page);
+    for (const [block, code] of [[read, read.locator("code")], [edited, edited.locator("pre code")]] as const) {
+      const tools = await block.locator("[data-code-tools]").boundingBox();
+      const first = await code.boundingBox();
+      if (!tools || !first) throw new Error("the tools or the code have no box");
+      expect(first.y).toBeGreaterThanOrEqual(tools.y + tools.height);
+    }
   });
 });
