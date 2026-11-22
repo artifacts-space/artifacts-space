@@ -1037,6 +1037,14 @@
     margin-top: 0;
     /* The read-side block's px-4 py-3.5. */
     padding: 0.875rem 1rem;
+    /*
+     * The read-side block's font-mono text-sm leading-6. Without them the pre
+     * took the document's 16px and the root's mono, not a theme's, so code
+     * read larger than the text around it.
+     */
+    font-family: --theme(--font-mono);
+    font-size: var(--text-sm);
+    line-height: 1.5rem;
     border: 0;
     border-radius: 0;
     background: transparent;
