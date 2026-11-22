@@ -69,7 +69,7 @@ test.describe("with a mouse", () => {
   test("should keep the editor's tools showing while the language menu is open, after the pointer leaves", async ({ page }) => {
     await openFixture(page);
     const block = await editorCodeBlock(page);
-    const tools = block.locator("[data-code-toolbar]");
+    const tools = block.locator("[data-code-tools]");
     await editor(page).getByText("Intro paragraph.").click();
     await page.mouse.move(0, 0);
     await expect.poll(() => opacityOf(tools)).toBe("0");
@@ -82,12 +82,27 @@ test.describe("with a mouse", () => {
   });
 });
 
+test("should end a titled block's title before its tools when they show", async ({ page }) => {
+  await page.goto("/docs/clients");
+  const block = page.locator("figure[data-code-block]").filter({ has: page.locator("figcaption", { hasText: "mcp.json" }) }).first();
+  await block.scrollIntoViewIfNeeded();
+  await block.hover();
+  const tools = block.locator("[data-code-tools]");
+  await expect.poll(() => opacityOf(tools)).toBe("1");
+
+  const title = await block.locator("figcaption").boundingBox();
+  const bar = await tools.boundingBox();
+  if (!title || !bar) throw new Error("the title or the tools have no box");
+  // The title's whole line, not only its words, stops short of the tools, so a long title truncates instead of running under them.
+  expect(title.x + title.width).toBeLessThanOrEqual(bar.x);
+});
+
 test.describe("on a touch screen", () => {
   test.skip(({ isMobile }) => !isMobile, "Only touch screens show the tools at rest.");
 
   test("should always show a code block's tools when the screen has no hover", async ({ page }) => {
     await openFixture(page);
     await expect.poll(() => opacityOf(readBlock(page).locator("[data-code-tools]"))).toBe("1");
-    await expect.poll(async () => opacityOf((await editorCodeBlock(page)).locator("[data-code-toolbar]"))).toBe("1");
+    await expect.poll(async () => opacityOf((await editorCodeBlock(page)).locator("[data-code-tools]"))).toBe("1");
   });
 });

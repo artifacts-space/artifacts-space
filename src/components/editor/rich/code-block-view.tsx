@@ -11,7 +11,7 @@ import { MermaidBlockView } from "./mermaid-block-view";
 
 export { languageOptions } from "./code-language-picker";
 
-/** A code block that is not a diagram: the toolbar, then the code. */
+/** A code block that is not a diagram: the code with its tools over it, then the caption. */
 function PlainCodeBlockView({ node, updateAttributes, editor }: ReactNodeViewProps) {
   const attrs = useCodeBlockAttrs(node.attrs.language, updateAttributes);
   return (
@@ -39,8 +39,8 @@ function PlainCodeBlockView({ node, updateAttributes, editor }: ReactNodeViewPro
 }
 
 /**
- * A code block in the editor: a toolbar with the language picker on the
- * left and Copy, Wrap code, and Caption on the right, then the code, then
+ * A code block in the editor: the code, with its tools over the top right
+ * (the language picker, Copy, Wrap code, and Caption; code-tools.ts), then
  * the caption. The language and its attributes are written after the
  * opening fence on save (markdown-dialect.md). A ```mermaid block shows its
  * diagram (mermaid-block-view.tsx).

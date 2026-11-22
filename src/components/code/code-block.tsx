@@ -38,12 +38,14 @@ function HighlightedCode({ lines }: { lines: readonly SyntaxLine[] }) {
 }
 
 /**
- * The language and the copy button, over the code's top right, shown on
- * hover and focus (code-tools.ts). Copy takes only the code, never the title.
+ * The language and the copy button, shown on hover and focus (code-tools.ts):
+ * over the code's top right, or `inline` at the end of a title's row, so a
+ * title truncates short of them instead of running under them. Copy takes
+ * only the code, never the title.
  */
-function CodeTools({ label, copyValue, copyLabel }: { label: string; copyValue: string; copyLabel: string }) {
+function CodeTools({ label, copyValue, copyLabel, inline = false }: { label: string; copyValue: string; copyLabel: string; inline?: boolean }) {
   return (
-    <div data-code-tools="" className={codeToolsClass}>
+    <div data-code-tools="" className={cn(codeToolsClass, inline && "static shrink-0")}>
       <span className="truncate px-1.5 font-mono text-xs text-muted-foreground">{label}</span>
       <CopyIconButton value={copyValue} label={copyLabel} />
     </div>
@@ -89,7 +91,7 @@ export interface CodeBlockProps {
   code: string;
   /** The language label, such as "typescript" or "ts". Unknown languages show as plain text. A command defaults to "bash". */
   language?: string | null | undefined;
-  /** An optional title at the left of the header. Not shown on a command. */
+  /** An optional title, on a quiet line at the top of the block that ends with its tools. Not shown on a command. */
   title?: string | undefined;
   /** Lines highlighted on the server. Without them the block highlights itself in the browser. */
   lines?: SyntaxLine[] | null | undefined;
@@ -144,20 +146,26 @@ function EmbeddedCode({ code, language, title, lines, capHeight = false, wrap = 
   );
 }
 
-/** A code block: a title line when it has one, the code, and the tools over its top right. */
+/** A code block: the code with the tools over its top right, or a title row that ends with the tools, then the code. */
 function CodeFigure({ code, language, title, lines, capHeight = false, copyLabel = "Copy code", wrap = false, className }: CodeBlockProps) {
   const model = codeBlockModel(code, language);
   const highlighted = useHighlightedLines(model.display, model.language, lines);
   return (
     <figure data-code-block="" className={cn(surfaceClass, "group/code relative", className)}>
-      {title ? <figcaption className="truncate px-4 pt-3 text-xs font-medium text-muted-foreground">{title}</figcaption> : null}
-      <CodeTools label={model.label} copyValue={model.copyValue} copyLabel={copyLabel} />
+      {title ? (
+        <div className="flex min-w-0 items-center gap-2 pt-2 pr-2 pl-4">
+          <figcaption className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">{title}</figcaption>
+          <CodeTools label={model.label} copyValue={model.copyValue} copyLabel={copyLabel} inline />
+        </div>
+      ) : (
+        <CodeTools label={model.label} copyValue={model.copyValue} copyLabel={copyLabel} />
+      )}
       <CodeArea
         display={model.display}
         lines={highlighted}
         name={title ?? model.label}
         wrap={wrap}
-        className={cn("overflow-auto px-4", title ? "pt-1.5 pb-3.5" : "py-3.5", capHeight && "max-h-[32rem]")}
+        className={cn("overflow-auto px-4", title ? "pt-1 pb-3.5" : "py-3.5", capHeight && "max-h-[32rem]")}
       />
     </figure>
   );

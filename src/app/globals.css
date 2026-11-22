@@ -278,10 +278,11 @@
   --series-7: #008300;
   --series-8: #e34948;
   /*
-   * Code blocks (src/components/code). A surface one step above the page with
-   * a hairline edge, and a restrained syntax palette: pink keywords, green
-   * strings, purple functions and types, blue properties, amber numbers and
-   * constants, grey comments and punctuation.
+   * Code blocks (src/components/code). A quiet fill with no edge: the card a
+   * step toward the ink, as --muted (codeTint in src/lib/themes/derive.ts), so
+   * a block stands apart from the page and from a card. A restrained syntax
+   * palette: pink keywords, green strings, purple functions and types, blue
+   * properties, amber numbers and constants, grey comments and punctuation.
    */
   --code: oklch(0.964 0.0003 60);
   --code-foreground: oklch(0.24 0.006 60);

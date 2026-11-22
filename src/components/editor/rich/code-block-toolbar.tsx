@@ -57,7 +57,7 @@ export function CodeBlockToolbar({ language, code, editable, view, wrap, caption
   // "Copied" is spoken by the editor's live region, never by one inside the text (editor-live-region.tsx).
   const announce = useEditorAnnounce();
   return (
-    <div contentEditable={false} data-code-toolbar="" className={`${codeToolsClass} select-none`}>
+    <div contentEditable={false} data-code-tools="" className={`${codeToolsClass} select-none`}>
       <CodeLanguagePicker language={language} disabled={!editable} onChange={onLanguage} />
       {view ? <DiagramViewPicker view={view} disabled={!editable} onChange={onView} /> : null}
       <div className="flex items-center gap-0.5">
