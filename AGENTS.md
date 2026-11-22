@@ -196,6 +196,17 @@ lint. Nothing renders under the 13px floor.
   its `label` as its name.
 - Forms use `noValidate` and show errors in the page's own UI, never browser
   validation bubbles.
+- A code block, in the read view and the editor, is a quiet fill with no
+  edge (`--code`, the card the same step toward the ink as `--muted`, so it
+  stands apart from the page and a card) and no header. Its tools (the
+  language, Copy, and in the editor the pickers, Wrap code, and Caption)
+  sit over its top right in one class, `codeToolsClass`
+  (`src/components/code/code-tools.ts`): shown on hover, on focus, while a
+  picker is open, and always on touch screens. They fade by opacity only,
+  so they stay in the tab order, and take no presses while hidden: a spec
+  hovers the block before it presses one. On a touch screen the code, and
+  a Mermaid block's diagram, start below them. `e2e/code-block-tools.spec.ts`
+  checks it.
 - Copy is plain, short, and benefit-first, in sentences with verbs. The UI
   says "Team", never "Organization".
 - Interface blocks (`src/components/artifact-view/ui`) size themselves by the

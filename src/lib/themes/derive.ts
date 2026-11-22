@@ -22,8 +22,8 @@ const siteSyntax: Record<PaletteMode, Record<SyntaxRole, string>> = {
     string: "oklch(0.5 0.12 150)",
     function: "oklch(0.5 0.19 295)",
     property: "oklch(0.5 0.14 250)",
-    number: "oklch(0.56 0.14 60)",
-    comment: "oklch(0.555 0.008 65)",
+    number: "oklch(0.55 0.14 60)",
+    comment: "oklch(0.54 0.008 65)",
     punctuation: "oklch(0.52 0.008 65)",
     inserted: "oklch(0.5 0.12 150)",
     deleted: "oklch(0.55 0.18 27)",
@@ -34,7 +34,7 @@ const siteSyntax: Record<PaletteMode, Record<SyntaxRole, string>> = {
     function: "oklch(0.77 0.12 295)",
     property: "oklch(0.77 0.1 245)",
     number: "oklch(0.81 0.11 70)",
-    comment: "oklch(0.6 0.008 70)",
+    comment: "oklch(0.615 0.008 70)",
     punctuation: "oklch(0.66 0.008 70)",
     inserted: "oklch(0.78 0.12 150)",
     deleted: "oklch(0.72 0.14 25)",
@@ -102,8 +102,14 @@ function surfaceTokens(colors: ThemeColors): Record<string, string> {
   };
 }
 
+/**
+ * A code block's fill: the card a quiet step toward the ink, the same step as
+ * --muted, so a block stands apart from both the page and a card it sits on.
+ */
+const codeTint = quietTint.muted;
+
 function codeTokens(mode: PaletteMode, colors: ThemeColors): Record<string, string> {
-  const code = mixOklch(read(colors.card), read(colors.background), 0.25);
+  const code = mixOklch(read(colors.card), read(colors.foreground), codeTint);
   return {
     "--code": formatOklch(code),
     "--code-foreground": colors.foreground,

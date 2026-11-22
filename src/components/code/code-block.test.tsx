@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { CodeBlock } from "./code-block";
 
 describe("CodeBlock", () => {
-  it("should show the language in the header when a language is set", () => {
+  it("should show the language in the block's tools when a language is set", () => {
     const html = renderToStaticMarkup(<CodeBlock code="const x = 1;" language="typescript" />);
     expect(html).toContain(">typescript</span>");
   });
@@ -30,7 +30,7 @@ describe("CodeBlock", () => {
 });
 
 describe("CodeBlock with a title", () => {
-  it("should keep the title left and put the language beside the copy button when a title is set", () => {
+  it("should show the title above the tools and put the language beside the copy button when a title is set", () => {
     const code = "npx skills add https://github.com/caldoai/skills --skill untangle-codebase";
     const html = renderToStaticMarkup(<CodeBlock code={code} language="bash" title="Install the skill" />);
     const title = html.indexOf("Install the skill");

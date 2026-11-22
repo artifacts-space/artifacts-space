@@ -229,7 +229,7 @@ test.describe("in the editor", () => {
     await page.keyboard.press("Enter");
     await page.keyboard.type("```ts ");
     await page.keyboard.type("const answer = 42;");
-    await expect(editor(page).locator("[data-code-toolbar]")).toHaveCount(1);
+    await expect(editor(page).locator("[data-code-tools]")).toHaveCount(1);
     const image = editor(page).getByRole("img", { name: "Dusk over the hills" });
     const block = await image.elementHandle();
     await image.dblclick();

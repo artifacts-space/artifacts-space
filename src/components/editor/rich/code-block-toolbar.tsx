@@ -4,6 +4,7 @@ import { IconTextCaption, IconTextWrap } from "@tabler/icons-react";
 import { useRef, useState, type KeyboardEvent } from "react";
 
 import { CopyIconButton } from "@/components/copy-icon-button";
+import { codeToolsClass } from "@/components/code/code-tools";
 import { IconButton } from "@/components/icon-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { diagramViews, type DiagramView } from "@/lib/markdown/fence-info";
@@ -46,20 +47,20 @@ export interface CodeBlockToolbarProps {
 }
 
 /**
- * The bar along the top of a code block. On the left, the language picker,
- * and on a diagram the view picker beside it (Code, Preview, Split). On the
- * right, Copy, Wrap code, and Caption, shown while the block is hovered or
- * focused, and always on touch screens. Wrap code and Caption are for
- * editors only.
+ * The tools over a code block's top right, as in the read view
+ * (code-tools.ts): the language picker, on a diagram the view picker beside
+ * it (Code, Preview, Split), then Copy, Wrap code, and Caption. They show
+ * while the block is hovered or focused, while a picker is open, and always
+ * on touch screens. Wrap code and Caption are for editors only.
  */
 export function CodeBlockToolbar({ language, code, editable, view, wrap, captionShown, onLanguage, onView, onWrap, onCaption }: CodeBlockToolbarProps) {
   // "Copied" is spoken by the editor's live region, never by one inside the text (editor-live-region.tsx).
   const announce = useEditorAnnounce();
   return (
-    <div contentEditable={false} data-code-toolbar="" className="flex min-h-9 items-center gap-1 border-b border-code-border pr-1.5 pl-1.5 select-none">
+    <div contentEditable={false} data-code-tools="" className={`${codeToolsClass} select-none`}>
       <CodeLanguagePicker language={language} disabled={!editable} onChange={onLanguage} />
       {view ? <DiagramViewPicker view={view} disabled={!editable} onChange={onView} /> : null}
-      <div className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover/code:opacity-100 group-focus-within/code:opacity-100 pointer-coarse:opacity-100">
+      <div className="flex items-center gap-0.5">
         <CopyIconButton value={code} label="Copy code" announce={announce} />
         {editable ? (
           <IconButton label="Wrap code" pressed={wrap} onClick={() => { onWrap(!wrap); }} className={wrap ? "text-foreground" : undefined}>
