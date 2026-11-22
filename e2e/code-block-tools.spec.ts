@@ -166,11 +166,13 @@ test.describe("on a touch screen", () => {
     await block.getByRole("combobox", { name: "Diagram view" }).click();
     await page.getByRole("option", { name: "Split", exact: true }).click();
     const pane = block.locator("[data-diagram-pane]");
-    const source = await block.locator("pre").boundingBox();
+    // The source side is the pre beside the diagram side, not any pre the diagram side may hold.
+    const source = await pane.locator("xpath=preceding-sibling::pre").boundingBox();
     const side = await pane.boundingBox();
     if (!source || !side) throw new Error("the source or the diagram side has no box");
-    expect(side.x).toBeGreaterThan(source.x);
-    expect(side.y).toBe(source.y);
+    // The sides sit in one row, the diagram on the right.
+    expect(side.x).toBeGreaterThanOrEqual(source.x + source.width - 1);
+    expect(Math.abs(side.y - source.y)).toBeLessThanOrEqual(1);
 
     const tools = await block.locator("[data-code-tools]").boundingBox();
     const drawing = await pane.locator("svg").first().boundingBox();
