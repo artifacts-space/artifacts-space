@@ -201,6 +201,7 @@ describe("the Default preset", () => {
     }
     for (const mode of ["light", "dark"] as const) {
       expect(paletteTokens(mode, preset.theme[mode])["--code-inline"], `${mode} --code-inline`).toBe(siteColor(mode, "--code-inline"));
+      expect(paletteTokens(mode, preset.theme[mode])["--code"], `${mode} --code`).toBe(siteColor(mode, "--code"));
     }
     expect(preset.theme.fonts).toEqual({ body: "geist-sans", heading: "geist-sans", mono: "geist-mono" });
     expect(preset.theme.radius).toBe("md");

@@ -7,6 +7,7 @@ import type { SyntaxKind, SyntaxLine } from "@/lib/syntax/tokens";
 import { cn } from "@/lib/utils";
 
 import { codeBlockModel } from "./code-block-model";
+import { codeToolsClass } from "./code-tools";
 import { scrollStopProps, scrollStopRing } from "./scroll-stop";
 import { useHighlightedLines } from "./use-highlighted-lines";
 import { useScrollable } from "./use-scrollable";
@@ -23,7 +24,8 @@ const kindClass: Record<SyntaxKind, string> = {
   deleted: "text-syntax-deleted",
 };
 
-const surfaceClass = "min-w-0 overflow-hidden rounded-lg border border-code-border bg-code text-code-foreground";
+/** A quiet fill a step from the page and the card (--code), with no edge, as a well. */
+const surfaceClass = "min-w-0 overflow-hidden rounded-lg bg-code text-code-foreground";
 
 function HighlightedCode({ lines }: { lines: readonly SyntaxLine[] }) {
   return lines.map((line, index) => (
@@ -36,19 +38,15 @@ function HighlightedCode({ lines }: { lines: readonly SyntaxLine[] }) {
 }
 
 /**
- * The header bar. Without a title the language sits left; with one, the title
- * sits left and the language moves right, beside the copy button. Copy takes
- * only the code, never the title.
+ * The language and the copy button, over the code's top right, shown on
+ * hover and focus (code-tools.ts). Copy takes only the code, never the title.
  */
-function CodeHeader({ title, label, copyValue, copyLabel }: { title: string | undefined; label: string; copyValue: string; copyLabel: string }) {
+function CodeTools({ label, copyValue, copyLabel }: { label: string; copyValue: string; copyLabel: string }) {
   return (
-    <figcaption className="flex h-9 items-center gap-2 border-b border-code-border pr-1.5 pl-4 text-xs text-muted-foreground">
-      {title ? <span className="min-w-0 truncate font-medium text-foreground">{title}</span> : <span className="min-w-0 truncate font-mono">{label}</span>}
-      <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
-        {title ? <span className="truncate font-mono">{label}</span> : null}
-        <CopyIconButton value={copyValue} label={copyLabel} />
-      </span>
-    </figcaption>
+    <div data-code-tools="" className={codeToolsClass}>
+      <span className="truncate px-1.5 font-mono text-xs text-muted-foreground">{label}</span>
+      <CopyIconButton value={copyValue} label={copyLabel} />
+    </div>
   );
 }
 
@@ -146,19 +144,20 @@ function EmbeddedCode({ code, language, title, lines, capHeight = false, wrap = 
   );
 }
 
-/** A code block with a header: the title or language, and the copy button. */
+/** A code block: a title line when it has one, the code, and the tools over its top right. */
 function CodeFigure({ code, language, title, lines, capHeight = false, copyLabel = "Copy code", wrap = false, className }: CodeBlockProps) {
   const model = codeBlockModel(code, language);
   const highlighted = useHighlightedLines(model.display, model.language, lines);
   return (
-    <figure data-code-block="" className={cn(surfaceClass, className)}>
-      <CodeHeader title={title} label={model.label} copyValue={model.copyValue} copyLabel={copyLabel} />
+    <figure data-code-block="" className={cn(surfaceClass, "group/code relative", className)}>
+      {title ? <figcaption className="truncate px-4 pt-3 text-xs font-medium text-muted-foreground">{title}</figcaption> : null}
+      <CodeTools label={model.label} copyValue={model.copyValue} copyLabel={copyLabel} />
       <CodeArea
         display={model.display}
         lines={highlighted}
         name={title ?? model.label}
         wrap={wrap}
-        className={cn("overflow-auto px-4 py-3.5", capHeight && "max-h-[32rem]")}
+        className={cn("overflow-auto px-4", title ? "pt-1.5 pb-3.5" : "py-3.5", capHeight && "max-h-[32rem]")}
       />
     </figure>
   );
@@ -167,8 +166,9 @@ function CodeFigure({ code, language, title, lines, capHeight = false, copyLabel
 /**
  * The one code block for every surface: code and JSON artifacts, fenced code
  * in Markdown and comments, the ui Code and Steps components, the docs, and
- * the setup screens. A raised surface with a hairline edge, a header with the
- * language and a copy button, and colors from the `--syntax-*` tokens. The
+ * the setup screens. A quiet fill with no edge, the language and a copy
+ * button over its top right on hover and focus, and colors from the
+ * `--syntax-*` tokens. The
  * "command" variant is the same surface on one compact row; "embedded" is the
  * highlighted code alone, for a frame with its own caption.
  */

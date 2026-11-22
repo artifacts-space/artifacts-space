@@ -283,7 +283,7 @@
    * strings, purple functions and types, blue properties, amber numbers and
    * constants, grey comments and punctuation.
    */
-  --code: oklch(0.995 0.0015 85);
+  --code: oklch(0.964 0.0003 60);
   --code-foreground: oklch(0.24 0.006 60);
   --code-border: oklch(0.2 0.006 60 / 9%);
   /* Inline code in running text: the card mixed 7% toward the ink, so it reads as code on the page and on cards. */
@@ -293,8 +293,8 @@
   --syntax-string: oklch(0.5 0.12 150);
   --syntax-function: oklch(0.5 0.19 295);
   --syntax-property: oklch(0.5 0.14 250);
-  --syntax-number: oklch(0.56 0.14 60);
-  --syntax-comment: oklch(0.555 0.008 65);
+  --syntax-number: oklch(0.55 0.14 60);
+  --syntax-comment: oklch(0.54 0.008 65);
   --syntax-punctuation: oklch(0.52 0.008 65);
   --syntax-inserted: oklch(0.5 0.12 150);
   --syntax-deleted: oklch(0.55 0.18 27);
@@ -483,7 +483,7 @@
   --series-6: #9085e9;
   --series-7: #0d880b;
   --series-8: #e66767;
-  --code: oklch(0.19 0.004 60);
+  --code: oklch(0.2233 0.004 60.9);
   --code-foreground: oklch(0.9 0.004 80);
   --code-border: oklch(1 0 0 / 8%);
   --code-inline: oklch(0.2418 0.004 61.4);
@@ -493,7 +493,7 @@
   --syntax-function: oklch(0.77 0.12 295);
   --syntax-property: oklch(0.77 0.1 245);
   --syntax-number: oklch(0.81 0.11 70);
-  --syntax-comment: oklch(0.6 0.008 70);
+  --syntax-comment: oklch(0.615 0.008 70);
   --syntax-punctuation: oklch(0.66 0.008 70);
   --syntax-inserted: oklch(0.78 0.12 150);
   --syntax-deleted: oklch(0.72 0.14 25);
@@ -1025,13 +1025,21 @@
   .rich-editor-content .rich-code-block {
     margin-top: 0.9em;
   }
-  /* Same surface as the read-side code block (the --code tokens): a toolbar, then the code; plain text while editing. */
+  /*
+   * Same surface as the read-side code block (the --code fill, no edge): the
+   * code, with its tools over the top right (code-tools.ts); plain text while
+   * editing. A diagram keeps a hairline edge, since its drawing sits on the
+   * card and needs the frame to read as one block.
+   */
   .rich-editor-content .rich-code-frame {
+    position: relative;
     overflow: hidden;
-    border: 1px solid var(--code-border);
     border-radius: var(--radius-lg);
     background: var(--code);
     color: var(--code-foreground);
+  }
+  .rich-editor-content [data-mermaid-block] .rich-code-frame {
+    border: 1px solid var(--code-border);
   }
   .rich-editor-content .rich-code-block pre {
     margin-top: 0;
