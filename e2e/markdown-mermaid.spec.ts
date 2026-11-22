@@ -291,6 +291,24 @@ test("should turn a diagram back into a code block when Plain text is picked", a
   await expect(savedMarkdown(page)).toContainText("Intro paragraph.\n\n```\nflowchart LR\n  Plan --> Build\n```\n\nEnd paragraph.");
 });
 
+test("should draw an editor code block in the read view's code font, size, and line height, smaller than the text", async ({ page }) => {
+  await openFixture(page);
+  const block = await editorBlock(page);
+  await block.getByRole("combobox", { name: "Code language" }).click();
+  await page.getByRole("option", { name: "Plain text" }).click();
+
+  const fontOf = (target: Locator) => target.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { family: style.fontFamily, size: style.fontSize, lineHeight: style.lineHeight };
+  });
+  const editorCode = await fontOf(editor(page).locator("pre").filter({ hasText: "Plan --> Build" }));
+  const readCode = await fontOf(readView(page).locator("[data-code-block] pre").filter({ hasText: "const answer" }));
+  const paragraph = await fontOf(editor(page).getByText("Intro paragraph."));
+
+  expect(editorCode).toEqual(readCode);
+  expect(Number.parseFloat(editorCode.size)).toBeLessThan(Number.parseFloat(paragraph.size));
+});
+
 test("should insert an empty diagram with its source open when Mermaid diagram is picked from the slash menu", async ({ page }) => {
   await openFixture(page);
   await editorBlock(page);
