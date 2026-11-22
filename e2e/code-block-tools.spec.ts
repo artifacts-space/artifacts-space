@@ -7,7 +7,7 @@ import { expect, test } from "./support/test";
  * it, and its tools (the language, Copy, and in the editor the pickers, Wrap
  * code, and Caption) sit over its top right, hidden at rest and shown on
  * hover, on keyboard focus, while a picker is open, and always on a touch
- * screen (src/components/code/code-tools.ts).
+ * screen, taking no presses while hidden (src/components/code/code-tools.ts).
  */
 
 const readView = (page: Page) => page.getByRole("region", { name: "Read view" });
@@ -27,10 +27,20 @@ async function openFixture(page: Page) {
   }
 }
 
+/** The editor's Mermaid block, in Preview (the default), once its diagram is drawn. */
+async function editorDiagramBlock(page: Page) {
+  const block = editor(page).locator("[data-mermaid-block]");
+  await block.scrollIntoViewIfNeeded();
+  await expect(block).toHaveAttribute("data-diagram-state", "drawn", { timeout: 60_000 });
+  return block;
+}
+
 /** Turns the editor's diagram into a plain code block and returns it. */
 async function editorCodeBlock(page: Page) {
   const diagram = editor(page).locator("[data-mermaid-block]");
   await diagram.scrollIntoViewIfNeeded();
+  // The tools take presses only while they show, as a person's pointer over the block makes them.
+  await diagram.hover();
   await diagram.getByRole("combobox", { name: "Code language" }).click();
   await page.getByRole("option", { name: "Plain text" }).click();
   const block = editor(page).locator(".rich-code-block").filter({ hasText: "Plan --> Build" });
@@ -43,9 +53,12 @@ test("should fill a code block with a color other than the page's when it is dra
   const block = readBlock(page);
   const pageFill = await backgroundOf(page.locator("body"));
   expect(await backgroundOf(block)).not.toBe(pageFill);
+  // The tools are a chip off what is under them, the code's fill or a diagram's card, so they and their buttons' hover fill (--muted, the code fill's own step) show on both.
+  const diagram = await editorDiagramBlock(page);
+  const toolsFill = await backgroundOf(block.locator("[data-code-tools]"));
+  expect(toolsFill).not.toBe(await backgroundOf(block));
+  expect(await backgroundOf(diagram.locator("[data-code-tools]"))).not.toBe(await backgroundOf(diagram.locator("[data-diagram-pane]")));
   expect(await backgroundOf((await editorCodeBlock(page)).locator(".rich-code-frame"))).toBe(await backgroundOf(block));
-  // The tools are a chip off the fill, so their buttons' hover fill (--muted, the fill's own step) still shows on them.
-  expect(await backgroundOf(block.locator("[data-code-tools]"))).not.toBe(await backgroundOf(block));
 });
 
 test.describe("with a mouse", () => {
@@ -66,6 +79,22 @@ test.describe("with a mouse", () => {
     await expect.poll(() => opacityOf(tools)).toBe("0");
     await block.getByRole("button", { name: "Copy code" }).focus();
     await expect.poll(() => opacityOf(tools)).toBe("1");
+  });
+
+  test("should let a press reach the code under a block's tools while they are hidden", async ({ page }) => {
+    await openFixture(page);
+    const block = readBlock(page);
+    const tools = block.locator("[data-code-tools]");
+    await block.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    await expect.poll(() => opacityOf(tools)).toBe("0");
+    const bar = await tools.boundingBox();
+    if (!bar) throw new Error("the tools have no box");
+    const hitsTools = () => page.evaluate(({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest("[data-code-tools]")), { x: bar.x + bar.width / 2, y: bar.y + bar.height / 2 });
+    expect(await hitsTools()).toBe(false);
+
+    await block.hover();
+    await expect.poll(hitsTools).toBe(true);
   });
 
   test("should keep the editor's tools showing while the language menu is open, after the pointer leaves", async ({ page }) => {
@@ -118,5 +147,14 @@ test.describe("on a touch screen", () => {
       if (!tools || !first) throw new Error("the tools or the code have no box");
       expect(first.y).toBeGreaterThanOrEqual(tools.y + tools.height);
     }
+  });
+
+  test("should start a diagram below the tools when they always show, so none of it is covered", async ({ page }) => {
+    await openFixture(page);
+    const block = await editorDiagramBlock(page);
+    const tools = await block.locator("[data-code-tools]").boundingBox();
+    const drawing = await block.locator("[data-diagram-pane] svg").first().boundingBox();
+    if (!tools || !drawing) throw new Error("the tools or the drawing have no box");
+    expect(drawing.y).toBeGreaterThanOrEqual(tools.y + tools.height);
   });
 });

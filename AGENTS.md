@@ -203,7 +203,10 @@ lint. Nothing renders under the 13px floor.
   sit over its top right in one class, `codeToolsClass`
   (`src/components/code/code-tools.ts`): shown on hover, on focus, while a
   picker is open, and always on touch screens. They fade by opacity only,
-  so they stay in the tab order. `e2e/code-block-tools.spec.ts` checks it.
+  so they stay in the tab order, and take no presses while hidden: a spec
+  hovers the block before it presses one. On a touch screen the code, and
+  a Mermaid block's diagram, start below them. `e2e/code-block-tools.spec.ts`
+  checks it.
 - Copy is plain, short, and benefit-first, in sentences with verbs. The UI
   says "Team", never "Organization".
 - Interface blocks (`src/components/artifact-view/ui`) size themselves by the

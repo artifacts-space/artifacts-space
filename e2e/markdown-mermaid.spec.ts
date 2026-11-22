@@ -86,8 +86,9 @@ test("should redraw the diagram in dark colors when the reader switches to dark 
   await expect(readDiagrams(page).first()).toHaveAttribute("data-diagram-state", "drawn");
 });
 
-/** Picks a view from a diagram block's view picker. */
+/** Picks a view from a diagram block's view picker, hovering the block first: its tools take presses only while they show (code-tools.ts). */
 async function pickView(page: Page, block: Locator, view: "Code" | "Preview" | "Split") {
+  await block.hover();
   await block.getByRole("combobox", { name: "Diagram view" }).click();
   await page.getByRole("option", { name: view, exact: true }).click();
 }
@@ -247,6 +248,7 @@ test("should save the view in the fence and redraw as the source changes when Sp
 test("should save a caption and wrapping in the fence when an editor adds them", async ({ page }) => {
   await openFixture(page);
   const block = await editorBlock(page);
+  await block.hover();
   await block.getByRole("button", { name: "Caption" }).click();
   const caption = block.getByRole("textbox", { name: "Caption" });
   await expect(caption).toBeFocused();
@@ -255,6 +257,7 @@ test("should save a caption and wrapping in the fence when an editor adds them",
   await expect(savedMarkdown(page)).toContainText('```mermaid {caption="The \\"build\\" path"}\nflowchart LR');
   await expect(block.getByRole("button", { name: "Caption" })).toHaveCount(0);
 
+  await block.hover();
   await block.getByRole("button", { name: "Wrap code" }).click();
   await expect(block.getByRole("button", { name: "Wrap code" })).toHaveAttribute("aria-pressed", "true");
   await expect(savedMarkdown(page)).toContainText('```mermaid {caption="The \\"build\\" path" wrap=true}\n');
@@ -283,6 +286,7 @@ test("should keep the source showing with the note when an edit breaks a diagram
 test("should turn a diagram back into a code block when Plain text is picked", async ({ page }) => {
   await openFixture(page);
   const block = await editorBlock(page);
+  await block.hover();
   await block.getByRole("combobox", { name: "Code language" }).click();
   await page.getByRole("option", { name: "Plain text" }).click();
 
@@ -294,6 +298,7 @@ test("should turn a diagram back into a code block when Plain text is picked", a
 test("should draw an editor code block in the read view's code font, size, and line height, smaller than the text", async ({ page }) => {
   await openFixture(page);
   const block = await editorBlock(page);
+  await block.hover();
   await block.getByRole("combobox", { name: "Code language" }).click();
   await page.getByRole("option", { name: "Plain text" }).click();
 

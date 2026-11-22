@@ -21,6 +21,8 @@ test("should copy the code without its title when a titled block's copy button i
   await page.goto("/docs/quickstart");
 
   const block = page.locator("figure[data-code-block]").filter({ hasText: "tools/call" });
+  // The tools take presses once the block is hovered (src/components/code/code-tools.ts).
+  await block.hover();
   await block.getByRole("button", { name: "Copy code" }).click();
 
   const copied = await page.evaluate(() => navigator.clipboard.readText());

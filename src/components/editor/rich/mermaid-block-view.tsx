@@ -98,11 +98,16 @@ export function blockLayout(view: DiagramView, sourceNeeded: boolean): Layout {
   return "diagram";
 }
 
-/** Classes for the two sides by layout: the hidden side stays in the tree, so the editable source never remounts. */
+/**
+ * Classes for the two sides by layout: the hidden side stays in the tree, so
+ * the editable source never remounts. Where the diagram side is under the
+ * tools (alone, or on the right of a wide split), it starts below them on a
+ * touch screen, where they always show (code-tools.ts).
+ */
 const sideClasses: Record<Layout, { grid: string; source: string; diagram: string }> = {
   code: { grid: "", source: "", diagram: "hidden" },
-  diagram: { grid: "", source: "hidden", diagram: "" },
-  both: { grid: "@xl:grid-cols-2", source: "", diagram: "border-t border-code-border @xl:border-t-0 @xl:border-l" },
+  diagram: { grid: "", source: "hidden", diagram: "pointer-coarse:pt-11" },
+  both: { grid: "@xl:grid-cols-2", source: "", diagram: "border-t border-code-border @xl:border-t-0 @xl:border-l @xl:pointer-coarse:pt-11" },
 };
 
 /** The diagram side of the block: a hint when empty, the short note when it fails, else the drawing (larger with a click). */
@@ -184,6 +189,7 @@ export function MermaidBlockView({ node, updateAttributes, editor, getPos }: Rea
             <div
               ref={scopeRef}
               contentEditable={false}
+              data-diagram-pane=""
               className={cn("min-w-0 bg-card select-none", sides.diagram)}
             >
               <DiagramPane code={preview} state={state} editable={editable} sourceShown={layout === "both"} />
