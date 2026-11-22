@@ -157,4 +157,24 @@ test.describe("on a touch screen", () => {
     if (!tools || !drawing) throw new Error("the tools or the drawing have no box");
     expect(drawing.y).toBeGreaterThanOrEqual(tools.y + tools.height);
   });
+
+  test("should start a wide Split's diagram below the tools when they always show, so none of it is covered", async ({ page }) => {
+    // A wide window gives the block room to set its two sides side by side, with the diagram on the right, under the tools.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openFixture(page);
+    const block = await editorDiagramBlock(page);
+    await block.getByRole("combobox", { name: "Diagram view" }).click();
+    await page.getByRole("option", { name: "Split", exact: true }).click();
+    const pane = block.locator("[data-diagram-pane]");
+    const source = await block.locator("pre").boundingBox();
+    const side = await pane.boundingBox();
+    if (!source || !side) throw new Error("the source or the diagram side has no box");
+    expect(side.x).toBeGreaterThan(source.x);
+    expect(side.y).toBe(source.y);
+
+    const tools = await block.locator("[data-code-tools]").boundingBox();
+    const drawing = await pane.locator("svg").first().boundingBox();
+    if (!tools || !drawing) throw new Error("the tools or the drawing have no box");
+    expect(drawing.y).toBeGreaterThanOrEqual(tools.y + tools.height);
+  });
 });
