@@ -51,8 +51,8 @@ describe("decideBuild", () => {
 });
 
 describe("isUnreadByApp", () => {
-  it("should count root docs, .github, and README images as unread", () => {
-    for (const path of ["README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md", ".github/dependabot.yml", ".github/CODEOWNERS", "docs/images/hero.webp"]) {
+  it("should count root docs, .github, README images, and the agent guides as unread", () => {
+    for (const path of ["README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md", ".github/dependabot.yml", ".github/CODEOWNERS", "docs/images/hero.webp", "docs/agents/page-files.md"]) {
       expect(isUnreadByApp(path)).toBe(true);
     }
   });
