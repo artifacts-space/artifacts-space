@@ -45,3 +45,6 @@ next-env.d.ts
 
 # routing eval reports (pnpm eval:routing)
 /scripts/evals/results/
+
+# agent tooling: local settings and worktrees (whole copies of the repo)
+/.claude/
