@@ -16,7 +16,7 @@ import { UserFacingError } from "@/lib/user-facing-error";
 import { getVersionOf } from "@/lib/versions/history";
 
 import { ARTIFACT_REF_WORDS, artifactRefField } from "./artifact-ref-field";
-import { toMcpArtifact } from "./artifact-view";
+import { toMcpWrittenArtifact } from "./artifact-view";
 import { baseVersionOf } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
 import { gateTools, type ToolServer } from "./tool-access";
@@ -45,12 +45,12 @@ export async function respond(run: () => Promise<unknown>) {
   }
 }
 
-/** The artifact after a file change, with the baseVersion for the agent's next update. */
+/** The artifact after a file change, with the baseVersion for the agent's next update. A file change never changes the text, so the result leaves the content out. */
 export async function artifactResult(userId: string, record: ArtifactRecord) {
   const [[dto], teams, base] = await Promise.all([toArtifactDtos([record], userId), listTeamsForUser(userId), baseVersionOf(record.id, record.updatedAt.toISOString())]);
   if (!dto) throw new UserFacingError("Artifact not found.");
   const view = await withActorsAfterSave(baseViewContext(userId, teams), [dto]);
-  return { ...toMcpArtifact(dto, view, { canEdit: true }), ...base };
+  return { ...toMcpWrittenArtifact(dto, view, { sent: undefined, returnContent: false }), ...base };
 }
 
 /**

@@ -20,7 +20,7 @@ const actorShape = `{ "handle": "ada" | null, "kind": "person" | "agent", "name"
 const artifactShape = `{
   "id": "Vq3kJ0pXw2mZ8rT5yN1aBc",   // 22-character public id
   "url": "https://artifacts.space/artifact/Vq3kJ0pXw2mZ8rT5yN1aBc",
-  "title": "…", "icon": "🚀" | "tabler:rocket" | "file:<file id>" | null, "summary": "…", "content": "…",
+  "title": "…", "icon": "🚀" | "tabler:rocket" | "file:<file id>" | null, "summary": "…", "content": "…",   // artifacts_get; writes only with returnContent
   "theme": "paper" | { "version": 1, "light": { … }, "dark": { … }, … } | null,
   "cover": "mist" | "file:<file id>" | null, "coverPosition": 40 | null,   // position for image covers only
   "fullWidth": false, "sheetFormat"?: { "banding": "muted" | null, "align": { "amount": "right" } },   // a CSV with formatting only
@@ -96,11 +96,11 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     shape: `[ { "tag": "needs-review", "count": 4 } ]`,
   },
   artifacts_create: {
-    summary: "The saved artifact and, when you set `visibility` or `comments`, what happened to each request. The artifact is saved even if sharing or the comments change fails. When a Markdown artifact's text names @handles, `mentions` says who hears of it now, who once the artifact is shared with them, and who never will, with why.",
+    summary: "The saved artifact without its `content` (you just sent it; pass `returnContent: true` to get it back), with its `baseVersion` for your next update, and, when you set `visibility` or `comments`, what happened to each request. `contentAdjusted` appears only when the save stored other text than you sent (Markdown links to this site's files made relative, or file ids in ui or canvas JSON written plainly): read it with artifacts_get before you edit the text. Until 24 Nov 2026 the artifact carried its content. The artifact is saved even if sharing or the comments change fails. When a Markdown artifact's text names @handles, `mentions` says who hears of it now, who once the artifact is shared with them, and who never will, with why.",
     shape: `{ "artifact": { … }, ${sharingShape},\n  ${documentMentionsShape} }`,
   },
   artifacts_update: {
-    summary: "The artifact after the save, with its new `baseVersion` for your next update. `edit` is \"pending\" when the change waits for approval (link or public artifacts shared through a team); readers outside the team keep the last approved version. `edit` is \"unchanged\" when you sent no content or fields (only `project`, tags, sharing, or comments): nothing was saved to the history, and the result has no `baseVersion`, so keep the one you have. A refused save is a tool error (`isError`) whose `structuredContent.error.code` is \"artifact_changed\" (someone saved since your `baseVersion`), \"base_version_required\" (no `baseVersion`, and a person saved it last), or \"artifact_being_edited\" (no `baseVersion`, and a person is typing in it): nothing was saved, so read it with artifacts_get, merge, and save with its `baseVersion`. When you changed the text or `visibility` of a Markdown artifact whose text names @handles, `mentions` says who hears of it.",
+    summary: "The artifact after the save, without its `content` unless you pass `returnContent: true` (`contentAdjusted` appears when the save stored other text than you sent), with its new `baseVersion` for your next update. `edit` is \"pending\" when the change waits for approval (link or public artifacts shared through a team); readers outside the team keep the last approved version. `edit` is \"unchanged\" when you sent no content or fields (only `project`, tags, sharing, or comments): nothing was saved to the history, and the result has no `baseVersion`, so keep the one you have. A refused save is a tool error (`isError`) whose `structuredContent.error.code` is \"artifact_changed\" (someone saved since your `baseVersion`), \"base_version_required\" (no `baseVersion`, and a person saved it last), or \"artifact_being_edited\" (no `baseVersion`, and a person is typing in it): nothing was saved, so read it with artifacts_get, merge, and save with its `baseVersion`. When you changed the text or `visibility` of a Markdown artifact whose text names @handles, `mentions` says who hears of it.",
     shape: `{ "artifact": { …, "versionId": "…", "baseVersion": "…" }, "edit": "applied" | "pending" | "unchanged", ${sharingShape},
   ${documentMentionsShape} }
 // "unchanged": the artifact has no versionId or baseVersion.
@@ -215,9 +215,9 @@ export const mcpToolResults: Record<McpToolName, ToolResultDoc> = {
     summary: "The checked, ready file. A file whose size, type, or content does not match its request is deleted instead.",
     shape: `{ "file": { … }, "next": "Use the id in files_create_artifact, files_attach, files_replace, or an Image or File element of a ui artifact." }`,
   },
-  files_create_artifact: { summary: "The new private file artifact, with its files and the `baseVersion` of this save." },
-  files_attach: { summary: "The artifact as the attach saved it, with its files and the `baseVersion` of this save." },
-  files_replace: { summary: "The artifact as the replace saved it, with its files and the `baseVersion` of this save. The replaced file keeps its id; `replacedAt` says when." },
+  files_create_artifact: { summary: "The new private file artifact, with its files and the `baseVersion` of this save. It has no `content`: the notes are what you sent." },
+  files_attach: { summary: "The artifact as the attach saved it, with its files and the `baseVersion` of this save. It has no `content`: an attach never changes the text (artifacts_get reads it)." },
+  files_replace: { summary: "The artifact as the replace saved it, with its files and the `baseVersion` of this save. The replaced file keeps its id; `replacedAt` says when. It has no `content`: a replace never changes the text (artifacts_get reads it)." },
   files_get_download_url: {
     summary: "A short-lived signed URL for the file.",
     shape: `{ "id", "filename", "contentType", "size", "url": "…", "expiresAt": "…" }`,
