@@ -240,21 +240,20 @@ export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, reader:
 
 /** Why a save can store text other than what an agent sent (`contentForSave`). */
 export const CONTENT_ADJUSTED_NOTE =
-  "The saved content differs from what you sent: Markdown keeps links to this site's files in their relative form, and ui and canvas JSON that spelled a file id with escapes is saved with the id written plainly. Read it with artifacts_get before you edit the text.";
+  "The saved content differs from what you sent: Markdown keeps links to this site's files in their relative form, and ui and canvas JSON that spelled a file id with escapes is saved re-serialized (parsed and written again, so its spacing can change too). Read it with artifacts_get before you edit the text.";
 
 /**
  * Maps a write's saved DTO to the agent-facing shape. The content is left
  * out unless the agent asked for it (`returnContent`): it just sent that
  * text, and a large page would fill its context for nothing. When the save
  * stored other text than `sent` (see CONTENT_ADJUSTED_NOTE), the result
- * says so. `sent` is undefined when the write sent no content.
+ * says so, with or without the content. `sent` is undefined when the write
+ * sent no content.
  */
 export function toMcpWrittenArtifact(dto: ArtifactDto, context: McpViewContext, options: { sent: string | undefined; returnContent: boolean }): McpArtifact {
-  const shown = toMcpArtifact(dto, context, { canEdit: true });
-  if (options.returnContent) return shown;
-  const { content, ...rest } = shown;
-  const adjusted = options.sent !== undefined && content !== options.sent;
-  return adjusted ? { ...rest, contentAdjusted: CONTENT_ADJUSTED_NOTE } : rest;
+  const { content, ...rest } = toMcpArtifact(dto, context, { canEdit: true });
+  const adjusted = options.sent !== undefined && content !== options.sent ? { contentAdjusted: CONTENT_ADJUSTED_NOTE } : {};
+  return options.returnContent && content !== undefined ? { ...rest, content, ...adjusted } : { ...rest, ...adjusted };
 }
 
 /** Maps a list item to the compact agent-facing shape: a preview, never the content, and each file without its dates. */

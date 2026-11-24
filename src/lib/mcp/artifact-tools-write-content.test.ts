@@ -92,6 +92,13 @@ describe("artifacts_create result", () => {
     expect(artifact).not.toHaveProperty("content");
     expect(String(artifact.contentAdjusted)).toContain("artifacts_get");
   });
+
+  it("should give the content and say it was adjusted when returnContent is true and the save stored other text", async () => {
+    data.createArtifact.mockResolvedValue(dto("[spec](/api/files/abc)"));
+    const artifact = await artifactFrom("artifacts_create", { title: "Launch", content: "[spec](https://artifacts.space/api/files/abc)", returnContent: true });
+    expect(artifact.content).toBe("[spec](/api/files/abc)");
+    expect(String(artifact.contentAdjusted)).toContain("artifacts_get");
+  });
 });
 
 describe("artifacts_update result", () => {
