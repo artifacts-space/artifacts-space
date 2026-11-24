@@ -11,6 +11,7 @@ import { registerCanvasTools } from "./canvas-tools";
 import { registerFileTools } from "./file-tools";
 import { registerFormatTools } from "./format-tools";
 import { registerPageFileTools } from "./page-file-tools";
+import { registerPageImageTool } from "./page-image-tool";
 import { registerProjectTools } from "./project-tools";
 import { registerTagTools } from "./tag-tools";
 import { registerTeamTools } from "./team-tools";
@@ -25,6 +26,7 @@ const readOnlyTools = [
   "artifacts_formats_guide",
   "artifacts_get",
   "artifacts_list",
+  "artifacts_page_image",
   "artifacts_validate",
   "artifacts_versions",
   "artifacts_views",
@@ -56,6 +58,7 @@ async function connect(access: McpAccess) {
   registerThemeTools(server, "agent-1", access);
   registerFileTools(server, "user-1", access);
   registerPageFileTools(server, "user-1", access);
+  registerPageImageTool(server, "user-1", access);
   registerTeamTools(server, "user-1", access);
   registerVersionTools(server, "user-1", access);
   registerViewTools(server, "user-1", access);

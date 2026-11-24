@@ -371,6 +371,11 @@ page host and page files are in their own guides (see Topic guides).
   than that, so someone who loses access can still load the page's files
   from an address they already hold until it ends. The token names no
   viewer; never log one.
+  A third one: the hosted browser that draws a page for
+  `artifacts_page_image` opens the site's render page under a render token
+  the MCP tool makes after the edit check. It works for two minutes and
+  for one save, and the render page runs the edit check again as the
+  person who asked (see `docs/agents/page-host.md`, Pictures of pages).
 - An artifact page a visitor cannot read (`unreadableArtifact` in
   `src/proxy.ts`): signed out, it redirects to sign-in with the artifact as
   the return address (the owner, 2026-11-19: someone who was sent a link
@@ -586,7 +591,7 @@ keep a new rule for an area in its guide, not here. A "see <section>" in
 any guide names a section of this file or of one listed here.
 
 - [auth-and-abuse.md](docs/agents/auth-and-abuse.md): before you change sign-in (GitHub, Google, password, emailed links), sessions, the OAuth endpoints and their limits, the bot check, the feedback webhook, domain verification, or search engine listing. Covers: GitHub and Google sign-in; Password sign-in; OAuth endpoint limits; Web sessions; Feedback to Slack; OpenAI domain verification; Search engine listing; Undeliverable addresses; Bot check on sign-in links.
-- [page-host.md](docs/agents/page-host.md): before you change anything that runs or serves an `html` artifact's page. Covers: Page host.
+- [page-host.md](docs/agents/page-host.md): before you change anything that runs or serves an `html` artifact's page. Covers: Page host; Pictures of pages.
 - [page-files.md](docs/agents/page-files.md): before you change an `html` artifact's own files, their tokens, renewal, uploads, or sites of several pages. Covers: Page files.
 - [page-layout-and-themes.md](docs/agents/page-layout-and-themes.md): before you change the artifact page's layout, the /app pane, themes, team presets, or covers. Covers: Page column; Themes; Covers.
 - [documents-and-media.md](docs/agents/documents-and-media.md): before you change uploads, images, or files in a Markdown artifact, the image viewer, attached files, or Replace. Covers: Media in documents; Images in a document; Files in a document; Replaced files.

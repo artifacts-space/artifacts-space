@@ -86,6 +86,7 @@ export function buildHtmlGuide(): string {
     "Saving",
     '- artifacts_create with kind "html" and the document as content. To change it, send the whole new document with artifacts_update and the baseVersion you read.',
     '- artifacts_validate with kind "html" checks that the document starts as a page. It does not run it: read your scripts for errors before you save.',
+    '- After you save, artifacts_page_image shows the page running, as a picture: check the layout and that it starts, fix what is wrong, and look again. Pass width 390 and height 844 to see it on a phone.',
     "",
     "Example",
     "<!doctype html>",

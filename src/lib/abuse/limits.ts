@@ -180,6 +180,13 @@ export const rateLimits = {
    * model, so this is lower than the plain read limits.
    */
   frameImageRead: { limit: 600, windowSeconds: hour },
+  /**
+   * Pictures of HTML pages drawn per person per hour (artifacts_page_image).
+   * Each one runs a hosted browser for a few seconds, which the site pays
+   * for, so this is the lowest of the read limits: a check after every save
+   * of a busy hour still fits.
+   */
+  pageImageRead: { limit: 120, windowSeconds: hour },
   /** Comments per agent per minute and per hour. Agents are stricter, to stop runaway loops. */
   agentCommentMinute: { limit: 6, windowSeconds: 60 },
   agentCommentHour: { limit: 60, windowSeconds: hour },
@@ -330,6 +337,7 @@ export const rateLimitMessages: Record<RateLimitName, string> = {
   frameCaptureStartByArtifact: "A lot of frame images were drawn for this canvas in the last few minutes.",
   frameCaptureFinish: "Your browser has finished a lot of frame images in the last hour.",
   frameImageRead: "You have read a lot of frame images in the last hour.",
+  pageImageRead: "You have drawn a lot of pages in the last hour.",
   agentCommentMinute: "You have posted a lot of comments in the last minute.",
   agentCommentHour: "You have posted a lot of comments in the last hour.",
   personCommentMinute: "You have posted a lot of comments in the last minute.",

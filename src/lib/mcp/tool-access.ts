@@ -51,6 +51,8 @@ export const toolAccess = {
   // Page files of an HTML artifact, many in few calls.
   page_files_request_uploads: "write",
   page_files_publish: "write",
+  // A picture of an HTML artifact's running page, drawn on request: only for callers who may edit it, on any connection.
+  artifacts_page_image: "read",
   // Inbox and comments
   inbox_list: "read",
   comments_list: "read",

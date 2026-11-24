@@ -30,7 +30,7 @@ export const securityTxtExpires = new Date("2027-11-01T00:00:00.000Z");
  * "Show in search engines" may be indexed, src/lib/search/search-rules.ts),
  * and a crawler blocked here could not read them.
  */
-export const crawlDisallowed = ["/app", "/inbox", "/teams", "/threads", "/invitations", "/api/", "/oauth/", "/dev/", "/preview", "/share/"] as const;
+export const crawlDisallowed = ["/app", "/inbox", "/teams", "/threads", "/invitations", "/api/", "/oauth/", "/dev/", "/preview", "/share/", "/render/"] as const;
 
 /** Where the site describes itself to language models: the llms.txt convention (src/lib/llms-txt.ts). */
 export const llmsTxtPath = "/llms.txt";

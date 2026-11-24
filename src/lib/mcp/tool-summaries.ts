@@ -23,6 +23,7 @@ export const toolSummaries = {
   canvas_frames_list: "List a canvas's frames, without their content.",
   canvas_frame_get: "Read one frame of a canvas in full.",
   canvas_frame_image: "See what one frame of a canvas you can edit looks like.",
+  artifacts_page_image: "See what an HTML page you can edit looks like when it runs.",
   canvas_frame_save: "Add a frame to a canvas, or replace one.",
   canvas_frame_update: "Rename, resize, or move one frame of a canvas.",
   canvas_frame_delete: "Remove one frame from a canvas.",
