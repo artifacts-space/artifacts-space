@@ -48,10 +48,12 @@ export interface McpArtifact {
   /** A CSV's banded rows and column alignment, as every reader sees them. Only on a CSV that has some. */
   sheetFormat?: SheetFormat;
   summary: string;
-  /** The full content. Only artifacts_get and writes return it. "" when `contentWithheld` says why. */
+  /** The full content. artifacts_get returns it, and artifacts_create and artifacts_update when asked (`returnContent`). "" when `contentWithheld` says why. */
   content?: string;
   /** Set when the content is left out: a CSV whose owner turned downloads off, read by a connection that cannot edit it. */
   contentWithheld?: string;
+  /** In a write result without the content: the save stored text other than what was sent, and why. Left out when it stored the text as sent. */
+  contentAdjusted?: string;
   /** "Allow CSV download": whether readers who cannot edit a CSV may take its data out. Read-only for agents. */
   allowCsvDownload: boolean;
   /** In lists: the first characters of text formats, "" for structured ones. Call artifacts_get for the content. */
@@ -234,6 +236,33 @@ export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, reader:
   const shape = toMcpShape(dto, context, { canEdit: reader.canEdit, full: true });
   if (!mayExportCsv(reader, dto)) return { ...shape, content: "", contentWithheld: csvDownloadOffNote };
   return { ...shape, content: dto.content };
+}
+
+/** Why a save can store text other than what an agent sent (`contentForSave`). */
+const CONTENT_ADJUSTED_WHY =
+  "The saved content differs from what you sent: Markdown keeps links to this site's files in their relative form, and ui and canvas JSON that spelled a file id with escapes is saved re-serialized (parsed and written again, so its spacing can change too).";
+
+/** The note in a result without the content: read the saved text before editing it. */
+export const CONTENT_ADJUSTED_NOTE = `${CONTENT_ADJUSTED_WHY} Read it with artifacts_get before you edit the text.`;
+
+/** The note in a result with the content (`returnContent`): the text it carries is the saved one, so no second read is needed. */
+export const CONTENT_ADJUSTED_RETURNED_NOTE = `${CONTENT_ADJUSTED_WHY} The \`content\` here is the saved text: edit from it.`;
+
+/**
+ * Maps a write's saved DTO to the agent-facing shape. The content is left
+ * out unless the agent asked for it (`returnContent`): it just sent that
+ * text, and a large page would fill its context for nothing. When the save
+ * stored other text than `sent` (see CONTENT_ADJUSTED_NOTE), the result
+ * says so, with or without the content. `sent` is undefined when the write
+ * sent no content.
+ */
+export function toMcpWrittenArtifact(dto: ArtifactDto, context: McpViewContext, options: { sent: string | undefined; returnContent: boolean }): McpArtifact {
+  const { content, ...rest } = toMcpArtifact(dto, context, { canEdit: true });
+  const adjusted = options.sent !== undefined && content !== options.sent;
+  if (!options.returnContent) return adjusted ? { ...rest, contentAdjusted: CONTENT_ADJUSTED_NOTE } : rest;
+  // An editor always gets `content` (mayExportCsv lets every editor have it); the field is optional only in the type.
+  const shown = { ...rest, content: content ?? "" };
+  return adjusted ? { ...shown, contentAdjusted: CONTENT_ADJUSTED_RETURNED_NOTE } : shown;
 }
 
 /** Maps a list item to the compact agent-facing shape: a preview, never the content, and each file without its dates. */

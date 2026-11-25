@@ -34,7 +34,7 @@ import { UserFacingError } from "@/lib/user-facing-error";
 
 import { artifactRefField } from "./artifact-ref-field";
 import { SEARCH_QUERY_MAX_CHARS, SEARCH_TEXT_MAX_CHARS, searchWithReferenced } from "./artifact-ref-search";
-import { toMcpArtifact, toMcpList } from "./artifact-view";
+import { toMcpArtifact, toMcpList, toMcpWrittenArtifact } from "./artifact-view";
 import { asSaved, baseVersionField, baseVersionOf, editConflictResult } from "./edit-conflict-tools";
 import { noHarness, type HarnessSource } from "./harness-context";
 import { savedMentions } from "./mention-tools";
@@ -103,6 +103,11 @@ const fullWidthField = z
   .boolean()
   .optional()
   .describe("Show the page full width (true) or at the reading width (false, the default), like Notion's Full width. A display setting: applies at once, files no version, and never waits for approval.");
+
+const returnContentField = z
+  .boolean()
+  .optional()
+  .describe("true to get the saved content back in the result. Left out (the default), the result has no `content`: you just sent it. `contentAdjusted` says when the save stored other text.");
 
 const editableFields = {
   title: z.string().min(1).max(160),
@@ -312,9 +317,9 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
     "artifacts_create",
     {
       ...artifactToolCopy.artifacts_create,
-      inputSchema: { ...editableFields, visibility: visibilityField, team: teamField, comments: commentsField },
+      inputSchema: { ...editableFields, visibility: visibilityField, team: teamField, comments: commentsField, returnContent: returnContentField },
     },
-    ({ visibility, team, comments, cover, coverPosition, ...input }) => respond(async () => {
+    ({ visibility, team, comments, cover, coverPosition, returnContent, ...input }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
       if (team) teamBySlug(teams, team);
       assertTheme(input.theme);
@@ -323,7 +328,7 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
       // What the agent created, with the token of that save, even if someone saved since (asSaved).
       const shown = asSaved(result.artifact, created);
       const [named, base, mentions] = await Promise.all([withActorsAfterSave(view, [shown]), baseVersionOf(created.id, created.updatedAt), savedMentions(created.id, userId)]);
-      const artifact = { ...toMcpArtifact(shown, named, { canEdit: true }), ...base };
+      const artifact = { ...toMcpWrittenArtifact(shown, named, { sent: input.content, returnContent: returnContent === true }), ...base };
       return { artifact, sharing: result.sharing, comments: result.comments, ...(mentions ? { mentions } : {}) };
     }),
   );
@@ -343,9 +348,10 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
         team: teamField,
         comments: commentsField,
         baseVersion: baseVersionField,
+        returnContent: returnContentField,
       },
     },
-    ({ id, visibility, team, comments, project, tags, addTags, removeTags, fullWidth, cover, coverPosition, baseVersion, ...input }) => respond(async () => {
+    ({ id, visibility, team, comments, project, tags, addTags, removeTags, fullWidth, cover, coverPosition, baseVersion, returnContent, ...input }) => respond(async () => {
       const { teams, view } = await loadContext(userId);
       const record = await editableByPublicId(userId, id);
       if (team) teamBySlug(teams, team);
@@ -366,7 +372,7 @@ function registerWriteTools(server: ToolServer, userId: string, harness: Harness
         saved.edit === "unchanged" ? {} : baseVersionOf(record.id, saved.artifact.updatedAt),
         reportsMentions ? savedMentions(record.id, userId) : null,
       ]);
-      const current = { ...toMcpArtifact(shown, named, { canEdit: true }), ...ownBase };
+      const current = { ...toMcpWrittenArtifact(shown, named, { sent: input.content, returnContent: returnContent === true }), ...ownBase };
       return { artifact: current, edit: saved.edit, sharing: result.sharing, comments: result.comments, ...(mentions ? { mentions } : {}) };
     }),
   );
