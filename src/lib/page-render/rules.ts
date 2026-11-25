@@ -21,12 +21,23 @@ export const pageImageLimits = {
   maxBytes: 1_500_000,
   /** WebP quality: small enough for a model's context, sharp enough to read text. */
   quality: 80,
-  /** How long the page may take to start running in its frame. */
-  shownTimeoutMs: 20_000,
+  /*
+   * The draw runs inside the MCP route, which may run for 30 seconds
+   * (`maxDuration` in src/app/api/mcp/route.ts). Every wait below fits in
+   * the request's own limit, and that limit leaves the route time to check
+   * access before and to answer after, so a slow page reaches the caller as
+   * page_not_drawn, never as a route cut off mid-call. rules.test.ts holds it.
+   */
+  /** How long the render page itself may take to load. */
+  loadTimeoutMs: 8_000,
+  /** How long the page may then take to start running in its frame. */
+  shownTimeoutMs: 12_000,
   /** How long to wait after the page started, for its fonts, scripts, and first animations. */
-  settleMs: 1_500,
-  /** How long the whole request to the hosted browser may take. */
-  requestTimeoutMs: 45_000,
+  settleMs: 1_000,
+  /** How long the whole request to the hosted browser may take: the waits above, and the picture. */
+  requestTimeoutMs: 22_000,
+  /** What the route keeps for itself around the draw: the rate limit, the edit check, and the answer. */
+  routeHeadroomMs: 8_000,
 } as const;
 
 const side = z.number().int().min(pageImageLimits.minSide).max(pageImageLimits.maxSide);
@@ -58,7 +69,7 @@ export function screenshotRequestBody(url: string, viewport: PageViewport) {
   return {
     url,
     viewport: { width: viewport.width, height: viewport.height, deviceScaleFactor: 1 },
-    gotoOptions: { waitUntil: "load", timeout: pageImageLimits.shownTimeoutMs },
+    gotoOptions: { waitUntil: "load", timeout: pageImageLimits.loadTimeoutMs },
     waitForSelector: { selector: pageShownSelector, timeout: pageImageLimits.shownTimeoutMs },
     waitForTimeout: pageImageLimits.settleMs,
     screenshotOptions: { type: "webp", quality: pageImageLimits.quality },
@@ -81,7 +92,7 @@ export const pageImageRefusals = {
   notHtml: { code: "not_html", message: "This artifact is not an HTML page. Only kind \"html\" artifacts are drawn; for a canvas frame use canvas_frame_image." },
   notDrawn: {
     code: "page_not_drawn",
-    message: `The page could not be drawn: it did not start within ${String(pageImageLimits.shownTimeoutMs / 1000)} seconds, or the browser that draws it failed. Try once more; if it fails again, check the page's scripts, and do not call in a loop.`,
+    message: `The page could not be drawn: it did not start within ${String((pageImageLimits.loadTimeoutMs + pageImageLimits.shownTimeoutMs) / 1000)} seconds, or the browser that draws it failed. Try once more; if it fails again, check the page's scripts, and do not call in a loop.`,
   },
   pictureRefused: {
     code: "page_picture_refused",

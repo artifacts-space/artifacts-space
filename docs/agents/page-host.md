@@ -151,6 +151,11 @@ any other way:
   off (`page_images_off`) before it counts or reads anything. Draws are
   limited per person (`pageImageRead`), counted before the edit check,
   since each one runs a browser the site pays for.
+- The draw fits inside the MCP route's `maxDuration` (30 seconds): the
+  browser's waits (`pageImageLimits`) fit in the request's own limit, which
+  leaves the route time for the edit check and the answer, so a slow page
+  comes back as `page_not_drawn` and not as a call the platform cut off.
+  `rules.test.ts` reads the route's number; change both together.
 - What comes back is checked before it reaches a model (`checkedPicture`):
   a WebP of the window's exact size, within `pageImageLimits.maxBytes`. The
   window holds at most 1,568 patches of 28 pixels, as a frame capture's

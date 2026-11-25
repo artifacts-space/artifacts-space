@@ -49,11 +49,24 @@ export type DrawOutcome = { state: "drawn"; picture: DrawnPage } | { state: "ref
  * asked for never reaches a model.
  */
 export function checkedPicture(bytes: Uint8Array<ArrayBuffer>, viewport: PageViewport): DrawnPage | null {
-  if (bytes.byteLength === 0 || bytes.byteLength > pageImageLimits.maxBytes) return null;
+  return pictureProblem(bytes, viewport) === null ? { bytes, contentType: "image/webp" } : null;
+}
+
+/**
+ * Why a picture fails checkedPicture, in words safe to log (sizes and a
+ * type, never the address or a token), or null when it passes. The size
+ * says whether a smaller window would help (too many bytes) or not (a
+ * picture drawn at another scale).
+ */
+export function pictureProblem(bytes: Uint8Array, viewport: PageViewport): string | null {
+  if (bytes.byteLength === 0) return "empty";
+  if (bytes.byteLength > pageImageLimits.maxBytes) return `${String(bytes.byteLength)} bytes, over ${String(pageImageLimits.maxBytes)}`;
   const header = readImageHeader(bytes);
-  if (header?.type !== "image/webp") return null;
-  if (header.width !== viewport.width || header.height !== viewport.height) return null;
-  return { bytes, contentType: "image/webp" };
+  if (header?.type !== "image/webp") return `not a WebP (${header?.type ?? "unreadable"})`;
+  if (header.width !== viewport.width || header.height !== viewport.height) {
+    return `${String(header.width)} by ${String(header.height)}, not the window's ${String(viewport.width)} by ${String(viewport.height)}`;
+  }
+  return null;
 }
 
 /**
@@ -75,9 +88,10 @@ export async function drawPage(config: BrowserRunConfig, url: string, viewport: 
       console.error("[page-render] The browser refused to draw a page", response.status);
       return { state: "failed" };
     }
-    const picture = checkedPicture(new Uint8Array(await response.arrayBuffer()), viewport);
-    if (picture) return { state: "drawn", picture };
-    console.error("[page-render] The browser returned a picture that failed the check");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const problem = pictureProblem(bytes, viewport);
+    if (problem === null) return { state: "drawn", picture: { bytes, contentType: "image/webp" } };
+    console.error("[page-render] The browser returned a picture that failed the check:", problem);
     return { state: "refused" };
   } catch (error) {
     console.error("[page-render] The browser could not be reached", error instanceof Error ? error.name : "unknown error");

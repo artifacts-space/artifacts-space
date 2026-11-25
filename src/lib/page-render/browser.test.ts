@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { browserRunConfigFromEnv, checkedPicture, drawPage } from "./browser";
+import { browserRunConfigFromEnv, checkedPicture, drawPage, pictureProblem } from "./browser";
 import { pageImageLimits, pageShownSelector, pageViewportSchema, screenshotRequestBody } from "./rules";
 
 /** The first bytes of an extended WebP (VP8X) of the given size, padded to `length`. */
@@ -54,6 +54,20 @@ describe("checking the picture", () => {
     expect(checkedPicture(webp(1280, 801), viewport)).toBeNull();
     expect(checkedPicture(new Uint8Array(64), viewport)).toBeNull();
     expect(checkedPicture(webp(1280, 800, pageImageLimits.maxBytes + 1), viewport)).toBeNull();
+  });
+});
+
+describe("why a picture fails", () => {
+  it("should name the sizes when a picture came back at another scale", () => {
+    expect(pictureProblem(webp(2560, 1600), viewport)).toBe("2560 by 1600, not the window's 1280 by 800");
+  });
+
+  it("should name the bytes when a picture is over the limit", () => {
+    expect(pictureProblem(webp(1280, 800, pageImageLimits.maxBytes + 1), viewport)).toContain("bytes, over");
+  });
+
+  it("should be null when the picture passes", () => {
+    expect(pictureProblem(webp(1280, 800), viewport)).toBeNull();
   });
 });
 
