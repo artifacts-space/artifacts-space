@@ -1,6 +1,12 @@
 import { pageAddressPattern, pageDocumentName, pageMessages, pageSourceHeader } from "./rules";
 
 /**
+ * An open popover that closes on Escape: every kind but `popover="manual"`,
+ * which ignores the key, so it would otherwise hold Escape back for nothing.
+ */
+export const escapePopoverSelector = ':popover-open:not([popover="manual" i])';
+
+/**
  * The one document a page host serves: a script that waits for the page's
  * HTML from the site that frames it, and writes it in place. It takes a
  * message only from the window that frames it, and only when that window is
@@ -48,7 +54,8 @@ import { pageAddressPattern, pageDocumentName, pageMessages, pageSourceHeader } 
  * Escape there. This tells the site ("escape") when one was pressed and the
  * page did not use it: no dialog or popover of the page's was open to close
  * (each selector asked on its own, so a browser that knows only `:modal`
- * still keeps a dialog's Escape; one in a shadow root is not seen),
+ * still keeps a dialog's Escape; a `popover="manual"`, which ignores the
+ * key, does not count; one in a shadow root is not seen),
  * and once every listener of the page had the key, none had stopped it
  * (preventDefault). The site leaves full screen on it, and ignores it
  * otherwise.
@@ -101,7 +108,7 @@ export function frameScript(siteOrigin: string): string {
   // An Escape the page did not use: one that closes a dialog or popover of the page's is the page's, and so is one a listener stopped.
   function onKey(event) {
     if (event.key !== "Escape" || event.repeat) return;
-    if (isOpen(":modal") || isOpen(":popover-open")) return;
+    if (isOpen(":modal") || isOpen(${JSON.stringify(escapePopoverSelector)})) return;
     // Once the key went past every listener of the page, on the window too.
     setTimeout(function () { if (!event.defaultPrevented) host.postMessage({ type: ${type("escape")} }, site); }, 0);
   }

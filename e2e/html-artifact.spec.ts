@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
 
+import { escapePopoverSelector } from "@/lib/page-host/frame-document";
+
 import { expectNoAxeViolations } from "./support/a11y";
 import { expect, test } from "./support/test";
 
@@ -115,6 +117,18 @@ test("should leave full screen with Escape pressed inside the running page, and 
   await expect(page.getByRole("button", { name: "Full screen", exact: true })).toBeFocused();
   // The same page, still running.
   await expect(shown.locator("#count")).toHaveText("1");
+});
+
+test("should count an open popover as the page's Escape only when it closes on Escape, as the frame document asks", async ({ page }) => {
+  await page.setContent(`<div id="auto" popover>Auto</div><div id="manual" popover="MANUAL">Manual</div>`);
+  const openOnly = (id: string, selector: string) => page.evaluate(({ id, selector }) => {
+    for (const element of document.querySelectorAll<HTMLElement>("[popover]")) if (element.matches(":popover-open")) element.hidePopover();
+    document.getElementById(id)?.showPopover();
+    return document.querySelector(selector)?.id ?? null;
+  }, { id, selector });
+  expect(await openOnly("auto", escapePopoverSelector)).toBe("auto");
+  // A manual popover ignores Escape, so it must not hold the key back: the selector misses it, in any letter case.
+  expect(await openOnly("manual", escapePopoverSelector)).toBeNull();
 });
 
 test("should show the HTML with Edit source, and the changed page with Hide source", async ({ page }) => {

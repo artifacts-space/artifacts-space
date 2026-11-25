@@ -2,7 +2,7 @@ import { runInNewContext } from "node:vm";
 
 import { describe, expect, it } from "vitest";
 
-import { frameDocument, frameScript } from "./frame-document";
+import { escapePopoverSelector, frameDocument, frameScript } from "./frame-document";
 import { pageMessages } from "./rules";
 
 /*
@@ -37,8 +37,8 @@ function loadFrame(pathname: string) {
   const moves: string[] = [];
   const written: string[] = [];
   const later: (() => void)[] = [];
-  // What the page has open (":modal" for a modal dialog, ":popover-open" for a popover), and which of the two selectors the browser knows.
-  const open = { now: new Set<string>(), known: new Set([":modal", ":popover-open"]) };
+  // What the page has open (":modal" for a modal dialog, escapePopoverSelector for a popover that closes on Escape), and which selectors the browser knows.
+  const open = { now: new Set<string>(), known: new Set([":modal", escapePopoverSelector]) };
   const host = { postMessage: (message: { type?: string }, target: string) => { posted.push({ message, target }); } };
   const location = { pathname, search: "", hash: "" };
   const frame = {
@@ -59,9 +59,9 @@ function loadFrame(pathname: string) {
     write: (html: string) => { written.push(html); },
     close: () => undefined,
     querySelector: (selector: string) => {
-      // As in a browser, a list with one selector it does not know throws as a whole.
-      if (!selector.split(",").every((part) => open.known.has(part.trim()))) throw new SyntaxError(`not a valid selector: ${selector}`);
-      return selector.split(",").some((part) => open.now.has(part.trim())) ? {} : null;
+      // As in a browser, a selector it does not know throws.
+      if (!open.known.has(selector)) throw new SyntaxError(`not a valid selector: ${selector}`);
+      return open.now.has(selector) ? {} : null;
     },
   };
   const history = {
@@ -187,7 +187,7 @@ describe("an Escape pressed in the page", () => {
     expect(escapes(loaded)).toEqual([]);
   });
 
-  it.each([":modal", ":popover-open"])("should leave it to the page when it has something open that %s matches", (selector) => {
+  it.each([":modal", escapePopoverSelector])("should leave it to the page when it has something open that %s matches", (selector) => {
     const loaded = shownPage();
     loaded.open.now.add(selector);
     loaded.press("Escape");
@@ -196,7 +196,7 @@ describe("an Escape pressed in the page", () => {
 
   it("should leave it to the page when a dialog is open in a browser that knows :modal but not :popover-open", () => {
     const loaded = shownPage();
-    loaded.open.known.delete(":popover-open");
+    loaded.open.known.delete(escapePopoverSelector);
     loaded.open.now.add(":modal");
     loaded.press("Escape");
     expect(escapes(loaded)).toEqual([]);
@@ -205,6 +205,14 @@ describe("an Escape pressed in the page", () => {
   it("should still tell the site in a browser that knows neither selector", () => {
     const loaded = shownPage();
     loaded.open.known.clear();
+    loaded.press("Escape");
+    expect(escapes(loaded)).toHaveLength(1);
+  });
+
+  it("should not count an open popover=\"manual\", which ignores Escape", () => {
+    // The page's only open popover is a manual one: the selector the frame document asks matches nothing.
+    expect(escapePopoverSelector).toContain(':not([popover="manual" i])');
+    const loaded = shownPage();
     loaded.press("Escape");
     expect(escapes(loaded)).toHaveLength(1);
   });
