@@ -106,24 +106,24 @@ on a second domain (`src/lib/page-host/rules.ts`).
   window and back. The box and its frame stay the same elements, shown in
   the browser's top layer (`popover`), so the page keeps running and keeps
   what the reader did in it; never draw a second frame for it, which would
-  load the page again. A fixed box alone is not enough: the /app pane's
-  body is a size container, which holds a fixed box inside it. The bar
-  stays in full screen with the artifact's title, so a page anyone wrote
-  never has the whole window to itself, and the frame gets no
-  `allowfullscreen`. Escape leaves full screen from the bar and from inside
-  the page: keys pressed in the page stay in its frame, so the frame
-  document tells the site (`pageMessages.escape`) about an Escape the page
-  did not use. One that closes a dialog or popover of the page's
-  (`:modal`, and `:popover-open` except `popover="manual"`, which ignores
-  the key; asked one at a time: a list with a selector
-  the browser does not know throws as a whole), or that a listener of the page stopped
-  (`preventDefault`), stays the page's. The page can send that message
-  itself; all it does is leave full screen. The bar's button is always
-  there, for a page that keeps Escape. What the browser does with Escape
-  by itself without cancelling the key (a search field clearing, a
-  `<select>` closing its list) reads as unused, so it leaves full screen
-  too; `buildHtmlGuide` tells agents that a page that uses Escape itself
-  calls `preventDefault`.
+  load the page again. A fixed box alone is not enough: the /app pane's body
+  is a size container, which holds a fixed box inside it. The bar stays in
+  full screen with the artifact's title, so a page anyone wrote never has
+  the whole window to itself, and the frame gets no `allowfullscreen`.
+  Escape leaves full screen from the bar and from inside the page: keys
+  pressed in the page stay in its frame, so the frame document tells the
+  site (`pageMessages.escape`) about an Escape the page did not use. One
+  that closes a dialog or popover of the page's (`:modal`, and
+  `:popover-open` except `popover="manual"`, which ignores the key; asked
+  one at a time: a list with a selector the browser does not know throws as
+  a whole), or that a listener of the page stopped (`preventDefault`), stays
+  the page's. The page can send that message itself; all it does is leave
+  full screen. The bar's button is always there, for a page that keeps
+  Escape. What the browser does with Escape by itself without cancelling the
+  key (a search field clearing, a `<select>` closing its list) reads as
+  unused, so it leaves full screen too; `buildHtmlGuide` tells agents that a
+  page that uses Escape itself calls `preventDefault`. An Escape pressed
+  inside a frame of the page's own stays in that frame, as any key does.
 - `PAGE_HOST` unset (and not `next dev`): no page runs, and `PageFrame`
   draws nothing (`usePagesCanRun`). Tests: `rules.test.ts`,
   `frame-document.test.ts`, `frame-document-pages.test.ts`,

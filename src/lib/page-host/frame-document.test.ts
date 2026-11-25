@@ -209,13 +209,7 @@ describe("an Escape pressed in the page", () => {
     expect(escapes(loaded)).toHaveLength(1);
   });
 
-  it("should not count an open popover=\"manual\", which ignores Escape", () => {
-    // The page's only open popover is a manual one: the selector the frame document asks matches nothing.
-    expect(escapePopoverSelector).toContain(':not([popover="manual" i])');
-    const loaded = shownPage();
-    loaded.press("Escape");
-    expect(escapes(loaded)).toHaveLength(1);
-  });
+  // A popover="manual" ignores Escape, and the selector skips it: that needs a browser's own matching, so e2e/html-artifact.spec.ts checks it.
 
   it("should tell the site nothing for another key, or for an Escape held down", () => {
     const loaded = shownPage();
