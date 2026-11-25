@@ -118,7 +118,11 @@ on a second domain (`src/lib/page-host/rules.ts`).
   the browser does not know throws as a whole), or that a listener of the page stopped
   (`preventDefault`), stays the page's. The page can send that message
   itself; all it does is leave full screen. The bar's button is always
-  there, for a page that keeps Escape.
+  there, for a page that keeps Escape. What the browser does with Escape
+  by itself without cancelling the key (a search field clearing, a
+  `<select>` closing its list) reads as unused, so it leaves full screen
+  too; `buildHtmlGuide` tells agents that a page that uses Escape itself
+  calls `preventDefault`.
 - `PAGE_HOST` unset (and not `next dev`): no page runs, and `PageFrame`
   draws nothing (`usePagesCanRun`). Tests: `rules.test.ts`,
   `frame-document.test.ts`, `frame-document-pages.test.ts`,
