@@ -143,11 +143,13 @@ describe("frameDocument", () => {
     const html = frameDocument("https://artifacts.space");
     expect(html).toContain('host.postMessage({ type: "artifact-page:pong", id: event.data.id }, site)');
     expect(html).toContain("function onPing(event) {\n    if (event.origin !== site || event.source !== host) return;");
-    // It answers before the page is written too, and again after document.open() dropped the first listener.
-    expect(html.split('window.addEventListener("message", onPing);').length - 1).toBe(2);
-    // The listener is added after document.open(), which drops the earlier ones, and before the page is written.
-    expect(html.indexOf("document.open()")).toBeLessThan(html.indexOf('window.addEventListener("message", onPing)'));
-    expect(html.indexOf('window.addEventListener("message", onPing)')).toBeLessThan(html.indexOf("document.write(html)"));
+    // listen() adds the answer, and it is called twice: before the page is written, and again after document.open() dropped the first listener.
+    expect(html).toContain('function listen() {\n    window.addEventListener("message", onPing);');
+    expect(html.split("listen();").length - 1).toBe(2);
+    // Added after document.open(), which drops the earlier ones, and before the page is written.
+    const written = html.slice(html.indexOf("function write(html) {"));
+    expect(written.indexOf("document.open()")).toBeLessThan(written.indexOf("listen();"));
+    expect(written.indexOf("listen();")).toBeLessThan(written.indexOf("document.write(html)"));
   });
 
   it("should never let a value end its script element", () => {

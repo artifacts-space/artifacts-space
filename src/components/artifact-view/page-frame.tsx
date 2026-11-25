@@ -185,6 +185,8 @@ interface Handshake {
   onReady: () => void;
   /** The frame document loaded at another page of the site, which it loads itself: it waits for the newest files address. */
   onOpened: () => void;
+  /** Escape was pressed in the page and the page did not use it. */
+  onEscape: (() => void) | undefined;
 }
 
 /** A question the site asked the frame and still waits on: its id, and the timer that closes the frame. */
@@ -204,7 +206,9 @@ interface OpenQuestion {
  * from the frame's window, from the page host's origin, with that id. No
  * such answer within PAGE_ANSWER_MS means the page sent its frame to
  * another address, and `onLeft` closes it. Whatever else the frame posts is
- * the page's word: it is read for nothing but "ready" and "shown".
+ * the page's word: it is read for nothing but "ready", "shown", and
+ * "escape", none of which can do more than show the page or leave full
+ * screen.
  *
  * The page is sent on each "ready" (a page that reloads itself, or comes
  * back to index.html from another page of its site, loads the frame
@@ -216,7 +220,7 @@ interface OpenQuestion {
  * not this HTML, so nothing is sent but the newest files address
  * (`onOpened`).
  */
-function usePageHandshake({ frameRef, origin, html, onLeft, onReady, onOpened }: Handshake) {
+function usePageHandshake({ frameRef, origin, html, onLeft, onReady, onOpened, onEscape }: Handshake) {
   const [shown, setShown] = useState(false);
   const questionRef = useRef<OpenQuestion | null>(null);
 
@@ -251,14 +255,15 @@ function usePageHandshake({ frameRef, origin, html, onLeft, onReady, onOpened }:
       if (message.type === pageMessages.pong && questionRef.current !== null && message.id === questionRef.current.id) settle();
       onPageMessage(message.type);
     };
-    /** "opened" and "shown": the frame document opened another page of the site, or wrote a page. */
+    /** "opened", "shown", and "escape": the frame document opened another page of the site, wrote a page, or had an Escape the page did not use. */
     const onPageMessage = (type: unknown) => {
       if (type === pageMessages.opened) onOpened();
       if (type === pageMessages.shown) setShown(true);
+      if (type === pageMessages.escape) onEscape?.();
     };
     window.addEventListener("message", onMessage);
     return () => { window.removeEventListener("message", onMessage); };
-  }, [frameRef, origin, send, ask, settle, onReady, onOpened]);
+  }, [frameRef, origin, send, ask, settle, onReady, onOpened, onEscape]);
   useEffect(() => settle, [settle]);
 
   const onLoad = useCallback(() => {
@@ -277,6 +282,7 @@ interface PageWindowProps {
   html: string;
   title: string;
   onLeft: () => void;
+  onEscape: (() => void) | undefined;
 }
 
 /**
@@ -287,7 +293,7 @@ interface PageWindowProps {
  * (usePassRenewal), and is never put in `src`. A link of the page to
  * another page of its site moves the frame by itself; `src` stays.
  */
-function PageWindow({ origin, path, pass, html, title, onLeft }: PageWindowProps) {
+function PageWindow({ origin, path, pass, html, title, onLeft, onEscape }: PageWindowProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const resend = usePassRenewal({ frameRef, origin, pass });
   const onReady = useCallback(() => { resend(); }, [resend]);
@@ -297,7 +303,7 @@ function PageWindow({ origin, path, pass, html, title, onLeft }: PageWindowProps
     if (resend() || !hasFiles) return;
     frameRef.current?.contentWindow?.postMessage({ type: pageMessages.renew, path }, origin);
   }, [resend, hasFiles, path, origin]);
-  const { shown, onLoad } = usePageHandshake({ frameRef, origin, html, onLeft, onReady, onOpened });
+  const { shown, onLoad } = usePageHandshake({ frameRef, origin, html, onLeft, onReady, onOpened, onEscape });
   return (
     <iframe
       ref={frameRef}
@@ -347,6 +353,8 @@ interface PageFrameProps {
   filesKey?: string | undefined;
   /** Sizes the frame: it fills this box, and the page scrolls inside it. */
   className?: string;
+  /** Called when Escape is pressed in the page and the page did not use it (a full screen view leaves on it). */
+  onEscape?: (() => void) | undefined;
 }
 
 /**
@@ -359,7 +367,7 @@ interface PageFrameProps {
  * nothing where no page host is set up; the caller shows the source there
  * (`usePagesCanRun`).
  */
-export function PageFrame({ pageKey, html, title, filesKey, className }: PageFrameProps) {
+export function PageFrame({ pageKey, html, title, filesKey, className, onEscape }: PageFrameProps) {
   const { origin, failed } = usePagePlace(pageKey);
   const generation = useGeneration(html);
   const filesGeneration = useGeneration(filesKey ?? "");
@@ -374,7 +382,7 @@ export function PageFrame({ pageKey, html, title, filesKey, className }: PageFra
   return (
     <div data-slot="page-frame-box" aria-busy={place || failed ? undefined : true} className={cn("min-h-0 overflow-hidden", className)}>
       {failed ? <PageCannotStart /> : null}
-      {place ? <PlacedPage key={load} place={place} left={leftLoad === load} html={html} title={title} onLeft={onLeft} onShowAgain={showAgain} /> : null}
+      {place ? <PlacedPage key={load} place={place} left={leftLoad === load} html={html} title={title} onLeft={onLeft} onShowAgain={showAgain} onEscape={onEscape} /> : null}
     </div>
   );
 }
@@ -387,10 +395,11 @@ interface PlacedPageProps {
   title: string;
   onLeft: () => void;
   onShowAgain: () => void;
+  onEscape: (() => void) | undefined;
 }
 
 /** One load of the page where it runs, or, once it left its frame, the note that it was closed. */
-function PlacedPage({ place, left, html, title, onLeft, onShowAgain }: PlacedPageProps) {
+function PlacedPage({ place, left, html, title, onLeft, onShowAgain, onEscape }: PlacedPageProps) {
   if (left) return <PageLeft onShowAgain={onShowAgain} />;
-  return <PageWindow origin={place.origin} path={place.path} pass={place.pass} html={html} title={title} onLeft={onLeft} />;
+  return <PageWindow origin={place.origin} path={place.path} pass={place.pass} html={html} title={title} onLeft={onLeft} onEscape={onEscape} />;
 }

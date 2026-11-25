@@ -48,9 +48,10 @@ function useTopLayer(on: boolean, box: RefObject<HTMLElement | null>, bar: RefOb
 /**
  * While the page covers the window: Escape leaves full screen, the document
  * behind does not scroll, and focus stays in the box (the bar and the page),
- * because everything else is covered. Escape reaches this site only while
- * focus is in the bar; inside the page, keys are the page's, so the bar's
- * button is always there.
+ * because everything else is covered. Escape pressed in the bar is this
+ * site's; Escape pressed in the page reaches it only from the frame document
+ * ("escape", see PageFrame's `onEscape`), when the page did not use it
+ * itself. The bar's button is always there, for a page that does.
  */
 function useWholeWindow(on: boolean, box: RefObject<HTMLElement | null>, bar: RefObject<HTMLElement | null>, onExit: () => void) {
   useEffect(() => {
@@ -126,7 +127,7 @@ function PageWindow({ content, title, pageKey }: { content: string; title: strin
           </IconButton>
         )}
       </div>
-      <PageFrame pageKey={pageKey} html={content} title={title} filesKey={filesKey} className="flex-1" />
+      <PageFrame pageKey={pageKey} html={content} title={title} filesKey={filesKey} className="flex-1" onEscape={fullScreen ? exit : undefined} />
     </div>
   );
 }
