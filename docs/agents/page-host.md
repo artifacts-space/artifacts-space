@@ -114,7 +114,8 @@ on a second domain (`src/lib/page-host/rules.ts`).
   the page: keys pressed in the page stay in its frame, so the frame
   document tells the site (`pageMessages.escape`) about an Escape the page
   did not use. One that closes a dialog or popover of the page's
-  (`:modal`, `:popover-open`), or that a listener of the page stopped
+  (`:modal`, `:popover-open`, asked one at a time: a list with a selector
+  the browser does not know throws as a whole), or that a listener of the page stopped
   (`preventDefault`), stays the page's. The page can send that message
   itself; all it does is leave full screen. The bar's button is always
   there, for a page that keeps Escape.

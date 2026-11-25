@@ -37,8 +37,8 @@ function loadFrame(pathname: string) {
   const moves: string[] = [];
   const written: string[] = [];
   const later: (() => void)[] = [];
-  // What the page has open: a modal dialog or a popover. "unsupported" is a browser that knows neither selector.
-  const open = { now: "nothing" as "nothing" | "dialog" | "unsupported" };
+  // What the page has open (":modal" for a modal dialog, ":popover-open" for a popover), and which of the two selectors the browser knows.
+  const open = { now: new Set<string>(), known: new Set([":modal", ":popover-open"]) };
   const host = { postMessage: (message: { type?: string }, target: string) => { posted.push({ message, target }); } };
   const location = { pathname, search: "", hash: "" };
   const frame = {
@@ -59,9 +59,9 @@ function loadFrame(pathname: string) {
     write: (html: string) => { written.push(html); },
     close: () => undefined,
     querySelector: (selector: string) => {
-      if (selector !== ":modal, :popover-open") throw new Error(`unexpected selector ${selector}`);
-      if (open.now === "unsupported") throw new SyntaxError("not a valid selector");
-      return open.now === "dialog" ? {} : null;
+      // As in a browser, a list with one selector it does not know throws as a whole.
+      if (!selector.split(",").every((part) => open.known.has(part.trim()))) throw new SyntaxError(`not a valid selector: ${selector}`);
+      return selector.split(",").some((part) => open.now.has(part.trim())) ? {} : null;
     },
   };
   const history = {
@@ -187,16 +187,24 @@ describe("an Escape pressed in the page", () => {
     expect(escapes(loaded)).toEqual([]);
   });
 
-  it("should leave it to the page when a dialog or popover of the page's is open", () => {
+  it.each([":modal", ":popover-open"])("should leave it to the page when it has something open that %s matches", (selector) => {
     const loaded = shownPage();
-    loaded.open.now = "dialog";
+    loaded.open.now.add(selector);
+    loaded.press("Escape");
+    expect(escapes(loaded)).toEqual([]);
+  });
+
+  it("should leave it to the page when a dialog is open in a browser that knows :modal but not :popover-open", () => {
+    const loaded = shownPage();
+    loaded.open.known.delete(":popover-open");
+    loaded.open.now.add(":modal");
     loaded.press("Escape");
     expect(escapes(loaded)).toEqual([]);
   });
 
   it("should still tell the site in a browser that knows neither selector", () => {
     const loaded = shownPage();
-    loaded.open.now = "unsupported";
+    loaded.open.known.clear();
     loaded.press("Escape");
     expect(escapes(loaded)).toHaveLength(1);
   });

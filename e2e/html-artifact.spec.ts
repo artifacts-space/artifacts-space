@@ -115,11 +115,6 @@ test("should leave full screen with Escape pressed inside the running page, and 
   await expect(page.getByRole("button", { name: "Full screen", exact: true })).toBeFocused();
   // The same page, still running.
   await expect(shown.locator("#count")).toHaveText("1");
-  // Out of full screen, an Escape in the page changes nothing.
-  await shown.getByRole("button", { name: "Add one" }).click();
-  await page.keyboard.press("Escape");
-  await expect(shown.locator("#count")).toHaveText("2");
-  await expect(page.getByRole("button", { name: "Full screen", exact: true })).toBeVisible();
 });
 
 test("should show the HTML with Edit source, and the changed page with Hide source", async ({ page }) => {

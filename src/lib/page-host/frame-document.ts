@@ -46,7 +46,9 @@ import { pageAddressPattern, pageDocumentName, pageMessages, pageSourceHeader } 
  *
  * Keys pressed in the page stay in the frame, so the site never sees an
  * Escape there. This tells the site ("escape") when one was pressed and the
- * page did not use it: no dialog or popover of the page's was open to close,
+ * page did not use it: no dialog or popover of the page's was open to close
+ * (each selector asked on its own, so a browser that knows only `:modal`
+ * still keeps a dialog's Escape; one in a shadow root is not seen),
  * and once every listener of the page had the key, none had stopped it
  * (preventDefault). The site leaves full screen on it, and ignores it
  * otherwise.
@@ -92,12 +94,14 @@ export function frameScript(siteOrigin: string): string {
       load();
     }
   }
+  // One selector at a time: a list with a selector the browser does not know throws as a whole, and :modal came before :popover-open.
+  function isOpen(selector) {
+    try { return document.querySelector(selector) !== null; } catch (error) { return false; }
+  }
   // An Escape the page did not use: one that closes a dialog or popover of the page's is the page's, and so is one a listener stopped.
   function onKey(event) {
     if (event.key !== "Escape" || event.repeat) return;
-    var owned = false;
-    try { owned = document.querySelector(":modal, :popover-open") !== null; } catch (error) { /* A browser without these selectors: nothing is open. */ }
-    if (owned) return;
+    if (isOpen(":modal") || isOpen(":popover-open")) return;
     // Once the key went past every listener of the page, on the window too.
     setTimeout(function () { if (!event.defaultPrevented) host.postMessage({ type: ${type("escape")} }, site); }, 0);
   }
