@@ -7,6 +7,12 @@ import { pageImageLimits, screenshotEndpoint, screenshotRequestBody, type PageVi
  * endpoint (REST). Its settings are read on each use, never at import time,
  * so the build needs no secrets. Nothing here logs the address it opens
  * (it holds a render token) or the API token.
+ *
+ * Checked against the live endpoint on 2026-11-24 with this module's
+ * request body (screenshotRequestBody): `/browser-run/screenshot` answered
+ * 200 with the raw image as the body, a VP8X WebP of exactly the viewport's
+ * size, not a JSON envelope. A refusal or a timeout answers 422 with JSON
+ * (error 6002 for a selector that never appeared).
  */
 
 /** The account and API token for Browser Run, or null where pictures of pages are not set up. */
@@ -33,6 +39,9 @@ export interface DrawnPage {
   contentType: "image/webp";
 }
 
+/** What a draw came to: the checked picture, a picture that failed the check, or no picture at all. */
+export type DrawOutcome = { state: "drawn"; picture: DrawnPage } | { state: "refused" } | { state: "failed" };
+
 /**
  * Checks what came back: a WebP of the window's exact pixel size, no bigger
  * than pageImageLimits.maxBytes. The type comes from the bytes, never from
@@ -48,12 +57,13 @@ export function checkedPicture(bytes: Uint8Array<ArrayBuffer>, viewport: PageVie
 }
 
 /**
- * Asks Browser Run to open `url` (the render page) at the viewport's size
- * and returns the checked picture, or null when it could not be drawn: a
- * refusal, a timeout, an error, or a picture that fails the check. The
- * reason is logged by status only.
+ * Asks Browser Run to open `url` (the render page) at the viewport's size.
+ * `drawn` with the checked picture; `refused` when a picture came back but
+ * failed the check (too big, or not what was asked for); `failed` for a
+ * refusal by the browser, a timeout, or an error. The reason is logged by
+ * status only.
  */
-export async function drawPage(config: BrowserRunConfig, url: string, viewport: PageViewport, fetcher: typeof fetch = fetch): Promise<DrawnPage | null> {
+export async function drawPage(config: BrowserRunConfig, url: string, viewport: PageViewport, fetcher: typeof fetch = fetch): Promise<DrawOutcome> {
   try {
     const response = await fetcher(screenshotEndpoint(config.accountId), {
       method: "POST",
@@ -63,13 +73,14 @@ export async function drawPage(config: BrowserRunConfig, url: string, viewport: 
     });
     if (!response.ok) {
       console.error("[page-render] The browser refused to draw a page", response.status);
-      return null;
+      return { state: "failed" };
     }
     const picture = checkedPicture(new Uint8Array(await response.arrayBuffer()), viewport);
-    if (!picture) console.error("[page-render] The browser returned a picture that failed the check");
-    return picture;
+    if (picture) return { state: "drawn", picture };
+    console.error("[page-render] The browser returned a picture that failed the check");
+    return { state: "refused" };
   } catch (error) {
     console.error("[page-render] The browser could not be reached", error instanceof Error ? error.name : "unknown error");
-    return null;
+    return { state: "failed" };
   }
 }

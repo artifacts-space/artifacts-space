@@ -72,7 +72,7 @@ export function screenshotEndpoint(accountId: string): string {
 
 /** Why there is no picture, as a typed tool error. */
 export interface PageImageRefusal {
-  code: "page_images_off" | "not_html" | "page_not_drawn" | "page_changed";
+  code: "page_images_off" | "not_html" | "page_not_drawn" | "page_picture_refused" | "page_changed";
   message: string;
 }
 
@@ -81,7 +81,11 @@ export const pageImageRefusals = {
   notHtml: { code: "not_html", message: "This artifact is not an HTML page. Only kind \"html\" artifacts are drawn; for a canvas frame use canvas_frame_image." },
   notDrawn: {
     code: "page_not_drawn",
-    message: "The page could not be drawn: it did not start within 20 seconds, or the browser that draws it failed. Try once more; if it fails again, check the page's scripts, and do not call in a loop.",
+    message: `The page could not be drawn: it did not start within ${String(pageImageLimits.shownTimeoutMs / 1000)} seconds, or the browser that draws it failed. Try once more; if it fails again, check the page's scripts, and do not call in a loop.`,
+  },
+  pictureRefused: {
+    code: "page_picture_refused",
+    message: `The page was drawn, but the picture was refused: it was over ${String(pageImageLimits.maxBytes / 1_000_000)} MB, or not a WebP of the window's size. Ask for a smaller window (width and height), then look again.`,
   },
   changed: { code: "page_changed", message: "The page was saved again while it was being drawn. Call once more to see the newest save." },
 } as const satisfies Record<string, PageImageRefusal>;

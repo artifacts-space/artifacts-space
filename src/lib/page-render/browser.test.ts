@@ -72,23 +72,29 @@ describe("drawing a page", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const fetcher = vi.fn(() => Promise.resolve(new Response(webp(1280, 800), { status: 200, headers: { "Content-Type": "image/webp" } })));
     const drawn = await drawPage(config, "https://artifacts.space/render/page/t", viewport, fetcher);
-    expect(drawn?.contentType).toBe("image/webp");
+    expect(drawn.state === "drawn" ? drawn.picture.contentType : null).toBe("image/webp");
     const [endpoint, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
     expect(endpoint).toBe("https://api.cloudflare.com/client/v4/accounts/acct/browser-run/screenshot");
     expect(init.headers).toMatchObject({ Authorization: "Bearer secret-token" });
   });
 
-  it("should return null without logging the address when the browser refuses", async () => {
+  it("should call the picture refused when one came back of another size", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetcher = vi.fn(() => Promise.resolve(new Response(webp(640, 400), { status: 200 })));
+    expect(await drawPage(config, "https://artifacts.space/render/page/t", viewport, fetcher)).toEqual({ state: "refused" });
+  });
+
+  it("should fail without logging the address when the browser refuses", async () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const fetcher = vi.fn(() => Promise.resolve(new Response("{}", { status: 422 })));
-    expect(await drawPage(config, "https://artifacts.space/render/page/secret-render-token", viewport, fetcher)).toBeNull();
+    expect(await drawPage(config, "https://artifacts.space/render/page/secret-render-token", viewport, fetcher)).toEqual({ state: "failed" });
     expect(JSON.stringify(logged.mock.calls)).not.toContain("secret-render-token");
     expect(JSON.stringify(logged.mock.calls)).not.toContain("secret-token");
   });
 
-  it("should return null when the browser cannot be reached", async () => {
+  it("should fail when the browser cannot be reached", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const fetcher = vi.fn(() => Promise.reject(new TypeError("fetch failed")));
-    expect(await drawPage(config, "https://artifacts.space/render/page/t", viewport, fetcher)).toBeNull();
+    expect(await drawPage(config, "https://artifacts.space/render/page/t", viewport, fetcher)).toEqual({ state: "failed" });
   });
 });

@@ -46,9 +46,10 @@ function viewportFor(input: PageImageInput): PageViewport {
  * Draws the page of an HTML artifact `userId` may edit, at its newest save.
  * Where pictures are not set up, it says so before it counts or reads
  * anything. Then it counts the draw (`pageImageRead`), runs the edit check,
- * and hands the hosted browser a render token for this save. When the
- * drawing fails it looks once more: a page saved meanwhile is
- * `page_changed`, anything else `page_not_drawn`.
+ * and hands the hosted browser a render token for this save. A picture
+ * that fails the check is `page_picture_refused`. When no picture came it
+ * looks once more: a page saved meanwhile is `page_changed`, anything else
+ * `page_not_drawn`.
  */
 export async function readPageImage(userId: string, input: PageImageInput, deps: PageImageDeps = defaultDeps): Promise<PageImageResult> {
   const viewport = viewportFor(input);
@@ -59,11 +60,12 @@ export async function readPageImage(userId: string, input: PageImageInput, deps:
   if (!record) throw new UserFacingError(notEditable);
   if (record.kind !== "html") return { state: "refused", refusal: pageImageRefusals.notHtml };
   const token = mintRenderToken({ userId, artifactId: record.id, stamp: record.updatedAt.getTime() }, deps.now());
-  const picture = await deps.draw(config, siteUrl(renderPagePath(token)), viewport);
-  if (!picture) {
+  const drawn = await deps.draw(config, siteUrl(renderPagePath(token)), viewport);
+  if (drawn.state === "refused") return { state: "refused", refusal: pageImageRefusals.pictureRefused };
+  if (drawn.state === "failed") {
     const now = await getEditableArtifact(userId, { id: record.id });
     const changed = now !== null && now.updatedAt.getTime() !== record.updatedAt.getTime();
     return { state: "refused", refusal: changed ? pageImageRefusals.changed : pageImageRefusals.notDrawn };
   }
-  return { state: "image", facts: { title: record.title, viewport, savedAt: record.updatedAt.toISOString(), drawnAt: deps.now().toISOString() }, picture };
+  return { state: "image", facts: { title: record.title, viewport, savedAt: record.updatedAt.toISOString(), drawnAt: deps.now().toISOString() }, picture: drawn.picture };
 }
