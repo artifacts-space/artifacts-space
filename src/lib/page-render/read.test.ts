@@ -88,10 +88,17 @@ describe("readPageImage", () => {
     expect(result).toMatchObject({ state: "refused", refusal: { code: "page_changed" } });
   });
 
-  it("should say the picture was refused, and not that the page failed to start, when a picture failed the check", async () => {
-    const result = await readPageImage("user-1", { publicId: record.publicId }, deps(() => Promise.resolve({ state: "refused" })));
+  it("should advise a smaller window when the picture was refused for its bytes", async () => {
+    const result = await readPageImage("user-1", { publicId: record.publicId }, deps(() => Promise.resolve({ state: "refused", tooBig: true })));
     expect(result).toMatchObject({ state: "refused", refusal: { code: "page_picture_refused" } });
+    expect(result.state === "refused" ? result.refusal.message : "").toContain("smaller window");
     expect(data.getEditableArtifact).toHaveBeenCalledTimes(1);
+  });
+
+  it("should not advise a smaller window when the picture was refused for its size or type", async () => {
+    const result = await readPageImage("user-1", { publicId: record.publicId }, deps(() => Promise.resolve({ state: "refused", tooBig: false })));
+    expect(result).toMatchObject({ state: "refused", refusal: { code: "page_picture_refused" } });
+    expect(result.state === "refused" ? result.refusal.message : "").not.toContain("smaller window");
   });
 
   it("should say the page was not drawn when the browser failed and nothing was saved since", async () => {

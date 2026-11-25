@@ -28,10 +28,16 @@ export const pageImageLimits = {
    * access before and to answer after, so a slow page reaches the caller as
    * page_not_drawn, never as a route cut off mid-call. rules.test.ts holds it.
    */
+  /*
+   * Not measured on a cold production start yet: a live draw of a static
+   * page took 1.7 seconds of browser time (2026-11-24). The render page's
+   * own load (its server render and the edit check) gets the larger share;
+   * drawPage logs each draw's browser time, so tune these from that.
+   */
   /** How long the render page itself may take to load. */
-  loadTimeoutMs: 8_000,
+  loadTimeoutMs: 12_000,
   /** How long the page may then take to start running in its frame. */
-  shownTimeoutMs: 12_000,
+  shownTimeoutMs: 8_000,
   /** How long to wait after the page started, for its fonts, scripts, and first animations. */
   settleMs: 1_000,
   /** How long the whole request to the hosted browser may take: the waits above, and the picture. */
@@ -94,9 +100,13 @@ export const pageImageRefusals = {
     code: "page_not_drawn",
     message: `The page could not be drawn: it did not start within ${String((pageImageLimits.loadTimeoutMs + pageImageLimits.shownTimeoutMs) / 1000)} seconds, or the browser that draws it failed. Try once more; if it fails again, check the page's scripts, and do not call in a loop.`,
   },
+  pictureTooBig: {
+    code: "page_picture_refused",
+    message: `The page was drawn, but the picture was over ${String(pageImageLimits.maxBytes / 1_000_000)} MB. Ask for a smaller window (width and height), then look again.`,
+  },
   pictureRefused: {
     code: "page_picture_refused",
-    message: `The page was drawn, but the picture was refused: it was over ${String(pageImageLimits.maxBytes / 1_000_000)} MB, or not a WebP of the window's size. Ask for a smaller window (width and height), then look again.`,
+    message: "The page was drawn, but the picture was not a WebP of the window's size, so it was refused. Try once more; if it happens again, the problem is on the server's side, not in the page, so stop and say so.",
   },
   changed: { code: "page_changed", message: "The page was saved again while it was being drawn. Call once more to see the newest save." },
 } as const satisfies Record<string, PageImageRefusal>;

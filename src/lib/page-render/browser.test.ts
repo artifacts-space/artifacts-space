@@ -62,6 +62,12 @@ describe("why a picture fails", () => {
     expect(pictureProblem(webp(2560, 1600), viewport)).toBe("2560 by 1600, not the window's 1280 by 800");
   });
 
+  it("should say a picture over the byte cap is too big, so a smaller window can help", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetcher = vi.fn(() => Promise.resolve(new Response(webp(1280, 800, pageImageLimits.maxBytes + 1), { status: 200 })));
+    expect(await drawPage(config, "https://artifacts.space/render/page/t", viewport, fetcher)).toEqual({ state: "refused", tooBig: true });
+  });
+
   it("should name the bytes when a picture is over the limit", () => {
     expect(pictureProblem(webp(1280, 800, pageImageLimits.maxBytes + 1), viewport)).toContain("bytes, over");
   });
@@ -83,7 +89,7 @@ describe("Browser Run settings", () => {
 
 describe("drawing a page", () => {
   it("should return the checked picture when the browser answers with one", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
     const fetcher = vi.fn(() => Promise.resolve(new Response(webp(1280, 800), { status: 200, headers: { "Content-Type": "image/webp" } })));
     const drawn = await drawPage(config, "https://artifacts.space/render/page/t", viewport, fetcher);
     expect(drawn.state === "drawn" ? drawn.picture.contentType : null).toBe("image/webp");
@@ -95,7 +101,7 @@ describe("drawing a page", () => {
   it("should call the picture refused when one came back of another size", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const fetcher = vi.fn(() => Promise.resolve(new Response(webp(640, 400), { status: 200 })));
-    expect(await drawPage(config, "https://artifacts.space/render/page/t", viewport, fetcher)).toEqual({ state: "refused" });
+    expect(await drawPage(config, "https://artifacts.space/render/page/t", viewport, fetcher)).toEqual({ state: "refused", tooBig: false });
   });
 
   it("should fail without logging the address when the browser refuses", async () => {

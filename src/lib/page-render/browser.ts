@@ -39,8 +39,12 @@ export interface DrawnPage {
   contentType: "image/webp";
 }
 
-/** What a draw came to: the checked picture, a picture that failed the check, or no picture at all. */
-export type DrawOutcome = { state: "drawn"; picture: DrawnPage } | { state: "refused" } | { state: "failed" };
+/**
+ * What a draw came to: the checked picture; a picture that failed the check
+ * (`tooBig` when only its bytes were over, which a smaller window fixes); or
+ * no picture at all.
+ */
+export type DrawOutcome = { state: "drawn"; picture: DrawnPage } | { state: "refused"; tooBig: boolean } | { state: "failed" };
 
 /**
  * Checks what came back: a WebP of the window's exact pixel size, no bigger
@@ -89,10 +93,14 @@ export async function drawPage(config: BrowserRunConfig, url: string, viewport: 
       return { state: "failed" };
     }
     const bytes = new Uint8Array(await response.arrayBuffer());
-    const problem = pictureProblem(bytes, viewport);
-    if (problem === null) return { state: "drawn", picture: { bytes, contentType: "image/webp" } };
-    console.error("[page-render] The browser returned a picture that failed the check:", problem);
-    return { state: "refused" };
+    const picture = checkedPicture(bytes, viewport);
+    if (picture) {
+      // Browser time per draw, so the waits in pageImageLimits can be tuned from what production sees.
+      console.info("[page-render] Drew a page | browser ms", response.headers.get("x-browser-ms-used"));
+      return { state: "drawn", picture };
+    }
+    console.error("[page-render] The browser returned a picture that failed the check:", pictureProblem(bytes, viewport), "| browser ms", response.headers.get("x-browser-ms-used"));
+    return { state: "refused", tooBig: bytes.byteLength > pageImageLimits.maxBytes };
   } catch (error) {
     console.error("[page-render] The browser could not be reached", error instanceof Error ? error.name : "unknown error");
     return { state: "failed" };

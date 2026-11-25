@@ -61,7 +61,7 @@ export async function readPageImage(userId: string, input: PageImageInput, deps:
   if (record.kind !== "html") return { state: "refused", refusal: pageImageRefusals.notHtml };
   const token = mintRenderToken({ userId, artifactId: record.id, stamp: record.updatedAt.getTime() }, deps.now());
   const drawn = await deps.draw(config, siteUrl(renderPagePath(token)), viewport);
-  if (drawn.state === "refused") return { state: "refused", refusal: pageImageRefusals.pictureRefused };
+  if (drawn.state === "refused") return { state: "refused", refusal: drawn.tooBig ? pageImageRefusals.pictureTooBig : pageImageRefusals.pictureRefused };
   if (drawn.state === "failed") {
     const now = await getEditableArtifact(userId, { id: record.id });
     const changed = now !== null && now.updatedAt.getTime() !== record.updatedAt.getTime();
