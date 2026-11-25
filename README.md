@@ -202,8 +202,8 @@ file. Three are needed to start:
 
 Most of the others turn one thing on, such as GitHub and Google sign-in,
 email, file uploads, browser notifications, pages that run scripts, pictures
-of those pages for agents, and the scheduled cleanup jobs. The full list, with what each one does and what
-happens without it, is in the docs:
+of those pages for agents, and the scheduled cleanup jobs. The full list, with
+what each one does and what happens without it, is in the docs:
 https://artifacts.space/docs/self-hosting#env
 
 Local `localhost` and `127.0.0.1` database URLs use the PostgreSQL TCP driver.
