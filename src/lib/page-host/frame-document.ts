@@ -43,6 +43,13 @@ import { pageAddressPattern, pageDocumentName, pageMessages, pageSourceHeader } 
  * the page itself, another frame, or another site can never move it. The
  * page shares this window and could move its own address anyway; that gives
  * it nothing, as a files address serves only that page's own files.
+ *
+ * Keys pressed in the page stay in the frame, so the site never sees an
+ * Escape there. This tells the site ("escape") when one was pressed and the
+ * page did not use it: no dialog or popover of the page's was open to close,
+ * and once every listener of the page had the key, none had stopped it
+ * (preventDefault). The site leaves full screen on it, and ignores it
+ * otherwise.
  */
 export function frameDocument(siteOrigin: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Page</title></head><body><script>${frameScript(siteOrigin)}</script></body></html>`;
@@ -85,11 +92,24 @@ export function frameScript(siteOrigin: string): string {
       load();
     }
   }
+  // An Escape the page did not use: one that closes a dialog or popover of the page's is the page's, and so is one a listener stopped.
+  function onKey(event) {
+    if (event.key !== "Escape" || event.repeat) return;
+    var owned = false;
+    try { owned = document.querySelector(":modal, :popover-open") !== null; } catch (error) { /* A browser without these selectors: nothing is open. */ }
+    if (owned) return;
+    // Once the key went past every listener of the page, on the window too.
+    setTimeout(function () { if (!event.defaultPrevented) host.postMessage({ type: ${type("escape")} }, site); }, 0);
+  }
+  function listen() {
+    window.addEventListener("message", onPing);
+    window.addEventListener("message", onRenew);
+    window.addEventListener("keydown", onKey);
+  }
   function write(html) {
     document.open();
     // document.open() drops every listener on the window, so these are added after it, and before any script of the page runs.
-    window.addEventListener("message", onPing);
-    window.addEventListener("message", onRenew);
+    listen();
     document.write(html);
     document.close();
     host.postMessage({ type: ${type("shown")} }, site);
@@ -125,8 +145,7 @@ export function frameScript(siteOrigin: string): string {
     write(data.html);
   }
   // Answers from the start, so the site can tell this document from another origin's before the page is written.
-  window.addEventListener("message", onPing);
-  window.addEventListener("message", onRenew);
+  listen();
   if (page !== null) {
     host.postMessage({ type: ${type("opened")} }, site);
     return;

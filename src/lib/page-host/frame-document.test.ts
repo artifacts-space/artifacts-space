@@ -22,24 +22,47 @@ interface Message {
   data: unknown;
 }
 
+/** A key pressed in the frame, as its listeners see it: a listener of the page may stop it. */
+interface Key {
+  key: string;
+  repeat: boolean;
+  defaultPrevented: boolean;
+}
+
 /** A frame document loaded at `pathname`, framed by `host`. */
 function loadFrame(pathname: string) {
   const listeners = new Set<(event: Message) => void>();
+  const keyListeners = new Set<(event: Key) => void>();
   const posted: { message: { type?: string; id?: string }; target: string }[] = [];
   const moves: string[] = [];
   const written: string[] = [];
+  const later: (() => void)[] = [];
+  // What the page has open: a modal dialog or a popover. "unsupported" is a browser that knows neither selector.
+  const open = { now: "nothing" as "nothing" | "dialog" | "unsupported" };
   const host = { postMessage: (message: { type?: string }, target: string) => { posted.push({ message, target }); } };
   const location = { pathname, search: "", hash: "" };
   const frame = {
     parent: host,
-    addEventListener: (_type: string, listener: (event: Message) => void) => { listeners.add(listener); },
-    removeEventListener: (_type: string, listener: (event: Message) => void) => { listeners.delete(listener); },
+    // The script hands a key listener only keys, and a message listener only messages.
+    addEventListener: (type: string, listener: (event: Message | Key) => void) => {
+      if (type === "keydown") keyListeners.add(listener);
+      else listeners.add(listener);
+    },
+    removeEventListener: (type: string, listener: (event: Message | Key) => void) => {
+      if (type === "keydown") keyListeners.delete(listener);
+      else listeners.delete(listener);
+    },
   };
   const document = {
     // As in a browser: document.open() drops every listener on the window.
-    open: () => { listeners.clear(); },
+    open: () => { listeners.clear(); keyListeners.clear(); },
     write: (html: string) => { written.push(html); },
     close: () => undefined,
+    querySelector: (selector: string) => {
+      if (selector !== ":modal, :popover-open") throw new Error(`unexpected selector ${selector}`);
+      if (open.now === "unsupported") throw new SyntaxError("not a valid selector");
+      return open.now === "dialog" ? {} : null;
+    },
   };
   const history = {
     state: null,
@@ -48,9 +71,18 @@ function loadFrame(pathname: string) {
       location.pathname = path;
     },
   };
-  runInNewContext(frameScript(site), { window: frame, document, history, location, RegExp, JSON });
+  const setTimeout = (callback: () => void) => { later.push(callback); };
+  runInNewContext(frameScript(site), { window: frame, document, history, location, RegExp, JSON, setTimeout });
   const deliver = (message: Message) => { for (const listener of [...listeners]) listener(message); };
-  return { frame, host, posted, moves, written, location, deliver, fromSite: (data: unknown) => { deliver({ origin: site, source: host, data }); } };
+  /** Presses a key in the page; `pageStops` is a listener of the page that runs after the frame document's and stops it. */
+  const press = (key: string, options: { repeat?: boolean; pageStops?: boolean } = {}) => {
+    const event: Key = { key, repeat: options.repeat ?? false, defaultPrevented: false };
+    for (const listener of [...keyListeners]) listener(event);
+    if (options.pageStops === true) event.defaultPrevented = true;
+    // The key went past every listener: what the frame document put off runs now.
+    for (const callback of later.splice(0)) callback();
+  };
+  return { frame, host, posted, moves, written, location, open, deliver, press, fromSite: (data: unknown) => { deliver({ origin: site, source: host, data }); } };
 }
 
 describe("the frame document's renewal", () => {
@@ -126,6 +158,55 @@ describe("the frame document's renewal", () => {
     });
     expect(listeners.length).toBeGreaterThan(0);
     expect(() => { for (const listener of listeners) listener({ origin: site, source: host, data: { type: pageMessages.renew, path: framePath("B") } }); }).not.toThrow();
+  });
+});
+
+describe("an Escape pressed in the page", () => {
+  const escapes = (loaded: ReturnType<typeof loadFrame>) => loaded.posted.filter((sent) => sent.message.type === pageMessages.escape);
+  const shownPage = () => {
+    const loaded = loadFrame(framePath("A"));
+    loaded.fromSite({ type: pageMessages.render, html: "<!doctype html><p>Page</p>" });
+    return loaded;
+  };
+
+  it("should tell the site, at its origin only, when the page did not use it", () => {
+    const loaded = shownPage();
+    loaded.press("Escape");
+    expect(escapes(loaded)).toEqual([{ message: { type: pageMessages.escape }, target: site }]);
+  });
+
+  it("should tell the site before the page was written too, and only once per press", () => {
+    const loaded = loadFrame(framePath("A"));
+    loaded.press("Escape");
+    expect(escapes(loaded)).toHaveLength(1);
+  });
+
+  it("should leave it to the page when a listener of the page stopped it", () => {
+    const loaded = shownPage();
+    loaded.press("Escape", { pageStops: true });
+    expect(escapes(loaded)).toEqual([]);
+  });
+
+  it("should leave it to the page when a dialog or popover of the page's is open", () => {
+    const loaded = shownPage();
+    loaded.open.now = "dialog";
+    loaded.press("Escape");
+    expect(escapes(loaded)).toEqual([]);
+  });
+
+  it("should still tell the site in a browser that knows neither selector", () => {
+    const loaded = shownPage();
+    loaded.open.now = "unsupported";
+    loaded.press("Escape");
+    expect(escapes(loaded)).toHaveLength(1);
+  });
+
+  it("should tell the site nothing for another key, or for an Escape held down", () => {
+    const loaded = shownPage();
+    loaded.press("Enter");
+    loaded.press("Esc");
+    loaded.press("Escape", { repeat: true });
+    expect(escapes(loaded)).toEqual([]);
   });
 });
 

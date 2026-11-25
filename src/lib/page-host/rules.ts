@@ -338,6 +338,14 @@ export const pageMessages = {
    * address.
    */
   renew: "artifact-page:renew",
+  /**
+   * Frame document to site: Escape was pressed in the page, and the page
+   * did not use it (no dialog or popover of its own was open, and no
+   * listener stopped it). Keys pressed in the page never reach the site, so
+   * this is how Escape leaves full screen. It carries nothing else, and the
+   * page itself can send it too: all it can do is leave full screen.
+   */
+  escape: "artifact-page:escape",
 } as const;
 
 /**

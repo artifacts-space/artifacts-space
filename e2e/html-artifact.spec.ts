@@ -100,6 +100,28 @@ test("should leave full screen with Escape, and keep the focus in the page's box
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).not.toBe("hidden");
 });
 
+test("should leave full screen with Escape pressed inside the running page, and keep what the reader did", async ({ page }) => {
+  await openPage(page);
+  const shown = await runningPage(page);
+  await page.getByRole("button", { name: "Full screen", exact: true }).click();
+  await expect(page.locator("[data-slot=html-page]")).toHaveAttribute("data-full-screen", "");
+  // Focus goes into the page, on another origin: the site never sees the keys pressed there.
+  await shown.getByRole("button", { name: "Add one" }).click();
+  await expect(shown.locator("#count")).toHaveText("1");
+  await expect(shown.getByRole("button", { name: "Add one" })).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-slot=html-page]")).not.toHaveAttribute("data-full-screen", "");
+  await expect(page.getByRole("button", { name: "Full screen", exact: true })).toBeFocused();
+  // The same page, still running.
+  await expect(shown.locator("#count")).toHaveText("1");
+  // Out of full screen, an Escape in the page changes nothing.
+  await shown.getByRole("button", { name: "Add one" }).click();
+  await page.keyboard.press("Escape");
+  await expect(shown.locator("#count")).toHaveText("2");
+  await expect(page.getByRole("button", { name: "Full screen", exact: true })).toBeVisible();
+});
+
 test("should show the HTML with Edit source, and the changed page with Hide source", async ({ page }) => {
   await openPage(page);
   await runningPage(page);

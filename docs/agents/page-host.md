@@ -110,8 +110,14 @@ on a second domain (`src/lib/page-host/rules.ts`).
   body is a size container, which holds a fixed box inside it. The bar
   stays in full screen with the artifact's title, so a page anyone wrote
   never has the whole window to itself, and the frame gets no
-  `allowfullscreen`. Escape reaches the site only while focus is in the
-  bar, so the bar's button is always there.
+  `allowfullscreen`. Escape leaves full screen from the bar and from inside
+  the page: keys pressed in the page stay in its frame, so the frame
+  document tells the site (`pageMessages.escape`) about an Escape the page
+  did not use. One that closes a dialog or popover of the page's
+  (`:modal`, `:popover-open`), or that a listener of the page stopped
+  (`preventDefault`), stays the page's. The page can send that message
+  itself; all it does is leave full screen. The bar's button is always
+  there, for a page that keeps Escape.
 - `PAGE_HOST` unset (and not `next dev`): no page runs, and `PageFrame`
   draws nothing (`usePagesCanRun`). Tests: `rules.test.ts`,
   `frame-document.test.ts`, `frame-document-pages.test.ts`,
