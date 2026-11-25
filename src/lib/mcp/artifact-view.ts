@@ -239,8 +239,14 @@ export function toMcpArtifact(dto: ArtifactDto, context: McpViewContext, reader:
 }
 
 /** Why a save can store text other than what an agent sent (`contentForSave`). */
-export const CONTENT_ADJUSTED_NOTE =
-  "The saved content differs from what you sent: Markdown keeps links to this site's files in their relative form, and ui and canvas JSON that spelled a file id with escapes is saved re-serialized (parsed and written again, so its spacing can change too). Read it with artifacts_get before you edit the text.";
+const CONTENT_ADJUSTED_WHY =
+  "The saved content differs from what you sent: Markdown keeps links to this site's files in their relative form, and ui and canvas JSON that spelled a file id with escapes is saved re-serialized (parsed and written again, so its spacing can change too).";
+
+/** The note in a result without the content: read the saved text before editing it. */
+export const CONTENT_ADJUSTED_NOTE = `${CONTENT_ADJUSTED_WHY} Read it with artifacts_get before you edit the text.`;
+
+/** The note in a result with the content (`returnContent`): the text it carries is the saved one, so no second read is needed. */
+export const CONTENT_ADJUSTED_RETURNED_NOTE = `${CONTENT_ADJUSTED_WHY} The \`content\` here is the saved text: edit from it.`;
 
 /**
  * Maps a write's saved DTO to the agent-facing shape. The content is left
@@ -252,8 +258,11 @@ export const CONTENT_ADJUSTED_NOTE =
  */
 export function toMcpWrittenArtifact(dto: ArtifactDto, context: McpViewContext, options: { sent: string | undefined; returnContent: boolean }): McpArtifact {
   const { content, ...rest } = toMcpArtifact(dto, context, { canEdit: true });
-  const adjusted = options.sent !== undefined && content !== options.sent ? { contentAdjusted: CONTENT_ADJUSTED_NOTE } : {};
-  return options.returnContent && content !== undefined ? { ...rest, content, ...adjusted } : { ...rest, ...adjusted };
+  const adjusted = options.sent !== undefined && content !== options.sent;
+  if (!options.returnContent) return adjusted ? { ...rest, contentAdjusted: CONTENT_ADJUSTED_NOTE } : rest;
+  // An editor always gets `content` (mayExportCsv lets every editor have it); the field is optional only in the type.
+  const shown = { ...rest, content: content ?? "" };
+  return adjusted ? { ...shown, contentAdjusted: CONTENT_ADJUSTED_RETURNED_NOTE } : shown;
 }
 
 /** Maps a list item to the compact agent-facing shape: a preview, never the content, and each file without its dates. */

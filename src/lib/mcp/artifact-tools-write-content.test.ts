@@ -97,7 +97,8 @@ describe("artifacts_create result", () => {
     data.createArtifact.mockResolvedValue(dto("[spec](/api/files/abc)"));
     const artifact = await artifactFrom("artifacts_create", { title: "Launch", content: "[spec](https://artifacts.space/api/files/abc)", returnContent: true });
     expect(artifact.content).toBe("[spec](/api/files/abc)");
-    expect(String(artifact.contentAdjusted)).toContain("artifacts_get");
+    expect(String(artifact.contentAdjusted)).toContain("is the saved text");
+    expect(String(artifact.contentAdjusted)).not.toContain("artifacts_get");
   });
 });
 
