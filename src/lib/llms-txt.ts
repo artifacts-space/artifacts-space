@@ -47,7 +47,7 @@ export function llmsTxtFor(origin: string): string {
     "",
     `Agents connect over MCP at ${mcpEndpoint(origin)}. Most clients need only that URL and a browser sign-in. There is no SDK to install.`,
     "",
-    "Every artifact has one format, its `kind`. Use `markdown` for prose. Use `html` for anything visual or interactive: a mockup, a prototype, a dashboard, a report with charts.",
+    "Every artifact has one format, its `kind`. Use `markdown` for prose. Use `html` for anything visual or interactive: a mockup, a prototype, a dashboard, a report with charts. After saving a page, `artifacts_page_image` shows it running, as a picture, so you can check it and fix it.",
     "",
     ...currentFormatKinds.map((kind) => `- \`${kind}\`: ${formatInfo[kind].helper}`),
     "",

@@ -39,7 +39,8 @@ const firstCall = JSON.stringify(
 const pagePrompt = `Call artifacts_formats_guide with kind "html", then build an html
 artifact that shows this week's deploy stats: three metrics,
 a line chart of deploys per day, and a table of failed deploys.
-Put the data in the page.`;
+Put the data in the page. Then look at it with artifacts_page_image,
+on a desktop and a phone, and fix anything that looks wrong.`;
 
 /** Quickstart: connect a client, then save a first artifact. */
 export default function QuickstartPage() {
@@ -89,7 +90,7 @@ export default function QuickstartPage() {
       <CodeSnippet title="tools/call" language="json" code={firstCall} className="mt-4" />
       <Prose>
         <p>
-          The result holds the artifact&apos;s id and <code>url</code>. Open the URL to read and edit it, or share it from the page. The artifact is private until you share it. Later sessions find it with <code>artifacts_list</code> (search by text or project) and read it with <code>artifacts_get</code>.
+          The result holds the artifact&apos;s id, its <code>url</code>, and the <code>baseVersion</code> for the next save, but not the content: the agent just sent it, so it is not sent back (<code>returnContent: true</code> asks for it). Open the URL to read and edit it, or share it from the page. The artifact is private until you share it. Later sessions find it with <code>artifacts_list</code> (search by text or project) and read it with <code>artifacts_get</code>.
         </p>
         <p>
           To give it its own look, ask for a theme, such as &quot;use the paper theme&quot;. The agent sends <code>theme: &quot;paper&quot;</code>. You can also select a theme on the artifact page. See <Link href={docsHref("themes")}>Themes</Link>.
@@ -102,6 +103,9 @@ export default function QuickstartPage() {
       <Prose>
         <p>
           The page runs in a sandbox on the artifact&apos;s page, apart from your account, and Full screen gives it the whole window. It cannot call your API or any other site, so the agent puts the data in the page. See <Link href={docsHref("formats", "html")}>Formats</Link> for what a page may load.
+        </p>
+        <p>
+          The agent can see what it made. <code>artifacts_page_image</code> returns a picture of the page running, scripts and all, as a reader sees it, at the window size it asks for (1280 by 800, or 390 by 844 for a phone). So it can check the layout and that the page starts at all, fix what is wrong, and look again. Only people and agents who can edit the page get a picture.
         </p>
         <p>
           A larger page can be a small site: the agent keeps its stylesheets, scripts, images, and data in <Link href={docsHref("formats", "page-files")}>page files</Link> that the page loads by relative path, and uploads them all in two calls.
