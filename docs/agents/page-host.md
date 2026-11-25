@@ -118,3 +118,57 @@ on a second domain (`src/lib/page-host/rules.ts`).
   `proxy.test.ts`, `e2e/page-frame.spec.ts` on `/dev/page-frame`,
   `e2e/page-files-sites.spec.ts`, and `e2e/security-headers.prod.spec.ts`
   for the production build.
+
+## Pictures of pages
+
+`artifacts_page_image` lets an agent see the page it saved: a hosted
+browser (Cloudflare Browser Run's screenshot endpoint) draws it on request
+(`src/lib/page-render`). The page runs exactly as readers see it, never
+any other way:
+
+- The browser opens the site's render page,
+  `/render/page/<render token>` (`src/app/render/page/[token]/page.tsx`):
+  one `PageFrame` that fills the window, with nothing of the site around
+  it. So the page runs on its page host, in the same sandbox, under the
+  same policy, with its page files. Never send the browser the HTML
+  itself (its `html` field): the page would run with no sandbox and no
+  policy, on an origin with nothing to keep it in.
+- The render token (`token.ts`) is sealed with a key of its own derived
+  from the server secret. It holds who asked, the artifact's internal id,
+  and the save it is for (`updatedAt`), works for two minutes, and shows
+  none of them. It grants nothing alone: the render page runs the edit
+  check again as that person (`loadRenderPage`), a later save makes it
+  open nothing, and the frame's files address comes from
+  `pageAddressFor` as that person, for that artifact only
+  (`renderPageAddress`). The page never sees the token: it runs on its
+  page host with its own page files token. Never log a render token or the
+  render page's address.
+- Editors only, as for frame captures (see `canvas.md`): an edit to a link
+  or public page can wait for approval, so a picture of the latest save
+  must never reach a reader of the approved version. The tool is a read
+  tool; what it returns follows the person.
+- Where `CLOUDFLARE_BROWSER_RUN_TOKEN` is unset the tool says pictures are
+  off (`page_images_off`) before it counts or reads anything. Draws are
+  limited per person (`pageImageRead`), counted before the edit check,
+  since each one runs a browser the site pays for.
+- The draw fits inside the MCP route's `maxDuration` (30 seconds): the
+  browser's waits (`pageImageLimits`) fit in the request's own limit, which
+  leaves the route time for the edit check and the answer, so a slow page
+  comes back as `page_not_drawn` and not as a call the platform cut off.
+  `rules.test.ts` reads the route's number; change both together.
+- What comes back is checked before it reaches a model (`checkedPicture`):
+  a WebP of the window's exact size, within `pageImageLimits.maxBytes`. The
+  window holds at most 1,568 patches of 28 pixels, as a frame capture's
+  part does. The text beside the picture says it is data.
+- A refused render (a token that does not open, a person who lost edit
+  access, a later save) draws one note and no frame, the same for every
+  reason, so the browser never finds the frame it waits for
+  (`pageShownSelector`) and the tool answers `page_not_drawn` or
+  `page_changed`. It is not a `notFound()`: with Cache Components the
+  shell has streamed by then, so it could not send a 404 anyway.
+- The render page is noindex, sends no referrer, and is disallowed in
+  robots.txt. The browser reaches it from the internet, so it cannot draw
+  a page on a local `pnpm dev`, nor on a preview behind Vercel's
+  deployment protection; unit tests replace the browser at `drawPage`, and
+  `e2e/page-render-db.spec.ts` opens the render page as the browser would.
+

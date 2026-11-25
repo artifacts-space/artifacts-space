@@ -35,6 +35,7 @@ const artifactInputs: Record<string, "id" | "artifact"> = {
   canvas_frames_list: "id",
   canvas_frame_get: "id",
   canvas_frame_image: "id",
+  artifacts_page_image: "id",
   canvas_frame_save: "id",
   canvas_frame_update: "id",
   canvas_frame_delete: "id",

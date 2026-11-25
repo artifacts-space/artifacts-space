@@ -56,6 +56,14 @@ export async function createTestArtifact(input: { userId: string; title: string;
   return publicId;
 }
 
+/** A seeded artifact's internal id and last save, for checks that need what the server keeps. */
+export async function artifactRowOf(publicId: string): Promise<{ id: string; updatedAt: Date }> {
+  const result = await db().query<{ id: string; updated_at: Date }>("select id, updated_at from artifact where public_id = $1", [publicId]);
+  const row = result.rows[0];
+  if (!row) throw new Error("The test artifact is missing.");
+  return { id: row.id, updatedAt: row.updated_at };
+}
+
 /** Files an approved version with this cover (the one readers outside the team see), while the artifact row keeps its own. */
 export async function approveVersionWithCover(publicId: string, cover: string | null): Promise<void> {
   const versionId = randomUUID();

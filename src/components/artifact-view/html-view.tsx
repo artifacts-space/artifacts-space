@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { CodeBlock } from "@/components/code/code-block";
 import { IconButton } from "@/components/icon-button";
 import { Button } from "@/components/ui/button";
+import { pageFilesKeyOf } from "@/lib/page-files/files-key";
 import { cn } from "@/lib/utils";
 
 import { useArtifactFiles } from "./files-context";
@@ -83,11 +84,7 @@ function useWholeWindow(on: boolean, box: RefObject<HTMLElement | null>, bar: Re
  */
 function usePageFilesKey(): string | undefined {
   const files = useArtifactFiles();
-  return useMemo(() => {
-    const pageFiles = (files ?? []).filter((file) => file.pagePath !== undefined);
-    if (pageFiles.length === 0) return undefined;
-    return pageFiles.map((file) => `${file.id}:${file.pagePath ?? ""}:${file.replacedAt ?? ""}`).join("|");
-  }, [files]);
+  return useMemo(() => pageFilesKeyOf(files ?? []), [files]);
 }
 
 /**

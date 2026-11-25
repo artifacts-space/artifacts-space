@@ -9,6 +9,7 @@ import { registerCanvasTools } from "./canvas-tools";
 import { registerFileTools } from "./file-tools";
 import { registerFormatTools } from "./format-tools";
 import { registerPageFileTools } from "./page-file-tools";
+import { registerPageImageTool } from "./page-image-tool";
 import { registerProjectTools } from "./project-tools";
 import { registerTagTools } from "./tag-tools";
 import { registerTeamTools } from "./team-tools";
@@ -35,6 +36,7 @@ export function registerAllTools(server: McpServer, userId: string, access: McpA
   registerThemeTools(server, userId, access);
   registerFileTools(server, userId, access, harness);
   registerPageFileTools(server, userId, access, harness);
+  registerPageImageTool(server, userId, access);
   registerTeamTools(server, userId, access);
   registerVersionTools(server, userId, access, harness);
   registerViewTools(server, userId, access);
