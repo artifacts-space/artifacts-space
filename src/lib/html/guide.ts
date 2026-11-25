@@ -81,7 +81,7 @@ export function buildHtmlGuide(): string {
     "- People see the running page in a frame on the artifact page: as wide as the page, about 80% of the window's height. The page scrolls inside the frame.",
     "- Make the layout work from 360 px wide to a desktop window.",
     "- The page sets its own colors. Without them it is black text on white. Check that text passes WCAG AA contrast.",
-    "- Escape leaves full screen. A page that uses Escape itself (to close its own menu, or clear a search) calls event.preventDefault() in its keydown listener, so the key stays with it. An open <dialog> or popover keeps its Escape without that.",
+    "- Escape leaves full screen. A page that uses Escape itself does the work in its own keydown listener (closes its menu, clears its search field) and calls event.preventDefault() there, so the key stays with it. preventDefault() also stops what the browser would have done, such as a search field clearing itself, so the listener does that work. An open <dialog> or popover keeps its Escape without any of this.",
     "- Editors change the page through View source, or through you.",
     "",
     "Saving",
