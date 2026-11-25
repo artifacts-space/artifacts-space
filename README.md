@@ -142,7 +142,7 @@ version and title in step with the server.
 
 | Area | Tools |
 | --- | --- |
-| Artifacts | `artifacts_list`, `artifacts_get`, `artifacts_create`, `artifacts_update`, `artifacts_delete`, `teams_list` |
+| Artifacts | `artifacts_list`, `artifacts_get`, `artifacts_create`, `artifacts_update`, `artifacts_delete`, `artifacts_page_image`, `teams_list` |
 | Themes and cover gradients | `themes_list` |
 | Versions | `artifacts_versions`, `artifacts_restore_version` |
 | Views of public artifacts | `artifacts_views` |
@@ -201,9 +201,9 @@ file. Three are needed to start:
 | `BETTER_AUTH_URL` | This site's origin, such as `http://localhost:3000` or `https://your-domain`. |
 
 Most of the others turn one thing on, such as GitHub and Google sign-in,
-email, file uploads, browser notifications, pages that run scripts, and the
-scheduled cleanup jobs. The full list, with what each one does and what
-happens without it, is in the docs:
+email, file uploads, browser notifications, pages that run scripts, pictures
+of those pages for agents, and the scheduled cleanup jobs. The full list, with
+what each one does and what happens without it, is in the docs:
 https://artifacts.space/docs/self-hosting#env
 
 Local `localhost` and `127.0.0.1` database URLs use the PostgreSQL TCP driver.
